@@ -228,3 +228,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Demo/example output — generated wiki captures and test suites, not core code
+demo/
+
+# One-off local scratch script
+_roadmap_issues.py
