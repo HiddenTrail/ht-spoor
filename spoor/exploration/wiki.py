@@ -75,6 +75,17 @@ and image `src` is written through, so a nav link, a cross-page link, and a scre
 reference all resolve from wherever the page sits. Purely a layout change; page content
 and redaction are untouched and it stays generic across every target (§0).
 
+Slice 6h restyles the wiki's shared `<style>` block: a dark, token-driven theme (CSS
+custom properties for background/surface/border/text/accent colours) in place of the
+original bare sans-serif-on-white rules, so the generated pages read as one considered
+surface instead of a default-browser-styles page. The tokens and layout language are
+generic to Spoor's own output, not any scraped target (§0) — no target branding, no
+non-system font that would fail to load for a reader without it installed. Mermaid is
+told to render in its own dark theme (`mermaid.initialize({..., theme: "dark"})`) so the
+overview diagram matches the page around it. Purely presentational: the class names
+(`.count`, `.screenshot`, `.screenshot-crop`) and every non-style attribute are
+unchanged, so existing content, links, and redaction behaviour are untouched.
+
 (The console/network buffers are also now *scoped per visit*: the driver clears them on
 each reset, so a state reached late in the run reflects only the walk that reached it,
 not the whole session's cumulative output — see `driver.reset`. That is a capture-layer
@@ -611,13 +622,84 @@ _LAYOUT = """<!DOCTYPE html>
     <meta charset="utf-8" />
     <title>{% block title %}Spoor exploration wiki{% endblock %}</title>
     <style>
-      body { font-family: sans-serif; margin: 2rem auto; max-width: 60rem; }
-      table { border-collapse: collapse; }
-      th, td { border: 1px solid #ccc; padding: 0.3rem 0.6rem; text-align: left; }
-      code { background: #f4f4f4; padding: 0 0.2rem; }
-      nav { margin-bottom: 1rem; }
-      .count { color: #888; font-size: 0.85em; }
-      .screenshot { max-width: 100%; height: auto; border: 1px solid #ccc; }
+      :root {
+        --bg: #1f1c1b;
+        --surface: #2a2724;
+        --surface-2: #322e2b;
+        --border: #3d3835;
+        --border-hover: #5a5550;
+        --text: #f0ece8;
+        --text-muted: #aaa39d;
+        --accent: #f85840;
+        --teal: #208e98;
+        --yellow: #d8fd1b;
+        --radius: 8px;
+      }
+      * { box-sizing: border-box; }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+        line-height: 1.55;
+        margin: 2rem auto;
+        max-width: 60rem;
+        padding: 0 1.5rem 3rem;
+      }
+      h1, h2 { font-weight: 700; letter-spacing: 0; line-height: 1.2; }
+      h1 { color: var(--accent); font-size: 1.9rem; margin-bottom: 0.75rem; }
+      h2 { color: var(--teal); font-size: 1.3rem; margin: 2rem 0 0.75rem; }
+      a { color: var(--accent); }
+      a:hover { text-decoration: underline; }
+      nav {
+        align-items: center;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+      }
+      nav a { color: var(--text-muted); }
+      nav a:hover { color: var(--text); }
+      table {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-collapse: collapse;
+        border-radius: var(--radius);
+        overflow: hidden;
+        width: 100%;
+      }
+      th, td {
+        border: 1px solid var(--border);
+        padding: 0.5rem 0.75rem;
+        text-align: left;
+      }
+      th {
+        background: var(--surface-2);
+        color: var(--text-muted);
+        font-size: 0.78em;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+      }
+      code {
+        background: var(--surface-2);
+        border-radius: 4px;
+        color: var(--yellow);
+        padding: 0.1rem 0.35rem;
+      }
+      pre.mermaid {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        padding: 1rem;
+      }
+      .count { color: var(--text-muted); font-size: 0.85em; }
+      .screenshot {
+        max-width: 100%;
+        height: auto;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+      }
       .screenshot-crop { max-width: none; }
     </style>
   </head>
@@ -647,7 +729,7 @@ _INDEX = """{% extends "layout.html" %}
 </pre>
 <script type="module">
   import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-  mermaid.initialize({ startOnLoad: true });
+  mermaid.initialize({ startOnLoad: true, theme: "dark" });
 </script>
 
 <h2>States</h2>
