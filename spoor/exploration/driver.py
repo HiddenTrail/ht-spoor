@@ -308,6 +308,76 @@ def _with_destination(
     return {**node, "destination": destination}
 
 
+def _input_type_of(node: Mapping[str, object]) -> str | None:
+    """The DOM `type` of a DOM node if it's an `<input>`, defaulting to `"text"`.
+
+    Mirrors HTML's own default: an `<input>` with no `type=` attribute behaves as
+    `type="text"`, so reporting that explicitly (rather than None) gives a scaffold
+    generator a real signal for the common, attribute-less case — a plain login-style
+    text field is often written with no `type=` at all. Every non-`<input>` element
+    (a `<select>`, a `<button type="submit">`, an `<ol type="1">`, …) yields None: the
+    scaffold's interest is specifically what an `<input>` wants typed into it, not any
+    element that happens to carry a `type` attribute for an unrelated reason.
+    """
+    if node.get("nodeName") != "INPUT":
+        return None
+    attributes = node.get("attributes")
+    if isinstance(attributes, list):
+        for i in range(0, len(attributes) - 1, 2):
+            if attributes[i] == "type":
+                value = attributes[i + 1]
+                if isinstance(value, str) and value:
+                    return value.lower()
+    return "text"
+
+
+def _input_types_by_backend_id(root: object) -> dict[int, str]:
+    """Map each `<input>` element's backend node id to its DOM `type`.
+
+    Walks the pierced DOM once (the same tree `_href_by_backend_id` walks, and can
+    share a single `DOM.getDocument` call with it), so a text-box accessibility node
+    can be enriched with the one signal that tells a password field apart from any
+    other — the accessibility tree alone reports both as `role="textbox"`. Non-`<input>`
+    elements contribute nothing, so buttons, links, and selects stay absent.
+    """
+    input_types: dict[int, str] = {}
+    if not isinstance(root, Mapping):
+        return input_types
+    stack: list[Mapping[str, object]] = [root]
+    while stack:
+        node = stack.pop()
+        backend = node.get("backendNodeId")
+        input_type = _input_type_of(node)
+        if isinstance(backend, int) and input_type is not None:
+            input_types[backend] = input_type
+        for key in ("children", "shadowRoots", "pseudoElements"):
+            children = node.get(key)
+            if isinstance(children, list):
+                stack.extend(c for c in children if isinstance(c, Mapping))
+        content = node.get("contentDocument")
+        if isinstance(content, Mapping):
+            stack.append(content)
+    return input_types
+
+
+def _with_input_type(
+    node: Mapping[str, object], input_types: Mapping[int, str]
+) -> Mapping[str, object]:
+    """A copy of `node` carrying its `<input>` DOM type, if it has one.
+
+    Looks the node's backend id up in the input-type map; a node with no match (not
+    an `<input>`) is returned unchanged, so discovery reads no `input_type` for it.
+    The original node is never mutated.
+    """
+    backend = node.get("backendDOMNodeId")
+    if not isinstance(backend, int):
+        return node
+    input_type = input_types.get(backend)
+    if input_type is None:
+        return node
+    return {**node, "input_type": input_type}
+
+
 class PlaywrightDriver:
     """Drives a headless Chromium page for the explorer (§2e, sub-slice 5b).
 
@@ -478,9 +548,11 @@ class PlaywrightDriver:
         Each node is enriched with a `destination` hint (§2e slice 9b) when its backing
         DOM element is a link with a navigable href: the href resolved against the live
         page URL and reduced to its path — the same shape the explorer orders the walk
-        by, so shallow, structural links are tried before deep ones. The href map is
-        built from one extra `DOM.getDocument` on the same CDP session; a node with no
-        such href is returned as read, so buttons and JS controls carry no destination.
+        by, so shallow, structural links are tried before deep ones. Each node is also
+        enriched with an `input_type` when its backing element is an `<input>` — the
+        signal a scaffold generator needs to tell a login field apart from any other
+        text box. Both maps are built from the same extra `DOM.getDocument` call on
+        this CDP session; a node matching neither is returned as read.
         """
         page = self._live_page
         session = page.context.new_cdp_session(page)
@@ -494,8 +566,13 @@ class PlaywrightDriver:
         nodes = result.get("nodes", [])
         if not isinstance(nodes, list):
             return []
-        hrefs = _href_by_backend_id(document.get("root"))
-        return [_with_destination(node, hrefs, page.url) for node in nodes]
+        root = document.get("root")
+        hrefs = _href_by_backend_id(root)
+        input_types = _input_types_by_backend_id(root)
+        return [
+            _with_input_type(_with_destination(node, hrefs, page.url), input_types)
+            for node in nodes
+        ]
 
     def capture_signals(self) -> StateSignals:
         """The free-signal bundle for the current page (§2e sub-slice 5c).
