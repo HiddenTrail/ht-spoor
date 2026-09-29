@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790690770371,
+  "lastUpdate": 1790707933168,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -3152,6 +3152,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5316.3,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ba4f8a3fdfedf2f315af6de8c91b4a8a5542de0e",
+          "message": "CLI: add an interactive wizard for building commands (#141)\n\nReplaces the earlier --dry-run + shell-completion approach (PR #140, closed\nunmerged per maintainer decision) with what was actually wanted: `spoor wizard`\nwalks through picking a command (explore/apply-scaffold/run/serve/serve-mcp)\nand answering one prompt per flag -- optional ones skip on a blank answer, a\nbad number just re-asks instead of crashing -- then prints the exact resolved\ncommand line before anything runs. Confirming runs that exact line as a\nsubprocess; declining just leaves it to copy. The wizard never reimplements a\ncommand's logic: it only assembles the same argv --help documents, so it can\nnever drift from what the real command actually does.\n\nCovers the \"mixing up commands and flags\" problem the --dry-run approach was\nalso aimed at, but front-loads the guidance (a prompt per flag, in order)\ninstead of only catching a mistake after it's already been typed.\n\nVerified manually (all five command types, the numeric-retry path, and the\n\"run it now\" path actually invoking python -m spoor.cli as a subprocess) and\nwith 4 new tests following the existing test_cli.py pattern -- CliRunner's\ninput= drives the prompts, subprocess.run is monkeypatched to assert it's\ncalled with the exact resolved argv (or not called at all when declined).\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-29T21:47:21+03:00",
+          "tree_id": "0c9f58f12676b9f79499717bd429f2fcae104150",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/ba4f8a3fdfedf2f315af6de8c91b4a8a5542de0e"
+        },
+        "date": 1790707931543,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 223.577,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04332,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.0604,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12374,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.9437,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06658,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 11.2982,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11416,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 18.6041,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04597,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2677,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.57945,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.2688,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05439,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.2303,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.99515,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.6275,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09408,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5755,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01051,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4713,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5306,
             "unit": "MB"
           }
         ]
