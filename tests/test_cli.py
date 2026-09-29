@@ -220,72 +220,56 @@ def test_wizard_apply_scaffold_builds_the_right_command(
     )
 
 
-# --- output-path collisions (a real incident: --wiki and --scaffold given the ---
-# --- same path, which crashed mid-crawl trying to open a directory as a file) ---
+# --- output-path validation ------------------------------------------------
+#
+# --scaffold now writes into a directory (interactive.yaml inside it), the same
+# as --wiki/--gen-tests, rather than taking a file path directly -- closing the
+# gap that let a real incident happen: --wiki and --scaffold given the same path
+# used to crash mid-crawl, because --scaffold expected a file where --wiki had
+# already created a directory. Now all three write non-colliding filenames into
+# whatever directory they're given, so sharing one is fine and no longer flagged;
+# what's still wrong is any of them pointing at a path that already exists as
+# something other than a directory.
 
 
-def test_explore_rejects_wiki_and_scaffold_sharing_a_path(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from spoor.exploration import driver as driver_mod
-
-    def _boom(*_a: object, **_k: object) -> object:
-        raise AssertionError("a browser must not be launched when paths collide")
-
-    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _boom)
-    result = runner.invoke(
-        cli.app,
-        [
-            "explore",
-            "http://localhost:8000/",
-            "--wiki",
-            "demo/out",
-            "--scaffold",
-            "demo/out",
-        ],
-    )
-    assert result.exit_code != 0
-    flat = _flatten_cli_error(result.output)
-    assert "--wiki" in flat
-    assert "--scaffold" in flat
+def test_explore_allows_wiki_and_scaffold_sharing_a_directory() -> None:
+    cli._check_explore_output_paths(
+        wiki=Path("demo/out"), gen_tests=Path("demo/out"), scaffold=Path("demo/out")
+    )  # must not raise
 
 
-def test_explore_rejects_a_scaffold_path_that_is_already_a_directory(
+def test_explore_rejects_an_output_path_that_is_already_a_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from spoor.exploration import driver as driver_mod
 
     def _boom(*_a: object, **_k: object) -> object:
-        raise AssertionError("a browser must not be launched when paths collide")
+        raise AssertionError("a browser must not be launched when a path is invalid")
 
     monkeypatch.setattr(driver_mod, "PlaywrightDriver", _boom)
-    existing_dir = tmp_path / "already-a-dir"
-    existing_dir.mkdir()
+    existing_file = tmp_path / "already-a-file"
+    existing_file.write_text("not a directory", encoding="utf-8")
     result = runner.invoke(
         cli.app,
-        ["explore", "http://localhost:8000/", "--scaffold", str(existing_dir)],
+        ["explore", "http://localhost:8000/", "--scaffold", str(existing_file)],
     )
     assert result.exit_code != 0
     assert "--scaffold" in _flatten_cli_error(result.output)
 
 
-def test_wizard_reprompts_when_scaffold_path_matches_wiki(
+def test_wizard_allows_scaffold_directory_to_match_wiki(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[list[str]] = []
     monkeypatch.setattr("subprocess.run", lambda argv, **_k: calls.append(argv))
     # 1=explore, url, sandbox=n, states/requests/seconds/depth/resume blank,
-    # wiki=demo/out, screenshots=n, gen-tests blank, scaffold=demo/out (rejected,
-    # re-asked) then scaffold=demo/out.yaml, run-now=n.
-    answers = (
-        "1\nhttp://localhost:8000/\nn\n\n\n\n\n\ndemo/out\nn\n\n"
-        "demo/out\ndemo/out.yaml\nn\n"
-    )
+    # wiki=demo/out, screenshots=n, gen-tests blank, scaffold=demo/out (same
+    # directory as wiki -- fine now), run-now=n.
+    answers = "1\nhttp://localhost:8000/\nn\n\n\n\n\n\ndemo/out\nn\n\ndemo/out\nn\n"
     result = runner.invoke(cli.app, ["wizard"], input=answers)
     assert result.exit_code == 0, result.output
     assert calls == []
-    assert "already writes to" in result.output
     assert (
-        "spoor explore http://localhost:8000/ --wiki demo/out --scaffold "
-        "demo/out.yaml" in result.output
+        "spoor explore http://localhost:8000/ --wiki demo/out --scaffold demo/out"
+        in result.output
     )

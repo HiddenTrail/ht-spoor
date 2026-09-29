@@ -172,11 +172,10 @@ def live_crawl(
     assert context["graph"].states, "the live crawl mapped no states"
 
 
-@when("I write that crawl's scaffold to a file")
+@when("I write that crawl's scaffold to a directory")
 def write_live_scaffold(context: dict[str, Any], tmp_path: Path) -> None:
-    out_path = tmp_path / "scaffold.yaml"
     context["out_path"] = render_scaffold(
-        context["graph"], out_path, target=context["target"]
+        context["graph"], tmp_path, target=context["target"]
     )
 
 
