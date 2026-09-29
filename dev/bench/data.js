@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790154754510,
+  "lastUpdate": 1790670812019,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -2144,6 +2144,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5384.2,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "33dde30c67f600d6713b1f7c3eca6d0ab74e37ea",
+          "message": "Scaffold an interactive-round config from an exploration graph (#131) (#132)\n\n* Record freshness-by-re-observation design note (§2f, #107)\n\nAgreed design for detecting \"ghost calls\" on mapped transitions: a\nre-observation run replays recorded transitions (same safety gate),\nrecords per transition what changed since the saved map, and marks\nsignals volatile when two in-run replays disagree (Diffy-style, no\naccumulated history). Records the observe-vs-judge boundary so Spoor\nstays a map, not a testing tool. Cross-links the §9 freshness and\n#128 backlog items; three decisions remain open before the feature file.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Scaffold an interactive-round config from an exploration graph (issue #131)\n\nAdds spoor explore --scaffold <file>: from a completed read-only crawl, writes\na human-editable YAML file listing discovered fields (with a best-guess\ngenerator and a blank value to fill in), discovered login points, and\ndiscovered actions the safety gate skipped for being destructive. Scaffold\n*generation* only — consuming a filled-in scaffold to run an actual\ninteractive round is separate, later work.\n\n- ActionableElement gains input_type (spoor/exploration/discovery.py), read\n  by the driver the same way destination was added for links (slice 9b): one\n  batched DOM read, additive, no behavior change for existing consumers. This\n  is the only signal that tells a password field apart from any other text\n  box, since the accessibility tree alone reports both as role=\"textbox\".\n- spoor/scaffold/interactive_config.py: build_scaffold (pure) / render_scaffold\n  (thin writer), mirroring pytest_gen.py's split. A password field becomes a\n  login_points entry pointing at the existing session: mechanism, never a\n  fillable credential (§2h, bring-your-own-session). destructive_actions\n  entries are matched against the safety gate's own recorded skip reason\n  (new DESTRUCTIVE_SKIP_REASON constant in safety.py) rather than re-derived\n  from the action's label, so an action skipped for an unrelated reason (e.g.\n  an overlay) is never misreported as having been skipped for being\n  destructive.\n- spoor explore --scaffold <file> wired beside --wiki/--gen-tests.\n\nBDD-first: features/interactive_scaffold.feature (6 fast-tier scenarios + one\n@browser live scenario against a new dedicated fixture, explore_login.html,\nkept separate from the shared two-page traversal fixture so it doesn't\nperturb exploration_browser.feature's hardcoded state/transition counts).\n\nFull local gate green: ruff, mypy (155 files), pytest (714 passed / 8\n@browser scenarios), scripts/check_genericity.py.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n* Clarify re-observation baseline compatibility and sampling uncertainty\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-29T11:28:28+03:00",
+          "tree_id": "3eb34a11d9ad1a1e70d75a061f2629f6405c9a72",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/33dde30c67f600d6713b1f7c3eca6d0ab74e37ea"
+        },
+        "date": 1790670810810,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 226.661,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03949,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.0782,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12692,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.0978,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.07642,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 12.5622,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.12031,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 19.4185,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04471,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2855,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.57981,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.5578,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05492,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.4131,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.01108,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.5995,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09966,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5917,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01087,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4823,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5291.5,
             "unit": "MB"
           }
         ]
