@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790710234516,
+  "lastUpdate": 1790713675860,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -3584,6 +3584,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5342.5,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c25659d9aa121e0b29d0460f57280c3f6a511d52",
+          "message": "--scaffold now writes into a directory, like --wiki/--gen-tests (#144)\n\nFollowed up on a maintainer question after the --wiki/--scaffold collision fix\n(PR #143): why does --scaffold take a file path at all, when --wiki and\n--gen-tests both take a directory? There was no real reason -- it was designed\nto mirror `run`'s -o/--output (a single-file flag), but --wiki/--gen-tests\nmirror each other instead (both write many files into a directory), so\nspoor explore ended up with two incompatible \"give me a path\" conventions on\nthe same command. That's exactly what let --wiki and --scaffold collide on\nthe same path in the first place.\n\nrender_scaffold now takes out_dir and writes a fixed SCAFFOLD_FILENAME\n(\"interactive.yaml\") inside it, the same directory-writer shape render_wiki\nand render_suite already use. --scaffold's CLI help/docstrings updated to\nmatch, and the collision guard from #143 is simplified: since none of\n--wiki/--gen-tests/--scaffold's filenames can ever collide with each other\nnow, giving them the same directory is a legitimate, even convenient way to\nkeep one run's output together, so it's no longer rejected -- only a path\nthat already exists as something other than a directory still is. Removed\nthe now-unnecessary same-path reprompt from spoor wizard for the same reason.\n\nspoor apply-scaffold's own positional scaffold argument is unchanged: it\nstill reads a single file (interactive.yaml, now nested inside the directory\n--scaffold wrote), since that's something the user reads/hand-edits, not\nsomething Spoor's output-flag conventions apply to.\n\nVerified live against the real EcoEstate demo target: --wiki and --scaffold\npointed at the same directory now both write happily -- the exact scenario\nthat crashed before PR #143 and would have been needlessly rejected by #143's\nown collision guard.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-29T23:23:07+03:00",
+          "tree_id": "bb39f7b2c0d1c074a82d57f53cb2d76b7b8159e3",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/c25659d9aa121e0b29d0460f57280c3f6a511d52"
+        },
+        "date": 1790713673775,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 208.636,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03138,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.6333,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.10299,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.5067,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.05822,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 9.6039,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.09169,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 15.1598,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.03576,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2175,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.56501,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 31.9117,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.0435,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 10.6397,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.9578,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 125.4355,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.0753,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.4456,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.00859,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.3791,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5395.5,
             "unit": "MB"
           }
         ]
