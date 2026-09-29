@@ -1,8 +1,10 @@
-"""End-to-end CLI tests for `spoor run` output wiring (ROADMAP.md §2a, §2d).
+"""End-to-end CLI tests for `spoor run` output wiring (ROADMAP.md §2a, §2d) and
+`spoor wizard` (interactive command building).
 
 `extract.run_report` is monkeypatched to a fixed `RunResult` so the CLI surface —
 format selection, the output pipeline, and the run summary — is exercised without
-any network.
+any network. The wizard tests drive `typer.prompt`/`typer.confirm` via `CliRunner`'s
+`input=`, exactly as the prompts themselves would read from a real terminal.
 """
 
 from __future__ import annotations
@@ -43,6 +45,7 @@ def _stub_result() -> RunResult:
         tiers_attempted=[1],
     )
 
+
 _CONFIG = """
 target: http://localhost:8000/x.html
 fields:
@@ -69,9 +72,7 @@ def test_run_infers_csv_from_extension(
     assert out.read_text(encoding="utf-8").splitlines()[0] == "title,price"
 
 
-def test_run_format_override(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_run_format_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(extract, "run_report", lambda cfg: _stub_result())
     out = tmp_path / "out.dat"
     result = runner.invoke(
@@ -79,9 +80,7 @@ def test_run_format_override(
         ["run", str(_config_file(tmp_path)), "-o", str(out), "-f", "json"],
     )
     assert result.exit_code == 0, result.output
-    assert json.loads(out.read_text(encoding="utf-8")) == [
-        {"title": "A", "price": 1.0}
-    ]
+    assert json.loads(out.read_text(encoding="utf-8")) == [{"title": "A", "price": 1.0}]
 
 
 def test_bad_format_aborts_before_extraction(
@@ -144,3 +143,78 @@ def test_explore_resume_without_saved_map_aborts_before_browser(
     # The message must point the user at mapping the URL first. Assert on the flattened
     # (whitespace-stripped) message so a Rich panel line-wrap can't hide the token.
     assert "nosavedexplorationmap" in _flatten_cli_error(result.output)
+
+
+# --- wizard --------------------------------------------------------------------
+
+
+def test_wizard_declining_run_prints_command_and_does_not_execute(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr("subprocess.run", lambda argv, **_k: calls.append(argv))
+    # 1=explore, url, sandbox=n, states/requests/seconds blank, depth=2, resume
+    # blank, wiki=./wiki, screenshots=n, gen-tests/scaffold blank, run-now=n.
+    answers = "1\nhttp://localhost:8000/\nn\n\n\n\n2\n\n./wiki\nn\n\n\nn\n"
+    result = runner.invoke(cli.app, ["wizard"], input=answers)
+    assert result.exit_code == 0, result.output
+    assert calls == []
+    assert "spoor explore http://localhost:8000/ --max-depth 2 --wiki ./wiki" in (
+        result.output
+    )
+    assert "--sandbox" not in result.output.split("Resolved command:")[1]
+
+
+def test_wizard_confirming_run_invokes_the_resolved_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import sys
+
+    calls: list[list[str]] = []
+
+    def _record(argv: list[str], **_kwargs: object) -> None:
+        calls.append(argv)
+
+    monkeypatch.setattr("subprocess.run", _record)
+    answers = "1\nhttp://localhost:8000/\ny\n\n\n\n\n\n\n\n\ny\n"
+    result = runner.invoke(cli.app, ["wizard"], input=answers)
+    assert result.exit_code == 0, result.output
+    assert calls == [
+        [
+            sys.executable,
+            "-m",
+            "spoor.cli",
+            "explore",
+            "http://localhost:8000/",
+            "--sandbox",
+        ]
+    ]
+
+
+def test_wizard_reprompts_on_a_non_numeric_answer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr("subprocess.run", lambda argv, **_k: calls.append(argv))
+    # max-states gets a bad answer ("abc") once before a good one ("5").
+    answers = "1\nhttp://localhost:8000/\nn\nabc\n5\n\n\n\n\n\n\n\nn\n"
+    result = runner.invoke(cli.app, ["wizard"], input=answers)
+    assert result.exit_code == 0, result.output
+    assert "isn't a whole number" in result.output
+    assert "--max-states 5" in result.output
+
+
+def test_wizard_apply_scaffold_builds_the_right_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr("subprocess.run", lambda argv, **_k: calls.append(argv))
+    # 2=apply-scaffold, url, scaffold path, sandbox=y, wiki blank, run-now=n.
+    answers = "2\nhttp://localhost:5173\n./interactive.yaml\ny\n\nn\n"
+    result = runner.invoke(cli.app, ["wizard"], input=answers)
+    assert result.exit_code == 0, result.output
+    assert calls == []
+    assert (
+        "spoor apply-scaffold http://localhost:5173 ./interactive.yaml --sandbox"
+        in result.output
+    )

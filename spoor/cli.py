@@ -4,6 +4,12 @@ The whole product surface on top of the resolution/extraction machinery:
 `spoor run config.yaml -o output.json`. The `run` command dispatches the config
 through the resolution ladder (§2), writes the chosen output format, and prints a
 run summary (§2d observability); later phases add their own commands as they land.
+
+`spoor wizard` builds any other command's argument line interactively, one prompt
+at a time, and shows the exact resolved command before anything runs — for anyone
+who finds hand-typing a long flag combination risky to get right. It never
+duplicates a command's logic: it only assembles the argv a real invocation would
+take and, if confirmed, runs that invocation as a subprocess.
 """
 
 from __future__ import annotations
@@ -12,6 +18,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Annotated
 
+import click
 import typer
 
 from spoor.core import extract
@@ -227,8 +234,10 @@ def explore(
     from spoor.exploration.screenshot_store import ImageRef
 
     if screenshots and wiki is None:
-        raise typer.BadParameter("--screenshots needs --wiki: there is no wiki to put "
-                                 "the images in without it.")
+        raise typer.BadParameter(
+            "--screenshots needs --wiki: there is no wiki to put "
+            "the images in without it."
+        )
     # The saved map to continue, when resuming: the §2h-shareable projection an earlier
     # explore of this exact URL stored (§2f). Loaded up front so a missing map fails
     # before a browser is launched.
@@ -542,6 +551,183 @@ def apply_scaffold_cmd(
 
             render_wiki(graph, wiki, target=url)
             typer.echo(f"  wiki refreshed at: {wiki / 'index.html'}")
+
+
+def _wizard_optional_str(question: str) -> str | None:
+    """Prompt for an optional value; blank means "not given"."""
+    raw = typer.prompt(f"{question} (blank to skip)", default="", show_default=False)
+    return raw.strip() or None
+
+
+def _wizard_optional_int(question: str) -> int | None:
+    """Prompt for an optional whole number, re-asking on anything unparsable."""
+    while True:
+        raw = typer.prompt(
+            f"{question} (blank to skip)", default="", show_default=False
+        )
+        if not raw.strip():
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            typer.echo(f"  {raw!r} isn't a whole number — try again.")
+
+
+def _wizard_optional_float(question: str) -> float | None:
+    """Prompt for an optional number, re-asking on anything unparsable."""
+    while True:
+        raw = typer.prompt(
+            f"{question} (blank to skip)", default="", show_default=False
+        )
+        if not raw.strip():
+            return None
+        try:
+            return float(raw)
+        except ValueError:
+            typer.echo(f"  {raw!r} isn't a number — try again.")
+
+
+def _wizard_choose_command() -> str:
+    """Ask which command to build, by number, defaulting to the most common one."""
+    options = {
+        "1": "explore",
+        "2": "apply-scaffold",
+        "3": "run",
+        "4": "serve",
+        "5": "serve-mcp",
+    }
+    typer.echo("Which Spoor command do you want to build?")
+    for key, name in options.items():
+        typer.echo(f"  {key}) {name}")
+    choice = typer.prompt(
+        "Choice",
+        type=click.Choice(list(options)),
+        default="1",
+        show_choices=False,
+    )
+    return options[choice]
+
+
+def _wizard_explore_args() -> list[str]:
+    url = typer.prompt("URL to explore")
+    args = ["explore", url]
+    if typer.confirm(
+        "Declare this target a sandbox? (destructive actions will fire)",
+        default=False,
+    ):
+        args.append("--sandbox")
+    max_states = _wizard_optional_int("Max states")
+    if max_states is not None:
+        args += ["--max-states", str(max_states)]
+    max_requests = _wizard_optional_int("Max requests")
+    if max_requests is not None:
+        args += ["--max-requests", str(max_requests)]
+    max_seconds = _wizard_optional_float("Max seconds")
+    if max_seconds is not None:
+        args += ["--max-seconds", str(max_seconds)]
+    max_depth = _wizard_optional_int("Max depth (clicks from the start page)")
+    if max_depth is not None:
+        args += ["--max-depth", str(max_depth)]
+    resume_from = _wizard_optional_str("Resume from a selector (e.g. id:abc123)")
+    if resume_from is not None:
+        args += ["--resume-from", resume_from]
+    wiki = _wizard_optional_str("Write a wiki to this directory")
+    if wiki is not None:
+        args += ["--wiki", wiki]
+        if typer.confirm("Include screenshots in the wiki?", default=False):
+            args.append("--screenshots")
+    gen_tests = _wizard_optional_str("Write a generated test suite to this directory")
+    if gen_tests is not None:
+        args += ["--gen-tests", gen_tests]
+    scaffold = _wizard_optional_str("Write a config scaffold to this file")
+    if scaffold is not None:
+        args += ["--scaffold", scaffold]
+    return args
+
+
+def _wizard_apply_scaffold_args() -> list[str]:
+    url = typer.prompt("URL already mapped by `spoor explore`")
+    scaffold = typer.prompt("Scaffold YAML file, as written by --scaffold")
+    args = ["apply-scaffold", url, scaffold]
+    if typer.confirm(
+        "Declare this target a sandbox? (required for anything to be typed)",
+        default=False,
+    ):
+        args.append("--sandbox")
+    wiki = _wizard_optional_str(
+        "Refresh a wiki at this directory (the one --wiki wrote earlier)"
+    )
+    if wiki is not None:
+        args += ["--wiki", wiki]
+    return args
+
+
+def _wizard_run_args() -> list[str]:
+    config = typer.prompt("Config file")
+    output = typer.prompt("Output path", default="output.json")
+    args = ["run", config, "-o", output]
+    fmt = _wizard_optional_str("Output format (json/jsonl/csv; blank infers from -o)")
+    if fmt is not None:
+        args += ["-f", fmt]
+    return args
+
+
+def _wizard_serve_args() -> list[str]:
+    host = typer.prompt("Host to bind to", default="127.0.0.1")
+    port = typer.prompt("Port", default=8000, type=int)
+    args = ["serve", "--host", host, "--port", str(port)]
+    if typer.confirm("Allow forcing a re-check of a mapped URL?", default=False):
+        args.append("--recheck")
+    return args
+
+
+def _wizard_serve_mcp_args() -> list[str]:
+    args = ["serve-mcp"]
+    if typer.confirm("Allow forcing a re-check of a mapped URL?", default=False):
+        args.append("--recheck")
+    return args
+
+
+_WIZARD_BUILDERS: dict[str, Callable[[], list[str]]] = {
+    "explore": _wizard_explore_args,
+    "apply-scaffold": _wizard_apply_scaffold_args,
+    "run": _wizard_run_args,
+    "serve": _wizard_serve_args,
+    "serve-mcp": _wizard_serve_mcp_args,
+}
+
+
+@app.command()
+def wizard() -> None:
+    """Build a Spoor command interactively, one prompt at a time.
+
+    Walks you through picking a command and its flags — so you never have to
+    remember which flag goes with which command, or mix one command's flags up
+    with another's — then shows you the exact resolved command line before
+    anything runs. Nothing is fetched, typed, launched, or written until you
+    explicitly confirm running it; answering "no" just leaves you the command
+    line to copy and run yourself, or adjust first.
+
+    This never reimplements a command's own logic — it only assembles the same
+    argument line `--help` documents and, if you confirm, runs that exact
+    invocation as a subprocess, so it can never drift from what the real
+    command actually does.
+    """
+    import shlex
+    import subprocess
+    import sys
+
+    command = _wizard_choose_command()
+    args = _WIZARD_BUILDERS[command]()
+
+    typer.echo("")
+    typer.echo("Resolved command:")
+    typer.echo(f"  spoor {shlex.join(args)}")
+    typer.echo("")
+    if typer.confirm("Run it now?", default=False):
+        subprocess.run([sys.executable, "-m", "spoor.cli", *args])
+    else:
+        typer.echo("Not run — copy the line above to run it yourself.")
 
 
 def _build_recheck(store: MapStore) -> Callable[[str], MapEntry | None]:

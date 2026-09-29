@@ -80,6 +80,18 @@ spoor run config.yaml -o data.csv          # CSV; columns = your config fields
 spoor run config.yaml -o out.dat -f jsonl  # force JSON Lines with --format
 ```
 
+**Not sure which flags go with which command?** `spoor wizard` builds any command
+for you interactively — pick a command from a numbered list, answer a prompt per
+flag (blank to skip an optional one), and it shows you the exact resolved command
+line before anything runs. Say no and it just leaves you the line to copy; say yes
+and it runs that exact command for you. It never has logic of its own beyond
+assembling the same flags `--help` documents, so it can't drift from what the real
+command does.
+
+```
+spoor wizard
+```
+
 ## Runtime behavior (important defaults)
 
 - Output formats: JSON, JSON Lines, CSV (schema-validated before writing)
