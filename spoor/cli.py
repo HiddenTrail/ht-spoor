@@ -162,6 +162,20 @@ def explore(
             ),
         ),
     ] = None,
+    scaffold: Annotated[
+        Path | None,
+        typer.Option(
+            "--scaffold",
+            help=(
+                "Also write a config-scaffold YAML file listing what a future, "
+                "not-yet-built interactive round would need: discovered fields with "
+                "a best-guess value type, discovered login points (flagged only — "
+                "Spoor never automates a login, point session: at a storage-state "
+                "file you already exported), and discovered actions skipped for "
+                "being destructive. Filling it in does nothing on its own today."
+            ),
+        ),
+    ] = None,
     screenshots: Annotated[
         bool,
         typer.Option(
@@ -196,7 +210,10 @@ def explore(
     (off by default, because a picture can't have secrets
     blanked out the way captured text can). Pass --gen-tests to also write a runnable
     pytest regression suite of the map (one test per mapped transition) you can re-run
-    against the live site later to catch drift. The
+    against the live site later to catch drift. Pass --scaffold to also write a
+    config-scaffold YAML file naming discovered fields, login points, and destructive
+    actions — a starting point for a planned, not-yet-built interactive round; filling
+    it in does nothing on its own yet. The
     mapped graph is also saved to the local map, so `spoor serve`/`serve-mcp` can hand
     it back later without re-exploring.
     """
@@ -313,6 +330,13 @@ def explore(
         # graph had no transitions and nothing was written at all).
         test_count = max(len(written) - 2, 0)
         typer.echo(f"  tests written to:  {gen_tests} ({test_count} test(s))")
+
+    if scaffold is not None:
+        from spoor.scaffold.interactive_config import render_scaffold
+
+        written_scaffold = render_scaffold(graph, scaffold, target=url)
+        if written_scaffold is not None:
+            typer.echo(f"  scaffold written to: {written_scaffold}")
 
     if wiki is not None:
         from spoor.exploration.wiki import render_wiki

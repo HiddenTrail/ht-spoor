@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<!--
+  Login-field fixture (ROADMAP.md §2e, interactive-round scaffold slice 1, issue
+  #131). A single page carrying one password field, kept separate from the
+  explore_home.html two-page traversal fixture so this doesn't perturb its
+  hardcoded state/transition counts (exploration_browser.feature). The password
+  field is discovery's input_type enrichment target: it and the link both surface
+  as accessibility-tree nodes, but only the password field carries a DOM input_type
+  once the driver enriches it — the signal that tells a login field apart from any
+  other text box.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Login</title>
+  </head>
+  <body>
+    <h1>Login</h1>
+    <label for="password">Password</label>
+    <input type="password" id="password" name="password" />
+  </body>
+</html>

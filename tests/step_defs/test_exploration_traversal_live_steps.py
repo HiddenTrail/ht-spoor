@@ -66,3 +66,18 @@ def discovered_has_destination(
     match = [a for a in actions if a.role == role and a.name == name]
     assert match, f"no discovered {role} named {name!r}"
     assert match[0].destination == destination
+
+
+@then(
+    parsers.parse(
+        'the discovered "{role}" named "{name}" has input type "{input_type}"'
+    )
+)
+def discovered_has_input_type(
+    context: dict[str, Any], role: str, name: str, input_type: str
+) -> None:
+    driver: PlaywrightDriver = context["driver"]
+    actions = discover_actions(driver.ax_nodes())
+    match = [a for a in actions if a.role == role and a.name == name]
+    assert match, f"no discovered {role} named {name!r}"
+    assert match[0].input_type == input_type

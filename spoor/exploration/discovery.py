@@ -7,7 +7,8 @@ mechanism, by reusing the §2c accessibility-tree signal. That snapshot (the CDP
 already labels every node with a generic ARIA role, so discovery is: keep the nodes
 whose role is interactive and that aren't ignored, and read each one's role,
 accessible name, backend DOM node id, and — when the driver enriched the node with
-one — its destination hint (a link's target URL path, read from `href`; §2e slice 9b).
+one — its destination hint (a link's target URL path, read from `href`; §2e slice 9b)
+and its DOM `input_type` (an `<input>` element's `type` attribute).
 
 The accessible name is the label the safety gate (`safety.py`) classifies; the
 backend node id is kept so the (later) explorer loop can locate the element to act
@@ -65,12 +66,19 @@ class ActionableElement:
     (peel the site outward in priority order) and lets the map name a link's target
     even when the budget stops the run before it is clicked. None when the driver
     reports no destination, which every non-link element and every URL-less fake keep.
+
+    `input_type` is the DOM `type` of the backing `<input>` element (e.g. `"password"`,
+    `"email"`, `"text"`) when the driver enriched the node with one — a scaffold
+    generator's only signal for telling a login field apart from any other text box,
+    since the accessibility tree alone reports both as `role="textbox"`. None for every
+    non-`<input>` element and every fake that supplies none.
     """
 
     role: str
     name: str
     backend_node_id: int | None
     destination: str | None = None
+    input_type: str | None = None
 
 
 def _ax_string(field: object) -> str:
@@ -97,6 +105,17 @@ def _destination(node: Mapping[str, object]) -> str | None:
     return raw if isinstance(raw, str) and raw else None
 
 
+def _input_type(node: Mapping[str, object]) -> str | None:
+    """The element's DOM `type`, if the driver enriched the node with one.
+
+    A plain string on the node under `input_type` (the live driver injects an
+    `<input>` element's `type` attribute; a fake supplies it directly). Absent, empty,
+    or non-string yields None — the pre-enrichment shape every such driver keeps.
+    """
+    raw = node.get("input_type")
+    return raw if isinstance(raw, str) and raw else None
+
+
 def discover_actions(
     ax_nodes: Sequence[Mapping[str, object]],
 ) -> list[ActionableElement]:
@@ -120,6 +139,7 @@ def discover_actions(
                 name=_ax_string(node.get("name")),
                 backend_node_id=_backend_node_id(node),
                 destination=_destination(node),
+                input_type=_input_type(node),
             )
         )
     return discovered

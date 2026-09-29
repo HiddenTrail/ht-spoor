@@ -40,6 +40,9 @@ def _ax_node(fields: dict[str, str]) -> dict[str, object]:
     destination = fields.get("destination")
     if destination:
         node["destination"] = destination
+    input_type = fields.get("input_type")
+    if input_type:
+        node["input_type"] = input_type
     return node
 
 
@@ -98,6 +101,16 @@ def first_element_destination(context: dict[str, Any], dest: str) -> None:
 @then("the second discovered element has no destination")
 def second_element_no_destination(context: dict[str, Any]) -> None:
     assert context["discovered"][1].destination is None
+
+
+@then(parsers.parse('the first discovered element has input type "{input_type}"'))
+def first_element_input_type(context: dict[str, Any], input_type: str) -> None:
+    assert context["discovered"][0].input_type == input_type
+
+
+@then("the second discovered element has no input type")
+def second_element_no_input_type(context: dict[str, Any]) -> None:
+    assert context["discovered"][1].input_type is None
 
 
 @then("no actionable elements are discovered")

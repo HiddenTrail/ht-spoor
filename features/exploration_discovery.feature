@@ -61,6 +61,19 @@ Feature: Exploration discovers the actionable elements on a page
     Then the first discovered element has destination "/9-art"
     And the second discovered element has no destination
 
+  Scenario: A text field's DOM input type is read from its enriched node
+    # When the driver enriches a node with an input_type (an <input> element's DOM
+    # `type` attribute), discovery carries it — the only signal that tells a login
+    # field (type="password") apart from any other text box, since both report the
+    # same accessibility role. An element with none carries None.
+    Given an accessibility tree:
+      | role    | name     | ignored | input_type |
+      | textbox | Password | false   | password   |
+      | textbox | Search   | false   |            |
+    When I discover the actionable elements
+    Then the first discovered element has input type "password"
+    And the second discovered element has no input type
+
   Scenario: A page with no interactive roles yields no actions
     Given an accessibility tree:
       | role      | name    | ignored |
