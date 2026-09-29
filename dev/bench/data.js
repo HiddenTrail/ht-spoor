@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790707933168,
+  "lastUpdate": 1790709549010,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -3296,6 +3296,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5306,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "416e3f32a73e03c990c8a95314e9a0300c8836ae",
+          "message": "spoor explore: show a live progress spinner/bar while crawling (#142)\n\nA long crawl printed nothing until it finished, giving no sense of whether it\nwas working or stuck. Adds a dependency-free live indicator: a [####------] NN%\ngauge against --max-states/--max-requests when either is set, or a spinner\n(|, /, -, \\) when the run is unbounded, alongside live states/requests/elapsed\ncounts.\n\nPlaywright's sync API is not safe to use from any thread but the one that\ncreated it, which rules out running the crawl in a background thread and\npolling it from the main thread -- the natural-looking approach, and wrong.\nInstead explorer.explore() (and resume_exploration, which delegates to it)\ngains an optional, no-argument progress callback, fired synchronously on the\nsame thread right after controller.record_state/record_request -- the same\n\"opt-in sink, None by default, zero cost unless asked for\" shape the\nscreenshot sinks already use. RunController gained public states/requests/\nbudget read accessors (previously private-only) for a caller to read from\ninside that callback.\n\nThe CLI's _CliProgress ticks off that callback: throttled to ~10 redraws/sec,\nand silently inactive when stdout isn't a real terminal (piped, redirected, or\nunder a test runner), so non-interactive output is never polluted with\ncarriage-return control characters.\n\nCovered by a new BDD scenario in exploration_loop.feature (the callback fires\nat least once per state and per action, using the existing fake-driver\nharness) and verified live against the real EcoEstate demo target: the bar\ncorrectly advanced 33% -> 66% -> 100% against --max-states 3, with request\ncounts and elapsed time ticking up between state discoveries, and cleared\nitself on completion.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-29T22:14:23+03:00",
+          "tree_id": "350e7b35b0eafb7d52fa05719be14003d0bc1238",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/416e3f32a73e03c990c8a95314e9a0300c8836ae"
+        },
+        "date": 1790709548430,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 218.732,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03911,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.7059,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12297,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.9879,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06431,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 11.4919,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11066,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 17.7677,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.05182,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2702,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.57553,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 29.6876,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05254,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 12.5256,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.99497,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.3317,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09128,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5608,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01046,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4561,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 4871,
             "unit": "MB"
           }
         ]
