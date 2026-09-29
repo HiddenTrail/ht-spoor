@@ -2,20 +2,21 @@
 
 Issue #131 shipped scaffold *generation* only (`spoor/scaffold/interactive_config.py`).
 This module is the first, deliberately narrow slice of *consuming* one: given a
-scaffold a human has filled in, navigate to each field's recorded state and type its
-pinned value in. Never presses Enter, never clicks a submit control, never applies the
-value in any way — this stays entirely inside the "types a scaffold's pinned values
-into their fields" exception `docs/ROADMAP.md` §2e records ahead of keyword-list
-localization (issue #101). Applying a value is still fully gated on #101 and the
-separate "how a filled field's value gets applied" open question.
+scaffold a human has filled in, type its pinned values into fields on the root state
+the crawl started from. Never presses Enter, never clicks a submit control, never
+applies the value in any way — this stays entirely inside the "types a scaffold's
+pinned values into their fields" exception `docs/ROADMAP.md` §2e records ahead of
+keyword-list localization (issue #101). Applying a value is still fully gated on #101
+and the separate "how a filled field's value gets applied" open question.
 
-Navigation reuses two already-public, already-proven pieces rather than inventing a new
-"go to this state" primitive: `spoor.exploration.graph.paths_from_root` (the same
-reset-and-replay path `spoor/testgen/pytest_gen.py`'s generated tests already replay)
-gives the path of actions from the root to any mapped state, and `driver.perform` fires
-each step exactly as exploration itself does. Nothing here crawls or discovers a new
-state — it only replays a path already recorded in the graph, then types into one
-field on the state it lands on.
+Restricted to the root state and to declared-sandbox targets only (§2e non-negotiable:
+destructive-or-not, any interaction beyond passive observation is sandbox-only). A
+field reached only by replaying prior navigation clicks is refused, never attempted —
+even a click that only exists to *reach* a field is a click this module's "types a
+value, clicks nothing else" contract cannot make. `spoor.exploration.graph.
+paths_from_root` (the same reset-and-replay path `spoor/testgen/pytest_gen.py`'s
+generated tests already replay) is used only to detect that case, never to actually
+replay it.
 """
 
 from __future__ import annotations
@@ -30,22 +31,20 @@ from spoor.exploration.discovery import ActionableElement
 from spoor.exploration.explorer import ActionError
 from spoor.exploration.graph import ExplorationGraph, paths_from_root
 from spoor.scaffold.interactive_config import FIELD_ROLES
+from spoor.security.sandbox import is_sandbox
 
 
 class ApplyDriver(Protocol):
-    """What this module needs from a driver: replay a path, then type into a field.
+    """What this module needs from a driver: reset to the entry URL, then type.
 
     Deliberately narrower than the full `BrowserDriver` Protocol (`explorer.py`) —
-    this never discovers, probes, or reads signals, so a driver or test fake doesn't
-    need any of that to satisfy it, only the three methods actually called here.
+    this never discovers, probes, reads signals, or clicks anything, so a driver or
+    test fake doesn't need any of that to satisfy it, only the two methods actually
+    called here.
     """
 
     def reset(self) -> None:
         """Return to the start state (e.g. re-navigate to the entry URL)."""
-        ...
-
-    def perform(self, action: ActionableElement) -> None:
-        """Fire an action (e.g. click the element it names), replaying a path step."""
         ...
 
     def fill(self, action: ActionableElement, value: str) -> None:
@@ -91,28 +90,41 @@ def load_scaffold(path: Path) -> dict[str, Any]:
     return data if isinstance(data, dict) else {}
 
 
-def applicable_fields(scaffold: dict[str, Any]) -> list[FieldToApply]:
-    """Every `fields:` entry with a non-blank value — pure, no I/O.
+def applicable_fields(
+    scaffold: dict[str, Any],
+) -> tuple[list[FieldToApply], list[FailedField]]:
+    """Every `fields:` entry with a non-blank value, plus any entry that is invalid.
 
     A blank or missing `value:` means the user chose not to fill this one in; skipped
     silently, not an error. A malformed entry (missing `state`/`name`, or either not a
     string) is skipped the same way — this stays a best-effort reader of a hand-edited
     file, never a strict parser that crashes on one bad row.
+
+    A `value:` that parsed as something other than a string — e.g. an unquoted `42`,
+    which YAML reads as an integer — is different: it *was* an attempt to fill the
+    field in, so it is reported as a `FailedField`, not silently dropped, with guidance
+    to quote it.
     """
     fields = scaffold.get("fields")
     if not isinstance(fields, list):
-        return []
-    result: list[FieldToApply] = []
+        return [], []
+    ready: list[FieldToApply] = []
+    invalid: list[FailedField] = []
     for entry in fields:
         if not isinstance(entry, dict):
             continue
         state, name, value = entry.get("state"), entry.get("name"), entry.get("value")
         if not isinstance(state, str) or not isinstance(name, str):
             continue
-        if not isinstance(value, str) or not value:
+        if value is None or value == "":
             continue
-        result.append(FieldToApply(state=state, name=name, value=value))
-    return result
+        if not isinstance(value, str):
+            invalid.append(
+                FailedField(state, name, "value must be a quoted YAML string")
+            )
+            continue
+        ready.append(FieldToApply(state=state, name=name, value=value))
+    return ready, invalid
 
 
 def _resolve_state(graph: ExplorationGraph, prefix: str) -> str | None:
@@ -126,23 +138,54 @@ def _resolve_state(graph: ExplorationGraph, prefix: str) -> str | None:
 
 
 def apply_scaffold(
-    driver: ApplyDriver, graph: ExplorationGraph, scaffold: dict[str, Any]
+    driver: ApplyDriver,
+    graph: ExplorationGraph,
+    scaffold: dict[str, Any],
+    *,
+    target: str,
+    declared_sandbox: bool = False,
 ) -> tuple[list[AppliedField], list[FailedField]]:
     """Type each applicable field's pinned value in. Never submits, never clicks
     anything beyond what typing itself requires (focusing the field).
 
+    Sandbox-gated, matching the §2e non-negotiable that any interaction beyond passive
+    observation is sandbox-only: `target` must resolve to a registry sandbox match
+    (`is_sandbox`) before the driver is touched at all. Against anything else, nothing
+    is applied and the driver is never reset — the same "always skipped and logged"
+    posture the exploration-mode destructive-action gate already takes, not a
+    config-flag-relaxable exception.
+
+    Restricted to the root state: a field reached only by replaying prior navigation
+    clicks is refused, not attempted — the "types a value, never clicks anything else"
+    exception this module lives inside is written against a session that clicks nothing
+    but the field itself, and replaying a path to get there would break that. Fields on
+    the root state (an empty path) are the only ones this can type into today.
+
+    Fields on the same resolved state share one `driver.reset()` — typing into one
+    field must not blow away a value already typed into another field on the same page.
+    A reset failure fails every field in that group (the page was never reached, so
+    none of them could be typed into) without aborting other groups' fields.
+
     One field's failure — an unresolved state prefix, a field no longer on that state,
     a vanished or covered element — is recorded and the rest still run, mirroring the
     explorer's own skip-and-continue posture rather than aborting the whole pass on one
-    bad entry. Nothing here raises for a single field; only a genuinely broken `graph`/
-    `scaffold` argument would. Two fields sharing the same name on the same state (rare
-    — e.g. a repeated "Notes" box) are not disambiguated: the first matching action on
-    that state is used, not reported ambiguous the way an unresolved *state* prefix is.
+    bad entry. Two fields sharing the same name on the same state (rare — e.g. a
+    repeated "Notes" box) are not disambiguated: the first matching action on that
+    state is used, not reported ambiguous the way an unresolved *state* prefix is.
     """
+    ready, failed = applicable_fields(scaffold)
+
+    if not is_sandbox(target, declared=declared_sandbox):
+        for field in ready:
+            failed.append(
+                FailedField(field.state, field.name, "target is not a declared sandbox")
+            )
+        return [], failed
+
     paths = paths_from_root(graph)
     applied: list[AppliedField] = []
-    failed: list[FailedField] = []
-    for field in applicable_fields(scaffold):
+    groups: dict[str, list[FieldToApply]] = {}
+    for field in ready:
         state_id = _resolve_state(graph, field.state)
         if state_id is None:
             failed.append(
@@ -159,23 +202,40 @@ def apply_scaffold(
                 FailedField(state_id, field.name, "no path from the root to this state")
             )
             continue
-        driver.reset()
-        for step in path:
-            driver.perform(step)
-        matches = [
-            a
-            for a in graph.node(state_id).actions
-            if a.name == field.name and a.role in FIELD_ROLES
-        ]
-        if not matches:
+        if path:
             failed.append(
-                FailedField(state_id, field.name, "no matching field on this state")
+                FailedField(
+                    state_id,
+                    field.name,
+                    "navigation replay is outside the typing-only scope",
+                )
             )
             continue
+        groups.setdefault(state_id, []).append(field)
+
+    for state_id, group_fields in groups.items():
         try:
-            driver.fill(matches[0], field.value)
+            driver.reset()
         except ActionError as exc:
-            failed.append(FailedField(state_id, field.name, str(exc)))
+            for field in group_fields:
+                failed.append(FailedField(state_id, field.name, str(exc)))
             continue
-        applied.append(AppliedField(state_id, field.name))
+        node = graph.node(state_id)
+        for field in group_fields:
+            matches = [
+                a
+                for a in node.actions
+                if a.name == field.name and a.role in FIELD_ROLES
+            ]
+            if not matches:
+                failed.append(
+                    FailedField(state_id, field.name, "no matching field on this state")
+                )
+                continue
+            try:
+                driver.fill(matches[0], field.value)
+            except ActionError as exc:
+                failed.append(FailedField(state_id, field.name, str(exc)))
+                continue
+            applied.append(AppliedField(state_id, field.name))
     return applied, failed

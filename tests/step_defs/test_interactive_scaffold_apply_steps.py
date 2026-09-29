@@ -17,7 +17,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 from spoor.exploration.control import RunBudget, RunController
 from spoor.exploration.discovery import ActionableElement
 from spoor.exploration.driver import PlaywrightDriver
-from spoor.exploration.explorer import explore
+from spoor.exploration.explorer import ActionError, explore
 from spoor.exploration.graph import ExplorationGraph
 from spoor.scaffold.apply import AppliedField, FailedField, apply_scaffold
 
@@ -28,12 +28,17 @@ class _FakeDriver:
     """Records what it was asked to do; never touches a real page."""
 
     def __init__(self) -> None:
+        self.current_url = "http://localhost/"
+        self.fail_reset = False
         self.resets = 0
         self.performed: list[str] = []
         self.filled: dict[str, str] = {}
 
     def reset(self) -> None:
         self.resets += 1
+        self.filled.clear()
+        if self.fail_reset:
+            raise ActionError("reset failed")
         self.performed = []
 
     def perform(self, action: ActionableElement) -> None:
@@ -79,8 +84,12 @@ def empty_scaffold(context: dict[str, Any]) -> None:
 @when("I apply the scaffold")
 def apply(context: dict[str, Any]) -> None:
     driver = _FakeDriver()
+    driver.fail_reset = context.get("fail_reset", False)
     context["driver"] = driver
-    applied, failed = apply_scaffold(driver, context["graph"], context["scaffold"])
+    applied, failed = apply_scaffold(
+        driver, context["graph"], context["scaffold"],
+        target=context.get("target", "http://localhost/"),
+    )
     context["applied"] = applied
     context["failed"] = failed
 
@@ -168,17 +177,73 @@ def scaffold_pins_crawled(context: dict[str, Any], name: str, value: str) -> Non
 @when("I apply the scaffold against the live driver")
 def apply_live(context: dict[str, Any]) -> None:
     with PlaywrightDriver(context["target"]) as driver:
-        applied, failed = apply_scaffold(driver, context["graph"], context["scaffold"])
+        applied, failed = apply_scaffold(
+            driver, context["graph"], context["scaffold"],
+            target=context.get("target", "http://localhost/"),
+        )
         context["applied"] = applied
         context["failed"] = failed
         # Read the live field's value back while this same driver/page is still open,
         # before the `with` block closes it — the actual end-to-end proof.
+        selector = context.get("live_field_selector", "#nickname")
         context["live_value"] = driver._live_page.locator(  # noqa: SLF001
-            "#nickname"
+            selector
         ).input_value()
+
+
+@given(parsers.parse('the live field to check is "{selector}"'))
+def live_field_selector(context: dict[str, Any], selector: str) -> None:
+    context["live_field_selector"] = selector
 
 
 @then(parsers.parse('the live page\'s "{name}" field now reads "{value}"'))
 def live_field_reads(context: dict[str, Any], name: str, value: str) -> None:
     assert context["failed"] == [], f"apply reported failures: {context['failed']!r}"
     assert context["live_value"] == value
+
+
+@then(parsers.parse('the live page\'s "{name}" field still reads "{value}"'))
+def live_field_still_reads(context: dict[str, Any], name: str, value: str) -> None:
+    assert context["live_value"] == value
+
+
+@given("the apply target is not a sandbox")
+def production_target(context: dict[str, Any]) -> None:
+    context["target"] = "https://production.invalid/"
+
+
+@given("the scaffold contains an unquoted numeric value")
+def numeric_value(context: dict[str, Any]) -> None:
+    context["scaffold"] = {"fields": [{"state": "home", "name": "Email", "value": 42}]}
+
+
+@given(parsers.parse('another field "{name}" on "{state}"'))
+def another_field(context: dict[str, Any], name: str, state: str) -> None:
+    context["graph"].node(state).actions.append(
+        ActionableElement(role="textbox", name=name, backend_node_id=2)
+    )
+
+
+@given("resetting the apply driver fails")
+def failing_reset(context: dict[str, Any]) -> None:
+    context["fail_reset"] = True
+
+
+@given("a field on a state reached by clicking")
+def deeper_field(context: dict[str, Any]) -> None:
+    graph = context["graph"]
+    graph.add_state(
+        "detail", [ActionableElement(role="textbox", name="Email", backend_node_id=1)]
+    )
+    link = ActionableElement(role="link", name="Details", backend_node_id=2)
+    graph.add_transition("home", link, "detail")
+
+
+@then("the driver was not reset")
+def not_reset(context: dict[str, Any]) -> None:
+    assert context["driver"].resets == 0
+
+
+@then("the driver was reset exactly once")
+def reset_once(context: dict[str, Any]) -> None:
+    assert context["driver"].resets == 1

@@ -450,17 +450,30 @@ def apply_scaffold_cmd(
     scaffold: Annotated[
         Path, typer.Argument(help="A scaffold YAML file, as written by --scaffold.")
     ],
+    sandbox: Annotated[
+        bool,
+        typer.Option(
+            "--sandbox",
+            help=(
+                "Declare this target a sandbox. Only ever use this on a local or "
+                "test system you own — on any real site, typing is always skipped."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Type a filled-in interactive-round scaffold's values into their fields.
 
     Reads a URL's saved exploration map and a scaffold file you've filled in (from
-    `spoor explore --scaffold <file>`), navigates to each field's recorded screen —
-    replaying the same path exploration itself used to reach it, nothing new
-    discovered or crawled — and types the value you pinned into it. That is the whole
-    of what this does: it never presses Enter, never clicks a submit control, and
-    never fires any action beyond typing. Applying or submitting a value is a
-    separate, not-yet-built capability (see ROADMAP.md §2e) — this command only gets a
-    value into a field, honestly, so you can see it land.
+    `spoor explore --scaffold <file>`) and types each field's pinned value into it —
+    only for fields on the screen the crawl started from. That is the whole of what
+    this does: it never presses Enter, never clicks a submit control, and never fires
+    any action beyond typing. Applying or submitting a value is a separate,
+    not-yet-built capability (see ROADMAP.md §2e) — this command only gets a value
+    into a field, honestly, so you can see it land.
+
+    Only runs against a target you declare a sandbox with --sandbox (a loopback
+    address such as localhost, or this flag) — on any other site nothing is typed,
+    the same rule exploration's own destructive-action gate already follows.
     """
     entry = MapStore().get(url)
     if entry is None or entry.exploration is None:
@@ -475,7 +488,9 @@ def apply_scaffold_cmd(
     graph = load_exploration_map(entry.exploration)
     scaffold_data = load_scaffold(scaffold)
     with PlaywrightDriver(url) as driver:
-        applied, failed = apply_scaffold(driver, graph, scaffold_data)
+        applied, failed = apply_scaffold(
+            driver, graph, scaffold_data, target=url, declared_sandbox=sandbox
+        )
     typer.echo(f"Applied {len(applied)} field(s):")
     for applied_field in applied:
         typer.echo(f"  state {applied_field.state}: {applied_field.name!r}")

@@ -24,6 +24,39 @@ Feature: Type a filled-in interactive-round scaffold's values into their fields
   Background:
     Given a mapped graph with a field "Email" on state "home"
 
+  Scenario: Production targets are rejected before any browser interaction
+    Given the scaffold pins "Email" on "home" to "jane@example.com"
+    And the apply target is not a sandbox
+    When I apply the scaffold
+    Then no field was applied
+    And the driver was not reset
+
+  Scenario: Numeric YAML values produce an actionable failure
+    Given the scaffold contains an unquoted numeric value
+    When I apply the scaffold
+    Then "Email" on "home" failed with reason "value must be a quoted YAML string"
+
+  Scenario: Multiple fields share one page visit
+    Given another field "Nickname" on "home"
+    And the scaffold pins "Email" on "home" to "jane@example.com"
+    And the scaffold pins "Nickname" on "home" to "fox"
+    When I apply the scaffold
+    Then the driver was reset exactly once
+    And the driver typed "jane@example.com" into "Email"
+    And the driver typed "fox" into "Nickname"
+
+  Scenario: A reset failure is reported for every affected field
+    Given the scaffold pins "Email" on "home" to "jane@example.com"
+    And resetting the apply driver fails
+    When I apply the scaffold
+    Then "Email" on "home" failed with reason "reset failed"
+
+  Scenario: Navigation clicks are outside the typing-only exception
+    Given a field on a state reached by clicking
+    And the scaffold pins "Email" on "detail" to "jane@example.com"
+    When I apply the scaffold
+    Then "Email" on "detail" failed with reason "navigation replay is outside the typing-only scope"
+
   Scenario: A filled field is typed into the correct state
     Given the scaffold pins "Email" on "home" to "jane@example.com"
     When I apply the scaffold
@@ -59,3 +92,12 @@ Feature: Type a filled-in interactive-round scaffold's values into their fields
     And the scaffold pins "Nickname" on the crawled state to "trail-fox"
     When I apply the scaffold against the live driver
     Then the live page's "Nickname" field now reads "trail-fox"
+
+  @browser
+  Scenario: A read-only field's non-change is reported, never claimed a success
+    Given a live crawl of "explore_login.html" was mapped at depth 1
+    And the live field to check is "#account-id"
+    And the scaffold pins "Account ID" on the crawled state to "ACC-002"
+    When I apply the scaffold against the live driver
+    Then no field was applied
+    And the live page's "Account ID" field still reads "ACC-001"

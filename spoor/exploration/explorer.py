@@ -129,6 +129,22 @@ class ElementNotLocated(ActionError):
         self.name = name
 
 
+class ElementNotEditable(ActionError):
+    """`fill` clicked and typed into an element whose value never changed (§2e, #131).
+
+    A read-only or disabled field takes a click and swallows keystrokes without
+    updating its value — the click and the typing both "succeed" from the driver's
+    point of view, so this is the only honest way to tell a real fill from one the
+    page silently ignored. Raised by `fill`, never `perform`, since `perform` never
+    checks for a resulting value change.
+    """
+
+    def __init__(self, role: str, name: str) -> None:
+        super().__init__(f"{role} {name!r} did not accept the typed value")
+        self.role = role
+        self.name = name
+
+
 class BrowserDriver(Protocol):
     """What the explorer needs from a browser, so the loop stays browser-free (§2e).
 
