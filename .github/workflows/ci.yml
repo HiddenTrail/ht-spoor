@@ -28,51 +28,20 @@ jobs:
           key: playwright-${{ runner.os }}-${{ hashFiles('pyproject.toml') }}
       - name: Install browser (tier 2)
         run: python -m playwright install --with-deps chromium
-      - name: Cache Juice Shop image (§5.1)
-        uses: actions/cache@v4
-        with:
-          # Cache the pinned archetype image as a tarball so the bench boot skips
-          # the registry pull on a hit. Key is the tag — bumping it invalidates.
-          path: /tmp/juice-shop-image.tar
-          key: juice-shop-image-v17.1.1
-      - name: Load or pull Juice Shop image
-        run: |
-          if [ -f /tmp/juice-shop-image.tar ]; then
-            docker load -i /tmp/juice-shop-image.tar
-          else
-            docker compose -f fixtures/docker-compose.yml pull
-            docker save bkimminich/juice-shop:v17.1.1 -o /tmp/juice-shop-image.tar
-          fi
-      - name: Start archetype bench (Juice Shop, §5.1)
-        run: docker compose -f fixtures/docker-compose.yml up -d
-      - name: Wait for Juice Shop to be ready
-        # Poll the port from outside (the image is distroless — no in-container
-        # probe), so the integration test finds a ready app instead of racing
-        # the boot.
-        run: timeout 180 bash -c 'until curl -sf http://127.0.0.1:3000/ >/dev/null; do sleep 3; done'
       - name: Lint (ruff)
         run: ruff check .
       - name: Type check (mypy)
         run: mypy .
-      - name: Tests (unit, .feature scenarios, golden-master, browser, integration)
-        # `-m ""` overrides the fast-local default in pyproject.toml (which deselects
-        # the `browser` and `integration` tiers) so CI runs the *whole* suite: the
-        # real-Chromium browser tier and, with the container up, the Juice Shop
-        # end-to-end (§5.1). Local devs get a seconds-fast `pytest`; CI carries the
-        # slow tiers. (ROADMAP.md §5 test-tiering note.)
-        run: pytest -m ""
-      - name: Upload extraction output
-        # The E2E run writes its extracted records here; keep them out of a temp
-        # folder and downloadable from the run page, especially on a golden-master
-        # mismatch (hence always()).
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: extraction-output
-          path: test-output/
-          if-no-files-found: ignore
+      - name: Tests (unit, .feature scenarios, golden-master, browser)
+        # `-m "not integration"` runs everything except the live-docker-archetype
+        # tier: the in-process unit/BDD/golden-master/mutation tests plus the
+        # real-Chromium `browser` tier, none of which needs a container. The
+        # `integration` tier (Juice Shop, Sauce Demo, ...) moved to a nightly run
+        # (.github/workflows/nightly.yml) — booting the whole archetype bench on
+        # every PR made this gate "terribly long" for a check that only needs to
+        # catch a genericity regression within a day, not synchronously with every
+        # push. (ROADMAP.md §5.1 decision: "the live-docker-archetype integration
+        # tier moves off the PR gate to a nightly run".)
+        run: pytest -m "not integration"
       - name: Genericity (§0)
         run: python scripts/check_genericity.py
-      - name: Stop archetype bench
-        if: always()
-        run: docker compose -f fixtures/docker-compose.yml down

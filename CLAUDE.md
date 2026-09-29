@@ -55,12 +55,12 @@ pytest -m mutation            # tier-3 mutation corpus — must be >= 95% (see �
 python scripts/check_genericity.py
 ```
 
-**Test tiering (§5.1 decision).** A bare `pytest` runs only the fast in-process tier: `pyproject.toml`'s `addopts` deselects the two slow tiers — `browser` (launches a real Chromium) and `integration` (needs a live docker archetype). This keeps the local edit-run loop fast; **CI runs the full suite** via `pytest -m ""` (empty marker expression = everything), so the browser tier and, with the container up, the Juice Shop end-to-end still gate every PR. When your change touches a browser-tier or integration path, exercise it locally before the PR — the fast gate will *not* have run it:
+**Test tiering (§5.1 decision).** A bare `pytest` runs only the fast in-process tier: `pyproject.toml`'s `addopts` deselects the two slow tiers — `browser` (launches a real Chromium) and `integration` (needs a live docker archetype). This keeps the local edit-run loop fast; **the PR-blocking CI gate** (`.github/workflows/ci.yml`) runs `pytest -m "not integration"`, so the `browser` tier gates every PR but `integration` does not. The live-docker-archetype `integration` tier (Juice Shop, Sauce Demo, ...) runs nightly instead (`.github/workflows/nightly.yml`, also triggerable on demand) — booting the whole archetype bench on every PR made that gate too slow for what it needs to be, and a slow mandatory gate is a gate people work around. When your change touches a browser-tier or integration path, exercise it locally before the PR — neither the fast local gate nor the PR-blocking CI gate will have run `integration` for you:
 
 ```
-pytest -m browser             # the real-Chromium scenarios (slow)
-pytest -m integration         # docker-archetype end-to-end (needs the bench up; skips if not)
-pytest -m ""                  # everything, exactly as CI runs it
+pytest -m browser             # the real-Chromium scenarios (slow) — gates every PR
+pytest -m integration         # docker-archetype end-to-end (needs the bench up; skips if not) — nightly only
+pytest -m ""                  # everything, including both slow tiers
 ```
 
 The `browser` marker is applied per *scenario* via a Gherkin `@browser` tag on the browser-tier scenarios (most step files are mixed — a browser scenario beside network-free tier-1 ones), not as a file-level `pytestmark`. A change that touches tier 3 must report the mutation-corpus success rate in the PR description.
