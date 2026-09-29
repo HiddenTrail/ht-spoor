@@ -100,6 +100,49 @@ def run(
     typer.echo(RunSummary.from_result(result).render())
 
 
+def _check_explore_output_paths(
+    *, wiki: Path | None, gen_tests: Path | None, scaffold: Path | None
+) -> None:
+    """Refuse, before any browser is launched, output flags that would collide.
+
+    `--wiki` and `--gen-tests` each write a whole directory of files; `--scaffold`
+    writes exactly one YAML file. Giving two of these the same path is always a
+    mistake — real incident: the same path handed to both `--wiki` and
+    `--scaffold` let the wiki's directory get created first, and then writing the
+    scaffold *to that same path* failed trying to open a directory as a file,
+    after a full crawl had already run. Checked up front, in one place, so the
+    failure is an immediate, clear message instead of a crawl that only then
+    crashes on write.
+    """
+    dir_flags = {"--wiki": wiki, "--gen-tests": gen_tests}
+    file_flags = {"--scaffold": scaffold}
+    seen: dict[Path, str] = {}
+    for name, maybe_path in (*dir_flags.items(), *file_flags.items()):
+        if maybe_path is None:
+            continue
+        if maybe_path in seen:
+            raise typer.BadParameter(
+                f"{seen[maybe_path]} and {name} both point at {maybe_path} — give "
+                "each a different path, or one will overwrite or collide with "
+                "what the other writes."
+            )
+        seen[maybe_path] = name
+    for name, path in dir_flags.items():
+        if path is not None and path.exists() and not path.is_dir():
+            raise typer.BadParameter(
+                f"{name} {path} already exists and is not a directory — {name} "
+                "writes a directory of files, so this path needs to be free or "
+                "already be one."
+            )
+    for name, path in file_flags.items():
+        if path is not None and path.exists() and path.is_dir():
+            raise typer.BadParameter(
+                f"{name} {path} already exists as a directory — {name} writes "
+                "a single file there, so this path needs to be free or already "
+                "be a file."
+            )
+
+
 class _CliProgress:
     """A dependency-free live spinner/bar for `spoor explore` (§2d observability).
 
@@ -306,6 +349,7 @@ def explore(
             "--screenshots needs --wiki: there is no wiki to put "
             "the images in without it."
         )
+    _check_explore_output_paths(wiki=wiki, gen_tests=gen_tests, scaffold=scaffold)
     # The saved map to continue, when resuming: the §2h-shareable projection an earlier
     # explore of this exact URL stored (§2f). Loaded up front so a missing map fails
     # before a browser is launched.
@@ -659,6 +703,30 @@ def _wizard_optional_float(question: str) -> float | None:
             typer.echo(f"  {raw!r} isn't a number — try again.")
 
 
+def _wizard_optional_output_path(
+    question: str, flag: str, used_paths: dict[str, str]
+) -> str | None:
+    """Like `_wizard_optional_str`, but rejects a path an earlier output flag in
+    this same answer set already claimed, re-asking instead of accepting it.
+
+    Catches the exact mistake that slips past a plain prompt: handing the same
+    directory to `--wiki` and a file to `--scaffold` builds a command that
+    crawls a whole site and only then crashes writing the scaffold, because the
+    wiki step already created that path as a directory. Caught here, before the
+    command is even built, the same way the CLI itself now also checks it (§2d)
+    — belt-and-suspenders, since the wizard exists precisely to prevent this
+    kind of mix-up.
+    """
+    while True:
+        answer = _wizard_optional_str(question)
+        if answer is None or answer not in used_paths:
+            return answer
+        typer.echo(
+            f"  {used_paths[answer]} already writes to {answer!r} — "
+            "give this a different path."
+        )
+
+
 def _wizard_choose_command() -> str:
     """Ask which command to build, by number, defaulting to the most common one."""
     options = {
@@ -703,15 +771,22 @@ def _wizard_explore_args() -> list[str]:
     resume_from = _wizard_optional_str("Resume from a selector (e.g. id:abc123)")
     if resume_from is not None:
         args += ["--resume-from", resume_from]
+    used_paths: dict[str, str] = {}
     wiki = _wizard_optional_str("Write a wiki to this directory")
     if wiki is not None:
         args += ["--wiki", wiki]
+        used_paths[wiki] = "--wiki"
         if typer.confirm("Include screenshots in the wiki?", default=False):
             args.append("--screenshots")
-    gen_tests = _wizard_optional_str("Write a generated test suite to this directory")
+    gen_tests = _wizard_optional_output_path(
+        "Write a generated test suite to this directory", "--gen-tests", used_paths
+    )
     if gen_tests is not None:
         args += ["--gen-tests", gen_tests]
-    scaffold = _wizard_optional_str("Write a config scaffold to this file")
+        used_paths[gen_tests] = "--gen-tests"
+    scaffold = _wizard_optional_output_path(
+        "Write a config scaffold to this file", "--scaffold", used_paths
+    )
     if scaffold is not None:
         args += ["--scaffold", scaffold]
     return args

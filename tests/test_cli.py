@@ -218,3 +218,74 @@ def test_wizard_apply_scaffold_builds_the_right_command(
         "spoor apply-scaffold http://localhost:5173 ./interactive.yaml --sandbox"
         in result.output
     )
+
+
+# --- output-path collisions (a real incident: --wiki and --scaffold given the ---
+# --- same path, which crashed mid-crawl trying to open a directory as a file) ---
+
+
+def test_explore_rejects_wiki_and_scaffold_sharing_a_path(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from spoor.exploration import driver as driver_mod
+
+    def _boom(*_a: object, **_k: object) -> object:
+        raise AssertionError("a browser must not be launched when paths collide")
+
+    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _boom)
+    result = runner.invoke(
+        cli.app,
+        [
+            "explore",
+            "http://localhost:8000/",
+            "--wiki",
+            "demo/out",
+            "--scaffold",
+            "demo/out",
+        ],
+    )
+    assert result.exit_code != 0
+    flat = _flatten_cli_error(result.output)
+    assert "--wiki" in flat
+    assert "--scaffold" in flat
+
+
+def test_explore_rejects_a_scaffold_path_that_is_already_a_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spoor.exploration import driver as driver_mod
+
+    def _boom(*_a: object, **_k: object) -> object:
+        raise AssertionError("a browser must not be launched when paths collide")
+
+    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _boom)
+    existing_dir = tmp_path / "already-a-dir"
+    existing_dir.mkdir()
+    result = runner.invoke(
+        cli.app,
+        ["explore", "http://localhost:8000/", "--scaffold", str(existing_dir)],
+    )
+    assert result.exit_code != 0
+    assert "--scaffold" in _flatten_cli_error(result.output)
+
+
+def test_wizard_reprompts_when_scaffold_path_matches_wiki(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[list[str]] = []
+    monkeypatch.setattr("subprocess.run", lambda argv, **_k: calls.append(argv))
+    # 1=explore, url, sandbox=n, states/requests/seconds/depth/resume blank,
+    # wiki=demo/out, screenshots=n, gen-tests blank, scaffold=demo/out (rejected,
+    # re-asked) then scaffold=demo/out.yaml, run-now=n.
+    answers = (
+        "1\nhttp://localhost:8000/\nn\n\n\n\n\n\ndemo/out\nn\n\n"
+        "demo/out\ndemo/out.yaml\nn\n"
+    )
+    result = runner.invoke(cli.app, ["wizard"], input=answers)
+    assert result.exit_code == 0, result.output
+    assert calls == []
+    assert "already writes to" in result.output
+    assert (
+        "spoor explore http://localhost:8000/ --wiki demo/out --scaffold "
+        "demo/out.yaml" in result.output
+    )
