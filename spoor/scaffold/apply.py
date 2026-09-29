@@ -30,6 +30,7 @@ import yaml
 from spoor.exploration.discovery import ActionableElement
 from spoor.exploration.explorer import ActionError
 from spoor.exploration.graph import ExplorationGraph, paths_from_root
+from spoor.exploration.safety import evaluate_action
 from spoor.scaffold.interactive_config import FIELD_ROLES
 from spoor.security.sandbox import is_sandbox
 
@@ -172,6 +173,13 @@ def apply_scaffold(
     bad entry. Two fields sharing the same name on the same state (rare — e.g. a
     repeated "Notes" box) are not disambiguated: the first matching action on that
     state is used, not reported ambiguous the way an unresolved *state* prefix is.
+
+    Every field also passes the same `evaluate_action` gate exploration itself uses
+    (docs/ROADMAP.md #134) before it is filled — belt-and-suspenders alongside the
+    `is_sandbox` check above: `evaluate_action` alone would allow any field whose name
+    doesn't match a destructive keyword even outside a sandbox, so the up-front check
+    is still required, but a field oddly labelled "Delete" is still refused here too,
+    the same as it would be during exploration.
     """
     ready, failed = applicable_fields(scaffold)
 
@@ -232,8 +240,18 @@ def apply_scaffold(
                     FailedField(state_id, field.name, "no matching field on this state")
                 )
                 continue
+            target_action = matches[0]
+            decision = evaluate_action(
+                target,
+                field.name,
+                role=target_action.role,
+                declared_sandbox=declared_sandbox,
+            )
+            if not decision.allowed:
+                failed.append(FailedField(state_id, field.name, decision.reason))
+                continue
             try:
-                driver.fill(matches[0], field.value)
+                driver.fill(target_action, field.value)
             except ActionError as exc:
                 failed.append(FailedField(state_id, field.name, str(exc)))
                 continue
