@@ -864,6 +864,35 @@ class PlaywrightDriver:
         # through DOM quiescence; a page that never settles is recorded, not fatal.
         self._wait_for_settle()
 
+    def fill(self, action: ActionableElement, value: str) -> None:
+        """Type `value` into `action`'s field (interactive-round scaffold, issue #131).
+
+        Shares `perform`'s exact relocate-and-verify path (`_actuation` — the same
+        `find_target` re-lookup, the same verified click point), so a field that
+        vanished or is covered raises the same `ElementNotLocated`/`ElementCovered` a
+        click would.
+        Clicks the verified point to focus the field (a real trusted click, same as
+        `perform`), selects any existing content with Ctrl+A so a re-run replaces rather
+        than appends, then types `value` with real, trusted keystrokes
+        (`page.keyboard.type`) — never a synthetic `.value =` DOM write, matching the
+        project's "real trusted input" precedent for clicks (7a). This only ever types;
+        it never presses Enter and never clicks anything else, so nothing here submits
+        or applies the value — that stays gated on issue #101 and the still-open
+        "how a filled field's value gets applied" design question (§2e).
+        """
+        verdict, cx, cy = self._actuation(action)
+        if verdict.verdict is Verdict.NOT_LOCATED:
+            raise ElementNotLocated(action.role, action.name)
+        if verdict.verdict is Verdict.COVERED:
+            assert verdict.covering is not None
+            raise ElementCovered(verdict.covering.role, verdict.covering.text)
+        assert cx is not None and cy is not None
+        self._inflight = 0
+        self._live_page.mouse.click(float(cx), float(cy))
+        self._live_page.keyboard.press("Control+A")
+        self._live_page.keyboard.type(value)
+        self._wait_for_settle()
+
     def _actuation(
         self, action: ActionableElement
     ) -> tuple[ActuationVerdict, float | None, float | None]:

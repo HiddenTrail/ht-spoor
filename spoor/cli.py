@@ -442,6 +442,53 @@ def serve_mcp(
     asyncio.run(server.run_stdio_async())  # pragma: no cover
 
 
+@app.command(name="apply-scaffold")
+def apply_scaffold_cmd(
+    url: Annotated[
+        str, typer.Argument(help="A URL already mapped by `spoor explore`.")
+    ],
+    scaffold: Annotated[
+        Path, typer.Argument(help="A scaffold YAML file, as written by --scaffold.")
+    ],
+) -> None:
+    """Type a filled-in interactive-round scaffold's values into their fields.
+
+    Reads a URL's saved exploration map and a scaffold file you've filled in (from
+    `spoor explore --scaffold <file>`), navigates to each field's recorded screen —
+    replaying the same path exploration itself used to reach it, nothing new
+    discovered or crawled — and types the value you pinned into it. That is the whole
+    of what this does: it never presses Enter, never clicks a submit control, and
+    never fires any action beyond typing. Applying or submitting a value is a
+    separate, not-yet-built capability (see ROADMAP.md §2e) — this command only gets a
+    value into a field, honestly, so you can see it land.
+    """
+    entry = MapStore().get(url)
+    if entry is None or entry.exploration is None:
+        raise typer.BadParameter(
+            f"there is no saved exploration map for {url} — run `spoor explore "
+            "<url>` first to map it."
+        )
+    from spoor.exploration.driver import PlaywrightDriver
+    from spoor.exploration.persisted_map import load_exploration_map
+    from spoor.scaffold.apply import apply_scaffold, load_scaffold
+
+    graph = load_exploration_map(entry.exploration)
+    scaffold_data = load_scaffold(scaffold)
+    with PlaywrightDriver(url) as driver:
+        applied, failed = apply_scaffold(driver, graph, scaffold_data)
+    typer.echo(f"Applied {len(applied)} field(s):")
+    for applied_field in applied:
+        typer.echo(f"  state {applied_field.state}: {applied_field.name!r}")
+    if failed:
+        typer.echo(f"Could not apply {len(failed)} field(s):")
+        for failed_field in failed:
+            typer.echo(
+                f"  state {failed_field.state}: {failed_field.name!r} — "
+                f"{failed_field.reason}"
+            )
+    typer.echo("Nothing was submitted or clicked beyond typing.")
+
+
 def _build_recheck(store: MapStore) -> Callable[[str], MapEntry | None]:
     """Bind the force-recheck seam to a store (lazy import keeps core light)."""
     from spoor.serving.recheck import recheck_url

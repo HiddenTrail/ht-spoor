@@ -42,8 +42,10 @@ from spoor.exploration.safety import DESTRUCTIVE_SKIP_REASON
 from spoor.security.redaction import redact
 
 # Field-like roles worth a generator guess — checkboxes/radios/buttons are actions to
-# fire, not values to provision, so they stay out of `fields:` entirely.
-_FIELD_ROLES = frozenset({"textbox", "searchbox", "combobox", "listbox"})
+# fire, not values to provision, so they stay out of `fields:` entirely. Public: also
+# the set `spoor/scaffold/apply.py` matches a scaffold field's name against, so the two
+# stay in lockstep by construction rather than by two separately-maintained lists.
+FIELD_ROLES = frozenset({"textbox", "searchbox", "combobox", "listbox"})
 
 _SHORT_ID = 12  # state ids are 64-char hashes; a short prefix labels a scaffold entry
 
@@ -107,7 +109,7 @@ def build_scaffold(graph: ExplorationGraph, *, target: str) -> str:
         node = graph.node(state_id)
         short = state_id[:_SHORT_ID]
         for action in node.actions:
-            if action.role not in _FIELD_ROLES:
+            if action.role not in FIELD_ROLES:
                 continue
             name = redact(action.name) or "(unnamed)"
             if action.input_type == "password":
