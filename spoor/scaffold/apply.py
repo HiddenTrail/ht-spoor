@@ -17,31 +17,46 @@ value, clicks nothing else" contract cannot make. `spoor.exploration.graph.
 paths_from_root` (the same reset-and-replay path `spoor/testgen/pytest_gen.py`'s
 generated tests already replay) is used only to detect that case, never to actually
 replay it.
+
+After a successful fill, the resulting page is *observed* the same read-only way
+exploration observes after any click — `discover_actions` + `capture_signals`, no new
+mechanism (§2e issue #137) — and, if the value changed what's on screen, recorded as a
+real graph edge: a new state and a transition whose `action.fill_value` marks it as
+typed rather than clicked. This mutates the `graph` object passed in, in place, the
+same way `explorer.walk()` mutates the graph it is given; persisting the enriched
+graph and re-rendering the wiki from it is the caller's job (`spoor/cli.py`), not
+this function's — `apply_scaffold` stays a pure-ish, driver-and-graph function a fast
+test can exercise without any I/O.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
 import yaml
 
-from spoor.exploration.discovery import ActionableElement
+from spoor.exploration.capture import StateSignals, diff_signals
+from spoor.exploration.discovery import ActionableElement, discover_actions
 from spoor.exploration.explorer import ActionError
 from spoor.exploration.graph import ExplorationGraph, paths_from_root
 from spoor.exploration.safety import evaluate_action
+from spoor.exploration.state import state_id as compute_state_id
 from spoor.scaffold.interactive_config import FIELD_ROLES
 from spoor.security.sandbox import is_sandbox
 
 
 class ApplyDriver(Protocol):
-    """What this module needs from a driver: reset to the entry URL, then type.
+    """What this module needs from a driver: reset, type, and observe the result.
 
     Deliberately narrower than the full `BrowserDriver` Protocol (`explorer.py`) —
-    this never discovers, probes, reads signals, or clicks anything, so a driver or
-    test fake doesn't need any of that to satisfy it, only the two methods actually
-    called here.
+    this never probes or clicks, so a driver or test fake doesn't need any of that to
+    satisfy it, only the methods actually called here. `state_html`/`ax_nodes`/
+    `capture_signals` are exactly the three the explorer itself calls to observe a
+    state after firing an action (§2e issue #137) — reused, not reinvented, for
+    observing the state a fill reveals.
     """
 
     def reset(self) -> None:
@@ -50,6 +65,18 @@ class ApplyDriver(Protocol):
 
     def fill(self, action: ActionableElement, value: str) -> None:
         """Type `value` into `action`'s field. Never submits, never clicks elsewhere."""
+        ...
+
+    def state_html(self) -> str:
+        """The current DOM, for computing the abstract state id after a fill."""
+        ...
+
+    def ax_nodes(self) -> Sequence[Mapping[str, object]]:
+        """The current accessibility-tree nodes, for discovering the fill result."""
+        ...
+
+    def capture_signals(self) -> StateSignals:
+        """The free-signal bundle for the current state, before and after a fill."""
         ...
 
 
@@ -126,6 +153,47 @@ def applicable_fields(
             continue
         ready.append(FieldToApply(state=state, name=name, value=value))
     return ready, invalid
+
+
+def _observe_and_merge(
+    driver: ApplyDriver,
+    graph: ExplorationGraph,
+    from_state: str,
+    filled_action: ActionableElement,
+    before: StateSignals,
+) -> str:
+    """Record what a fill revealed as a real graph edge, and return the landed state.
+
+    Mirrors the explorer's own after-action observation (`explorer.py`'s `walk`):
+    compute the new state id, add it (with its discovered actions and signals) if the
+    graph hasn't seen it before, and add a transition for it if this exact hop isn't
+    already recorded — idempotent, so re-running `apply_scaffold` with an unchanged
+    scaffold against an unchanged target adds nothing a second time. `filled_action`
+    already carries `fill_value` (set by the caller), so the added transition is
+    self-marking: any consumer can tell it apart from a clicked one without guessing.
+    An unchanged state (the fill had no observable effect) adds nothing at all — the
+    same "nothing new is written" outcome as before, now reached by comparison rather
+    than by never observing in the first place.
+    """
+    landed = compute_state_id(driver.state_html())
+    after = driver.capture_signals()
+    if not graph.has_state(landed):
+        graph.add_state(landed, discover_actions(driver.ax_nodes()), after)
+    if landed == from_state:
+        return landed
+    already_recorded = any(
+        t.from_state == from_state
+        and t.action.role == filled_action.role
+        and t.action.name == filled_action.name
+        and t.action.fill_value == filled_action.fill_value
+        and t.to_state == landed
+        for t in graph.transitions
+    )
+    if not already_recorded:
+        graph.add_transition(
+            from_state, filled_action, landed, diff_signals(before, after)
+        )
+    return landed
 
 
 def _resolve_state(graph: ExplorationGraph, prefix: str) -> str | None:
@@ -228,16 +296,22 @@ def apply_scaffold(
             for field in group_fields:
                 failed.append(FailedField(state_id, field.name, str(exc)))
             continue
-        node = graph.node(state_id)
+        # Tracks where the driver actually is as fills within this group chain
+        # (§2e issue #137): each field is matched against the *current* page's own
+        # action inventory, not the group's original state, since an earlier fill in
+        # this same group may already have revealed a new one.
+        current_state = state_id
         for field in group_fields:
             matches = [
                 a
-                for a in node.actions
+                for a in graph.node(current_state).actions
                 if a.name == field.name and a.role in FIELD_ROLES
             ]
             if not matches:
                 failed.append(
-                    FailedField(state_id, field.name, "no matching field on this state")
+                    FailedField(
+                        current_state, field.name, "no matching field on this state"
+                    )
                 )
                 continue
             target_action = matches[0]
@@ -248,12 +322,22 @@ def apply_scaffold(
                 declared_sandbox=declared_sandbox,
             )
             if not decision.allowed:
-                failed.append(FailedField(state_id, field.name, decision.reason))
+                failed.append(FailedField(current_state, field.name, decision.reason))
                 continue
+            before = driver.capture_signals()
             try:
                 driver.fill(target_action, field.value)
             except ActionError as exc:
-                failed.append(FailedField(state_id, field.name, str(exc)))
+                failed.append(FailedField(current_state, field.name, str(exc)))
                 continue
-            applied.append(AppliedField(state_id, field.name))
+            applied.append(AppliedField(current_state, field.name))
+            filled_action = ActionableElement(
+                role=target_action.role,
+                name=target_action.name,
+                backend_node_id=None,
+                fill_value=field.value,
+            )
+            current_state = _observe_and_merge(
+                driver, graph, current_state, filled_action, before
+            )
     return applied, failed

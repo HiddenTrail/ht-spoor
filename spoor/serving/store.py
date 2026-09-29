@@ -83,8 +83,18 @@ def shareable_api_surface(
 
 
 def _action_label(action: ActionableElement) -> dict[str, str]:
-    """A fired/discovered action as its accessibility role and name (both shared)."""
-    return {"role": action.role, "name": action.name}
+    """A fired/discovered action as its accessibility role and name (both shared).
+
+    Also carries `fill_value` when the action represents a scaffold-typed field
+    (§2e issue #137) rather than a click, so a persisted-map round-trip preserves
+    which transitions were reached by typing and what was typed. Kept raw/local
+    like `name` already is — redaction happens at the wiki/testgen render boundary,
+    not on the way into the local-only cache.
+    """
+    label = {"role": action.role, "name": action.name}
+    if action.fill_value is not None:
+        label["fill_value"] = action.fill_value
+    return label
 
 
 def _state_signal_counts(signals: StateSignals | None) -> dict[str, int] | None:

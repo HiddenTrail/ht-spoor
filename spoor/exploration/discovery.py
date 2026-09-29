@@ -72,6 +72,14 @@ class ActionableElement:
     generator's only signal for telling a login field apart from any other text box,
     since the accessibility tree alone reports both as `role="textbox"`. None for every
     non-`<input>` element and every fake that supplies none.
+
+    `fill_value` marks this element as a *typed* transition rather than a clicked one
+    (§2e, issue #137): when set, it is the value an interactive-round scaffold typed
+    into this field to reach the transition's destination state, and a replayer must
+    call `driver.fill(action, action.fill_value)` for this hop, never `driver.perform`
+    (which clicks). None for every element discovery itself ever produces — only
+    `spoor/scaffold/apply.py` constructs one with this set, when it records what a
+    scaffold's fill revealed as a real, replayable graph edge.
     """
 
     role: str
@@ -79,6 +87,7 @@ class ActionableElement:
     backend_node_id: int | None
     destination: str | None = None
     input_type: str | None = None
+    fill_value: str | None = None
 
 
 def _ax_string(field: object) -> str:

@@ -38,13 +38,16 @@ from spoor.exploration.graph import ExplorationGraph
 def _action(entry: Mapping[str, Any]) -> ActionableElement:
     """Rebuild an ActionableElement from a stored `{role, name}` action label.
 
-    The projection keeps only the shareable role and name (§2h); the live-only
-    backend node id and destination are not stored, so they come back as `None`.
+    The projection keeps only the shareable role, name, and (when present)
+    `fill_value` (§2h, §2e issue #137); the live-only backend node id and
+    destination are not stored, so they come back as `None`.
     """
+    fill_value = entry.get("fill_value")
     return ActionableElement(
         role=str(entry["role"]),
         name=str(entry["name"]),
         backend_node_id=None,
+        fill_value=str(fill_value) if isinstance(fill_value, str) else None,
     )
 
 

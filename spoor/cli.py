@@ -460,6 +460,18 @@ def apply_scaffold_cmd(
             ),
         ),
     ] = False,
+    wiki: Annotated[
+        Path | None,
+        typer.Option(
+            "--wiki",
+            help=(
+                "Also refresh the wiki at this directory (the same one --wiki wrote) "
+                "so it shows what a filled-in field revealed. Only rewritten when a "
+                "fill actually changed the page — states/transitions it added are "
+                "clearly marked as reached via this config, not a click."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Type a filled-in interactive-round scaffold's values into their fields.
 
@@ -474,6 +486,12 @@ def apply_scaffold_cmd(
     Only runs against a target you declare a sandbox with --sandbox (a loopback
     address such as localhost, or this flag) — on any other site nothing is typed,
     the same rule exploration's own destructive-action gate already follows.
+
+    When a fill changes what's on the page, that new state is read the same
+    read-only way exploration reads any other state, and saved into the map
+    alongside what the original crawl found — never overwriting it, only adding to
+    it. Pass --wiki to see it there too, clearly marked as reached by typing rather
+    than a click.
     """
     entry = MapStore().get(url)
     if entry is None or entry.exploration is None:
@@ -487,6 +505,7 @@ def apply_scaffold_cmd(
 
     graph = load_exploration_map(entry.exploration)
     scaffold_data = load_scaffold(scaffold)
+    states_before, transitions_before = len(graph.states), len(graph.transitions)
     with PlaywrightDriver(url) as driver:
         applied, failed = apply_scaffold(
             driver, graph, scaffold_data, target=url, declared_sandbox=sandbox
@@ -502,6 +521,27 @@ def apply_scaffold_cmd(
                 f"{failed_field.reason}"
             )
     typer.echo("Nothing was submitted or clicked beyond typing.")
+
+    new_states = len(graph.states) - states_before
+    new_transitions = len(graph.transitions) - transitions_before
+    if new_states or new_transitions:
+        MapStore().record(
+            url,
+            entry.records,
+            tier=entry.tier,
+            api_surface=entry.api_surface,
+            config=entry.config,
+            exploration=shareable_exploration_map(graph),
+        )
+        typer.echo(
+            f"  map updated: +{new_states} state(s), +{new_transitions} "
+            "transition(s) revealed by this config"
+        )
+        if wiki is not None:
+            from spoor.exploration.wiki import render_wiki
+
+            render_wiki(graph, wiki, target=url)
+            typer.echo(f"  wiki refreshed at: {wiki / 'index.html'}")
 
 
 def _build_recheck(store: MapStore) -> Callable[[str], MapEntry | None]:

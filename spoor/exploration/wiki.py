@@ -418,6 +418,11 @@ def _transition_view(
         "to_index": states.index(transition.to_state),
         "action_name": _label(transition.action.name),
         "action_role": transition.action.role,
+        "filled_value": (
+            None
+            if transition.action.fill_value is None
+            else _label(transition.action.fill_value)
+        ),
         "recovered_via": (
             None
             if transition.recovered_via is None
@@ -495,6 +500,15 @@ def build_pages(
     ]
     skip_views = [_skip_view(s, states) for s in graph.skipped]
 
+    # A state reached by any transition whose action carries a `fill_value` was
+    # revealed by an interactive-round scaffold typing into a field, not by a click
+    # (§2e issue #137) — flagged on the state page so a reader (or an automation tool
+    # treating the wiki as ground truth) can always tell a config-derived state apart
+    # from one the plain read-only crawl discovered.
+    filled_states = {
+        tv["to_index"] for tv in transition_views if tv["filled_value"] is not None
+    }
+
     # A state's actionable elements (6e), each joined to the transition it fired so the
     # Actions table links onward through the state's edges via its Destination column.
     for view in state_views:
@@ -510,6 +524,7 @@ def build_pages(
         # A full-page screenshot is embedded only for states the caller opted in (8a);
         # the marked state carries the relative filename its image was written under.
         view["screenshot_image"] = shot_files.get(str(view["id"]))
+        view["filled_via_scaffold"] = view["index"] in filled_states
 
     env = _environment()
     safe_target = redact(target)
@@ -787,6 +802,11 @@ _STATE = """{% extends "layout.html" %}
 <p><strong>⚠ Did not settle:</strong> the page kept changing until the settle timeout,
 so this snapshot is best-effort and may be incomplete.</p>
 {% endif %}
+{% if state.filled_via_scaffold %}
+<p><strong>&#128427; Reached via an interactive-round config:</strong> this state was
+revealed by typing a filled-in scaffold's value into a field, not by a click — see the
+transition below for what was typed.</p>
+{% endif %}
 {% if state.screenshot_image %}
 <h2>Screenshot</h2>
 {{ shot(state.screenshot_image, "Full-page screenshot of " ~ state.label, root) }}
@@ -858,6 +878,11 @@ _TRANSITION = """{% extends "layout.html" %}
 <p><strong>Reached from behind a blocker:</strong> a covering layer
   (<code>{{ transition.recovered_via }}</code>) was cleared before this action could be
   fired.</p>
+{% endif %}
+{% if transition.filled_value is not none %}
+<p><strong>&#128427; Reached via an interactive-round config:</strong> this
+  transition was not clicked — a filled-in scaffold typed
+  <code>{{ transition.filled_value }}</code> into this field.</p>
 {% endif %}
 {% if transition.has_signals %}
 <h2>What this action changed</h2>

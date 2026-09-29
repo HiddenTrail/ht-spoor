@@ -14,6 +14,7 @@ from typing import Any
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
+from spoor.exploration.capture import StateSignals
 from spoor.exploration.control import RunBudget, RunController
 from spoor.exploration.discovery import ActionableElement
 from spoor.exploration.driver import PlaywrightDriver
@@ -33,6 +34,10 @@ class _FakeDriver:
         self.resets = 0
         self.performed: list[str] = []
         self.filled: dict[str, str] = {}
+        # When False (the default), state_html() never changes, so a fill's own
+        # observe-and-merge step (§2e issue #137) sees no change and adds nothing new
+        # to the graph — the behaviour every scenario not about that feature expects.
+        self.reveals_new_state = False
 
     def reset(self) -> None:
         self.resets += 1
@@ -46,6 +51,25 @@ class _FakeDriver:
 
     def fill(self, action: ActionableElement, value: str) -> None:
         self.filled[action.name] = value
+
+    def state_html(self) -> str:
+        # apply_scaffold is root-state-only (the existing navigation restriction), so
+        # every group's starting state is always the graph's root — "home" in every
+        # scenario in this file. Paired with the `compute_state_id -> identity`
+        # monkeypatch the `apply` step installs, returning "home" here round-trips to
+        # exactly the graph's own root id, the same way a real driver's unchanged page
+        # hashes back to the state it started at.
+        if not self.reveals_new_state:
+            return "home"
+        # Distinct per fill step so a group of several fills chains through a
+        # distinct state after each one, exactly as a real page would.
+        return f"home+{sorted(self.filled.items())}"
+
+    def ax_nodes(self) -> list[dict[str, object]]:
+        return []
+
+    def capture_signals(self) -> StateSignals:
+        return StateSignals()
 
 
 @pytest.fixture
@@ -82,10 +106,19 @@ def empty_scaffold(context: dict[str, Any]) -> None:
 
 
 @when("I apply the scaffold")
-def apply(context: dict[str, Any]) -> None:
+def apply(context: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> None:
     driver = _FakeDriver()
     driver.fail_reset = context.get("fail_reset", False)
+    driver.reveals_new_state = context.get("reveals_new_state", False)
     context["driver"] = driver
+    context["states_before"] = list(context["graph"].states)
+    # The fast tier's graph states are plain labels ("home"), not real content
+    # hashes (see the module docstring) — `apply_scaffold`'s post-fill observation
+    # (§2e issue #137) otherwise hashes `_FakeDriver.state_html()` for real, which
+    # could never equal a plain label. Identity here makes the fake's own labels
+    # round-trip as themselves, exactly like a real driver's hash of an unchanged
+    # page round-trips to the state it started at.
+    monkeypatch.setattr("spoor.scaffold.apply.compute_state_id", lambda html: html)
     applied, failed = apply_scaffold(
         driver, context["graph"], context["scaffold"],
         target=context.get("target", "http://localhost/"),
@@ -247,3 +280,31 @@ def not_reset(context: dict[str, Any]) -> None:
 @then("the driver was reset exactly once")
 def reset_once(context: dict[str, Any]) -> None:
     assert context["driver"].resets == 1
+
+
+@given("filling a field on this driver reveals a new page")
+def reveals_new_state(context: dict[str, Any]) -> None:
+    context["reveals_new_state"] = True
+
+
+@then("a new state was added to the graph")
+def new_state_added(context: dict[str, Any]) -> None:
+    before = set(context["states_before"])
+    after = set(context["graph"].states)
+    assert after - before, f"no new state; graph still has {sorted(before)}"
+
+
+@then("no new state was added to the graph")
+def no_new_state_added(context: dict[str, Any]) -> None:
+    assert list(context["graph"].states) == context["states_before"]
+
+
+@then(parsers.parse('its incoming transition was typed with "{value}", not clicked'))
+def incoming_transition_typed(context: dict[str, Any], value: str) -> None:
+    before = set(context["states_before"])
+    new_states = set(context["graph"].states) - before
+    assert len(new_states) == 1, f"expected exactly one new state, got {new_states!r}"
+    (new_state,) = new_states
+    matches = [t for t in context["graph"].transitions if t.to_state == new_state]
+    assert matches, f"no transition leads to the new state {new_state!r}"
+    assert matches[0].action.fill_value == value
