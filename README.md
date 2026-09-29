@@ -220,8 +220,15 @@ it couldn't type into — an unquoted number in the YAML, a field that's no long
 one that's only reachable by clicking through the site (this first slice only reaches
 fields on the crawl's starting screen).
 
+When typing a value changes what's on the page, that's observed the same read-only way as
+everything else Spoor maps, and added to the saved map as a real, replayable state and
+transition — never overwriting what the earlier crawl found, only adding to it. Pass
+`--wiki` (the same directory an earlier `--wiki` wrote to) to see it there too, clearly
+marked as reached by typing a value rather than by a click, so it's never mistaken for
+something the site itself linked to.
+
 ```bash
-spoor apply-scaffold https://example.com ./interactive.yaml --sandbox
+spoor apply-scaffold https://example.com ./interactive.yaml --sandbox --wiki ./wiki
 ```
 
 **The safety rule — read this before pointing it at anything real.** Some actions

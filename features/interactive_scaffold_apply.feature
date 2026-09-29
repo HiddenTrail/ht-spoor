@@ -15,6 +15,13 @@
 # covered element) is reported and the rest still run — the explorer's own
 # skip-and-continue posture, never an abort on one bad entry. Nothing here is
 # site-specific (§0): one applier for every target.
+#
+# When a fill actually changes the page, that's observed the same read-only way
+# exploration observes after any click (issue #137) and recorded as a real graph
+# edge — a new state and a transition whose action carries the typed value, so it is
+# replayable and clearly distinguishable from a clicked one, never a second-class or
+# unreachable addition. A fill with no observable effect adds nothing new, same as
+# before this was built.
 
 Feature: Type a filled-in interactive-round scaffold's values into their fields
   As a team that has filled in a scaffold Spoor generated
@@ -85,6 +92,20 @@ Feature: Type a filled-in interactive-round scaffold's values into their fields
     When I apply the scaffold
     Then no field was applied
     And no field failed
+
+  Scenario: A fill that changes the page adds a real, typed graph edge
+    Given the scaffold pins "Email" on "home" to "jane@example.com"
+    And filling a field on this driver reveals a new page
+    When I apply the scaffold
+    Then "Email" on "home" was applied
+    And a new state was added to the graph
+    And its incoming transition was typed with "jane@example.com", not clicked
+
+  Scenario: A fill with no observable effect adds nothing new to the graph
+    Given the scaffold pins "Email" on "home" to "jane@example.com"
+    When I apply the scaffold
+    Then "Email" on "home" was applied
+    And no new state was added to the graph
 
   @browser
   Scenario: A live crawl's field is typed into and the DOM value actually changes

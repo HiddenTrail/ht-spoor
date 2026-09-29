@@ -86,12 +86,36 @@ def fire(page, role, name):
     page.wait_for_load_state()
 
 
+def fill(page, role, name, value):
+    """Type into an element by ARIA role and accessible name, first match.
+
+    Mirrors PlaywrightDriver.fill: click to focus, select any existing content, then
+    type with real keystrokes -- a typed transition (§2e issue #137), not a click.
+    """
+    if name:
+        locator = page.get_by_role(role, name=name, exact=True)
+    else:
+        locator = page.get_by_role(role)
+    locator.first.click()
+    page.keyboard.press("Control+A")
+    page.keyboard.type(value)
+    page.wait_for_load_state()
+
+
 def reach(page, path):
-    """Reset to the target and replay the recorded path of (role, name) actions."""
+    """Reset to the target and replay the recorded path of (role, name, value) steps.
+
+    `value` is None for a clicked step (replayed with `fire`) or a string for a typed
+    step (replayed with `fill`) -- a fill-revealed state's own incoming edge is typed,
+    never clicked (§2e issue #137).
+    """
     page.goto(TARGET)
     page.wait_for_load_state()
-    for role, name in path:
-        fire(page, role, name)
+    for role, name, value in path:
+        if value is None:
+            fire(page, role, name)
+        else:
+            fill(page, role, name, value)
 '''
 
 _CONFTEST_SOURCE = '''\
@@ -170,8 +194,25 @@ def render_suite(
 
 
 def _locator_args(action: ActionableElement) -> str:
-    """The `fire(...)`/path arguments for an action: role and redacted name."""
+    """The `fire(...)` arguments for a clicked action: role and redacted name."""
     return f"{action.role!r}, {redact(action.name)!r}"
+
+
+def _fill_value_repr(action: ActionableElement) -> str:
+    """The redacted `fill_value` literal for a path/action step, or `None`'s repr."""
+    return "None" if action.fill_value is None else repr(redact(action.fill_value))
+
+
+def _path_step_repr(action: ActionableElement) -> str:
+    """One `_PATH` tuple: role, redacted name, and redacted fill value or `None`."""
+    return f"({action.role!r}, {redact(action.name)!r}, {_fill_value_repr(action)})"
+
+
+def _fire_line(action: ActionableElement) -> str:
+    """The final replay line for a transition's own action: `fire(...)`/`fill(...)`."""
+    if action.fill_value is None:
+        return f"    fire(page, {_locator_args(action)})\n"
+    return f"    fill(page, {_locator_args(action)}, {_fill_value_repr(action)})\n"
 
 
 def _render_test(
@@ -184,16 +225,16 @@ def _render_test(
         f"{transition.from_state[:_SHORT_ID]} --{label}--> "
         f"{transition.to_state[:_SHORT_ID]}"
     )
-    path_lines = "".join(f"    ({_locator_args(step)}),\n" for step in path)
+    path_lines = "".join(f"    {_path_step_repr(step)},\n" for step in path)
     body = _assertion_body(transition)
     return (
         "from __future__ import annotations\n\n"
-        "from _spoor_testkit import fire, reach, redact_all, storage_keys\n\n"
+        "from _spoor_testkit import fill, fire, reach, redact_all, storage_keys\n\n"
         f"_PATH = [\n{path_lines}]\n\n\n"
         f"def test_transition_{index}(page):\n"
         f'    """{heading} (replay, fire, assert)."""\n'
         "    reach(page, _PATH)\n"
-        f"    fire(page, {_locator_args(action)})\n"
+        f"{_fire_line(action)}"
         f"{body}"
     )
 
