@@ -121,6 +121,95 @@ def test_explore_screenshots_requires_wiki(monkeypatch: pytest.MonkeyPatch) -> N
     assert "--wiki" in _flatten_cli_error(result.output)
 
 
+def test_run_dry_run_does_not_fetch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls = {"n": 0}
+
+    def _boom(cfg: object) -> RunResult:
+        calls["n"] += 1
+        raise AssertionError("a dry run must not fetch anything")
+
+    monkeypatch.setattr(extract, "run_report", _boom)
+    out = tmp_path / "out.json"
+    result = runner.invoke(
+        cli.app, ["run", str(_config_file(tmp_path)), "-o", str(out), "--dry-run"]
+    )
+    assert result.exit_code == 0, result.output
+    assert calls["n"] == 0
+    assert not out.exists()
+    assert "http://localhost:8000/x.html" in result.output
+    assert str(out) in result.output
+
+
+def test_explore_dry_run_does_not_launch_browser(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from spoor.exploration import driver as driver_mod
+
+    def _boom(*_a: object, **_k: object) -> object:
+        raise AssertionError("a browser must not be launched on a dry run")
+
+    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _boom)
+    result = runner.invoke(
+        cli.app,
+        [
+            "explore",
+            "http://localhost:8000/",
+            "--sandbox",
+            "--max-depth",
+            "2",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert "http://localhost:8000/" in result.output
+    assert "max depth 2" in result.output
+    assert "destructive actions" in result.output.lower()
+
+
+def test_apply_scaffold_dry_run_does_not_launch_browser(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spoor.exploration import driver as driver_mod
+    from spoor.exploration.discovery import ActionableElement
+    from spoor.exploration.graph import ExplorationGraph
+    from spoor.security import storage
+    from spoor.serving.store import MapStore, shareable_exploration_map
+
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path)
+    graph = ExplorationGraph()
+    graph.add_state(
+        "home", [ActionableElement(role="textbox", name="Email", backend_node_id=1)]
+    )
+    url = "http://localhost:8000/"
+    MapStore().record(url, [], exploration=shareable_exploration_map(graph))
+
+    scaffold_path = tmp_path / "interactive.yaml"
+    scaffold_path.write_text(
+        "fields:\n"
+        "  - state: home\n"
+        "    name: Email\n"
+        "    value: jane@example.com\n"
+        "  - state: home\n"
+        "    name: Postcode\n"
+        "    value: 00210\n",  # unquoted, parses as an int -- an invalid entry
+        encoding="utf-8",
+    )
+
+    def _boom(*_a: object, **_k: object) -> object:
+        raise AssertionError("a browser must not be launched on a dry run")
+
+    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _boom)
+    result = runner.invoke(
+        cli.app,
+        ["apply-scaffold", url, str(scaffold_path), "--sandbox", "--dry-run"],
+    )
+    assert result.exit_code == 0, result.output
+    assert "jane@example.com" in result.output
+    assert "value must be a quoted YAML string" in result.output
+
+
 def test_explore_resume_without_saved_map_aborts_before_browser(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

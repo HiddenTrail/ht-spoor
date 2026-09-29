@@ -248,6 +248,20 @@ hard rule, not a preference: there is no flag or config that makes Spoor perform
 destructive action on a target it doesn't recognize as a sandbox (a local address,
 or one you declared with `--sandbox`).
 
+**Checking a command before it runs.** `run`, `explore`, and `apply-scaffold` all
+take `--dry-run`: it validates every flag you gave and prints exactly what the
+command would do — target, sandbox status, budget, every output path — then exits
+without fetching a page, launching a browser, typing into anything, or writing to
+the local map. Useful whenever a command has a lot of flags and you want to be sure
+you got them right before it does anything:
+
+```bash
+spoor explore https://example.com --sandbox --max-depth 3 --wiki ./wiki --dry-run
+```
+
+Tab-completion is also available for every command and flag — run
+`spoor --install-completion` once in the shell you use.
+
 ## Current capabilities
 
 ### Available now

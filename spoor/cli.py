@@ -4,6 +4,13 @@ The whole product surface on top of the resolution/extraction machinery:
 `spoor run config.yaml -o output.json`. The `run` command dispatches the config
 through the resolution ladder (§2), writes the chosen output format, and prints a
 run summary (§2d observability); later phases add their own commands as they land.
+
+Two ergonomics features cut across every command that can fire a real action
+(`run`, `explore`, `apply-scaffold`): shell completion (`spoor --install-completion`,
+Typer's built-in) and `--dry-run`, which validates every argument and prints exactly
+what the command would do — without fetching a page, launching a browser, typing into
+anything, or writing to the local map — so a mistyped flag is caught before it can do
+anything, not after.
 """
 
 from __future__ import annotations
@@ -29,7 +36,9 @@ app = typer.Typer(
     name="spoor",
     help="Give your agents a map of the web.",
     no_args_is_help=True,
-    add_completion=False,
+    # Typer's built-in shell completion (tab-completes every command and flag) —
+    # enable with `spoor --install-completion` once, in the shell you use.
+    add_completion=True,
 )
 
 
@@ -57,6 +66,16 @@ def run(
             help="Output format (json, jsonl, csv); inferred from -o if omitted.",
         ),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help=(
+                "Validate the config and print what would be fetched and written, "
+                "then exit — no request is made and no file is written."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Run a config against its target and write the extracted records."""
     cfg = load_config(config.read_text(encoding="utf-8"))
@@ -64,6 +83,11 @@ def run(
         fmt = resolve_format(output, output_format)
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
+    if dry_run:
+        typer.echo("Dry run — nothing was fetched or written.")
+        typer.echo(f"  target: {cfg.target}")
+        typer.echo(f"  output: {output} ({fmt})")
+        return
     result = extract.run_report(cfg)
     write_records(result.records, cfg, output, fmt)
     # Remember this run in the local map so the read-only serving layer (§2f)
@@ -191,6 +215,18 @@ def explore(
             ),
         ),
     ] = False,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help=(
+                "Validate every flag and print exactly what this run would do — "
+                "target, sandbox status, budget, resume point, and every output "
+                "path — then exit. No browser is launched, nothing is fired, and "
+                "nothing is saved to the local map."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Explore a target with no config, mapping its state-action graph.
 
@@ -215,7 +251,9 @@ def explore(
     actions — a starting point for a planned, not-yet-built interactive round; filling
     it in does nothing on its own yet. The
     mapped graph is also saved to the local map, so `spoor serve`/`serve-mcp` can hand
-    it back later without re-exploring.
+    it back later without re-exploring. Pass --dry-run to check every flag and see
+    exactly what a run would do before committing to it — no browser, no requests,
+    nothing saved.
     """
     import signal
 
@@ -227,8 +265,10 @@ def explore(
     from spoor.exploration.screenshot_store import ImageRef
 
     if screenshots and wiki is None:
-        raise typer.BadParameter("--screenshots needs --wiki: there is no wiki to put "
-                                 "the images in without it.")
+        raise typer.BadParameter(
+            "--screenshots needs --wiki: there is no wiki to put "
+            "the images in without it."
+        )
     # The saved map to continue, when resuming: the §2h-shareable projection an earlier
     # explore of this exact URL stored (§2f). Loaded up front so a missing map fails
     # before a browser is launched.
@@ -251,6 +291,42 @@ def explore(
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     controller = RunController(budget)
+    if dry_run:
+        typer.echo("Dry run — no browser was launched, nothing was fired or saved.")
+        typer.echo(f"  target:  {url}")
+        typer.echo(
+            "  sandbox: "
+            + (
+                "yes — destructive actions (delete, buy, pay, ...) will fire"
+                if sandbox
+                else "no — destructive actions will be skipped and logged"
+            )
+        )
+        if resume_from is not None:
+            typer.echo(f"  resume:  from {resume_from!r}")
+        budget_bits = [
+            f"{label} {value}"
+            for label, value in (
+                ("max states", max_states),
+                ("max requests", max_requests),
+                ("max seconds", max_seconds),
+                ("max depth", max_depth),
+            )
+            if value is not None
+        ]
+        typer.echo(
+            "  budget:  "
+            + (", ".join(budget_bits) if budget_bits else "unbounded (Ctrl-C to stop)")
+        )
+        if wiki is not None:
+            typer.echo(
+                f"  wiki:    {wiki}" + (" (with screenshots)" if screenshots else "")
+            )
+        if gen_tests is not None:
+            typer.echo(f"  tests:   {gen_tests}")
+        if scaffold is not None:
+            typer.echo(f"  scaffold: {scaffold}")
+        return
     # The opt-in screenshot sinks: dicts only when asked for, so a default run captures
     # no pixels at all (§2e slice 8). During exploration each image is written straight
     # to disk under the wiki directory as it is captured (§2e slice 8f) — and only when
@@ -472,6 +548,17 @@ def apply_scaffold_cmd(
             ),
         ),
     ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help=(
+                "Parse the scaffold and print exactly which fields would be typed "
+                "into, and which are already invalid, then exit. No browser is "
+                "launched, nothing is typed, and nothing is saved."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Type a filled-in interactive-round scaffold's values into their fields.
 
@@ -491,7 +578,8 @@ def apply_scaffold_cmd(
     read-only way exploration reads any other state, and saved into the map
     alongside what the original crawl found — never overwriting it, only adding to
     it. Pass --wiki to see it there too, clearly marked as reached by typing rather
-    than a click.
+    than a click. Pass --dry-run to check the scaffold and see exactly which fields
+    would be typed into before opening a browser at all.
     """
     entry = MapStore().get(url)
     if entry is None or entry.exploration is None:
@@ -499,12 +587,37 @@ def apply_scaffold_cmd(
             f"there is no saved exploration map for {url} — run `spoor explore "
             "<url>` first to map it."
         )
-    from spoor.exploration.driver import PlaywrightDriver
     from spoor.exploration.persisted_map import load_exploration_map
-    from spoor.scaffold.apply import apply_scaffold, load_scaffold
+    from spoor.scaffold.apply import applicable_fields, load_scaffold
 
     graph = load_exploration_map(entry.exploration)
     scaffold_data = load_scaffold(scaffold)
+    if dry_run:
+        ready, invalid = applicable_fields(scaffold_data)
+        typer.echo("Dry run — no browser was launched, nothing was typed or saved.")
+        typer.echo(f"  target:  {url}")
+        typer.echo(
+            "  sandbox: "
+            + ("yes" if sandbox else "no — nothing would be typed without --sandbox")
+        )
+        if wiki is not None:
+            typer.echo(
+                f"  wiki:    {wiki} (refreshed only if a fill reveals a new state)"
+            )
+        typer.echo(f"  fields that would be attempted ({len(ready)}):")
+        for field in ready:
+            typer.echo(f"    state {field.state}: {field.name!r} = {field.value!r}")
+        if invalid:
+            typer.echo(f"  fields already invalid in the YAML ({len(invalid)}):")
+            for failed_field in invalid:
+                typer.echo(
+                    f"    state {failed_field.state}: {failed_field.name!r} — "
+                    f"{failed_field.reason}"
+                )
+        return
+    from spoor.exploration.driver import PlaywrightDriver
+    from spoor.scaffold.apply import apply_scaffold
+
     states_before, transitions_before = len(graph.states), len(graph.transitions)
     with PlaywrightDriver(url) as driver:
         applied, failed = apply_scaffold(
