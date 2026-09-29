@@ -195,6 +195,19 @@ spoor explore https://example.com --gen-tests ./tests-from-map
 python -m pytest ./tests-from-map      # re-run later to catch drift
 ```
 
+**Scaffolding a config for a future interactive round.** Add `--scaffold <file>` to also
+write a YAML file naming what a planned, not-yet-built interactive round would need:
+every field it found (with a best guess at what kind of value it wants, and a blank spot
+to fill one in), every point where a login is required, and every action it skipped for
+being destructive. Filling this file in does nothing on its own today — it's a starting
+point, not a config anything reads yet. Spoor never automates a login itself: a login
+entry is a flag pointing at the same session file you'd already supply to a config, never
+a place to type a password.
+
+```bash
+spoor explore https://example.com --scaffold ./interactive.yaml
+```
+
 **The safety rule — read this before pointing it at anything real.** Some actions
 are destructive: deleting a record, buying, paying, logging out, submitting a form.
 On any normal site Spoor **always skips** those and tells you it skipped them — it

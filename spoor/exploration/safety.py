@@ -81,6 +81,18 @@ class GateDecision:
         return not self.allowed
 
 
+DESTRUCTIVE_SKIP_REASON = "skipped: destructive action not allowed outside a sandbox"
+"""The exact reason a destructive action gets skipped outside a sandbox.
+
+A named constant (not just the literal below) so anything downstream that needs to
+tell a *destructive* skip apart from any other kind (e.g. a layer-recovery skip) can
+match on it precisely, rather than re-deriving the same judgement a second time and
+risking a false positive — an element whose label happens to contain a destructive
+keyword but was skipped for an unrelated reason (blocked by an overlay, not gone)
+must not be misreported as "skipped for being destructive".
+"""
+
+
 def evaluate_action(
     target: str,
     label: str,
@@ -101,7 +113,4 @@ def evaluate_action(
         return GateDecision(
             allowed=True, reason="destructive action permitted in sandbox"
         )
-    return GateDecision(
-        allowed=False,
-        reason="skipped: destructive action not allowed outside a sandbox",
-    )
+    return GateDecision(allowed=False, reason=DESTRUCTIVE_SKIP_REASON)
