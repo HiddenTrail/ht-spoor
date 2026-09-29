@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790679856093,
+  "lastUpdate": 1790683006140,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -2576,6 +2576,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5443.5,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "99ec3e337e9afe37738f4994114afd5d40c4b636",
+          "message": "Type a filled-in interactive-round scaffold's values into their fields (#135)\n\n* Type a filled-in interactive-round scaffold's values into their fields\n\nAdds spoor apply-scaffold <url> <file>: the first, deliberately narrow slice\nof consuming a filled-in interactive-round scaffold (issue #131 shipped\ngeneration only). Navigates to each field's recorded state and types its\npinned value in -- never presses Enter, never clicks a submit control, never\napplies the value. This is the maintainer-approved, explicitly narrow\nexception to the read-only-mode-exit gate ahead of keyword-list localization\n(#101): typing isn't a DESTRUCTIVE_KEYWORDS match, and applying a value\nstays fully blocked on #101.\n\n- PlaywrightDriver.fill(action, value): shares perform()'s exact\n  relocate-and-verify path (_actuation -- the same find_target re-lookup,\n  the same verified click point) rather than Playwright's own locator API,\n  consistent with the relocation-bug precedent (7a) that first ruled that\n  out. Clicks to focus, selects existing content, types with real trusted\n  keystrokes (page.keyboard.type), never a synthetic DOM write.\n- spoor/scaffold/apply.py: apply_scaffold navigates via paths_from_root +\n  driver.perform replay -- the same reset-and-replay pattern the generated\n  test suite already proves, so no new crawl primitive was needed. One\n  field's failure (unresolved state prefix, field no longer present,\n  vanished/covered element) is recorded and the rest still run, mirroring\n  the explorer's own skip-and-continue posture.\n- FIELD_ROLES promoted to public in interactive_config.py so apply.py\n  matches the same role set scaffold generation used, by construction.\n\nBDD-first: features/interactive_scaffold_apply.feature, 5 fast-tier\nscenarios + one @browser scenario that types into a real field and reads\nthe DOM value back. New field added to the existing dedicated\nexplore_login.html fixture (not the shared two-page traversal fixture, per\nthe lesson from issue #131's own PR).\n\nFull local gate green: ruff, mypy (157 files), pytest (719 passed / 6\n@browser scenarios for this feature), scripts/check_genericity.py. Also\nverified against the real EcoEstate demo target with a human-filled\nscaffold -- 5 fields applied live, 0 failures.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n* Fix 5 safety/correctness gaps in scaffold apply (§2e, #131 review)\n\napply_scaffold now checks is_sandbox before touching the driver at all,\nmatching the §2e destructive-action non-negotiable (the previous cut\nfired fill() unconditionally). Fields on the same resolved state share\none reset+visit instead of reloading the page per field, which was\noverwriting earlier fields' typed values. A reset/replay failure now\nfails only that state's fields instead of aborting the whole run. A\nnon-string YAML value (an unquoted number) is now reported as a failed\nfield instead of silently dropped. And apply is restricted to the root\nstate only: a field reachable solely by replaying navigation clicks is\nrefused (\"navigation replay is outside the typing-only scope\") rather\nthan attempted, since a click that only exists to reach a field is\nstill a click this module's contract forbids.\n\nSeparately, PlaywrightDriver.fill() now verifies a field's live value\nactually changed to what was typed before reporting success, so a\nread-only/disabled field can't be reported as filled. Raises the new\nElementNotEditable.\n\nAdded --sandbox to `spoor apply-scaffold`, a @browser scenario proving\nthe read-only-field case end to end (fixtures/static/explore_login.html\ngained a read-only \"Account ID\" field), and reconciled README.md,\ndocs/ROADMAP.md's decision note (which previously claimed a safety\ngate the shipped code didn't actually apply), and features/README.md.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-29T14:51:19+03:00",
+          "tree_id": "a6eabd57508d65bd2c42003364735083e13bbf84",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/99ec3e337e9afe37738f4994114afd5d40c4b636"
+        },
+        "date": 1790683005551,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 225.494,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04486,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.1698,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.1266,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.1211,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.07267,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 11.8111,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.12515,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 18.8337,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04415,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.261,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.57632,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.3289,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05265,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.5291,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.02332,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.9786,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09005,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5561,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01069,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4825,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5305.4,
             "unit": "MB"
           }
         ]
