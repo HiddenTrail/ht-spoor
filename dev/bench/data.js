@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790709549010,
+  "lastUpdate": 1790710234516,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -3440,6 +3440,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 4871,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "091967e3ac30bbcefa43e118c1df06b088540311",
+          "message": "CLI: reject colliding --wiki/--gen-tests/--scaffold output paths upfront (#143)\n\nReal incident: spoor wizard was used to build `spoor explore ... --wiki\ndemo/wizard-eco --scaffold demo/wizard-eco` -- the same path handed to both\nflags. --wiki writes a directory of files; --scaffold writes one YAML file.\nThe crawl ran to completion (states/transitions/skips printed successfully),\nthen crashed writing the scaffold with a bare PermissionError, because that\npath already existed as the wiki's directory.\n\nAdds _check_explore_output_paths, run before any browser is launched: refuses\nwith a clear message when two of --wiki/--gen-tests/--scaffold share a path,\nor when one already exists on disk as the wrong kind of thing (a file where a\ndirectory-writing flag expects one, or vice versa). Verified against the\nexact reported command -- now fails in under a second instead of after a full\ncrawl.\n\nAlso hardens the wizard itself, since this is precisely the class of mistake\nit exists to prevent: _wizard_optional_output_path rejects and re-prompts\nwhen a later output-path answer (--gen-tests, --scaffold) repeats an earlier\none (--wiki, --gen-tests) in the same session, catching it before the command\nis even built -- belt-and-suspenders with the CLI-level check, not a\nreplacement for it (a directly-typed `spoor explore` command bypasses the\nwizard entirely and still needs its own guard).\n\nCovered by 3 new tests in test_cli.py: the exact colliding-paths case, a path\nthat already exists as the wrong kind of thing, and the wizard's reprompt\npath -- all following the existing \"assert PlaywrightDriver is never\nconstructed\" pattern to prove nothing runs before the check.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-29T22:25:31+03:00",
+          "tree_id": "b1b120710df9f3458a82922e71f4e76bfa3c4d2a",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/091967e3ac30bbcefa43e118c1df06b088540311"
+        },
+        "date": 1790710232895,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 222.827,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03824,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.9535,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.1288,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.0947,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06866,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 11.6343,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11559,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 18.3855,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.07934,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.3659,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.57499,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.0711,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05241,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.2017,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.98129,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 125.9622,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09317,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.577,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01119,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4875,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5342.5,
             "unit": "MB"
           }
         ]
