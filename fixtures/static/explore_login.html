@@ -1,13 +1,19 @@
 <!DOCTYPE html>
 <!--
   Login-field fixture (ROADMAP.md §2e, interactive-round scaffold slice 1, issue
-  #131). A single page carrying one password field, kept separate from the
-  explore_home.html two-page traversal fixture so this doesn't perturb its
-  hardcoded state/transition counts (exploration_browser.feature). The password
-  field is discovery's input_type enrichment target: it and the link both surface
-  as accessibility-tree nodes, but only the password field carries a DOM input_type
-  once the driver enriches it — the signal that tells a login field apart from any
-  other text box.
+  #131). A single page carrying one password field and one plain text field, kept
+  separate from the explore_home.html two-page traversal fixture so this doesn't
+  perturb its hardcoded state/transition counts (exploration_browser.feature). The
+  password field is discovery's input_type enrichment target: it and every other
+  field surface as accessibility-tree nodes, but only the password field carries a
+  DOM input_type of "password" once the driver enriches it — the signal that tells
+  a login field apart from any other text box. The "Nickname" text field is the
+  scaffold-apply live target (issue #131 follow-on): a real field to type into and
+  read the DOM value back from, proving the typing path works end to end. The
+  "Account ID" field is read-only and pre-filled by the page itself — the
+  scaffold-apply editability-verification target (finding 4 of the #131 apply-scaffold
+  review): a field that takes a click and swallows keystrokes without its value ever
+  changing, proving `fill` reports that honestly rather than claiming success.
 -->
 <html lang="en">
   <head>
@@ -18,5 +24,9 @@
     <h1>Login</h1>
     <label for="password">Password</label>
     <input type="password" id="password" name="password" />
+    <label for="nickname">Nickname</label>
+    <input type="text" id="nickname" name="nickname" />
+    <label for="account-id">Account ID</label>
+    <input type="text" id="account-id" name="account-id" value="ACC-001" readonly />
   </body>
 </html>

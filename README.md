@@ -208,6 +208,22 @@ a place to type a password.
 spoor explore https://example.com --scaffold ./interactive.yaml
 ```
 
+**Typing a filled-in scaffold's values in.** Once you've filled some `value:` fields in
+that YAML, `spoor apply-scaffold <url> <file> --sandbox` types each one into its field on
+the screen the crawl started from — nothing else. It never presses Enter, never clicks a
+submit button, and never applies the value in any way; that's a separate, not-yet-built
+capability. It only runs against a target you declare a sandbox with `--sandbox` (see the
+safety rule below) — against anything else nothing is typed. It confirms each field
+actually changed to the value you typed, so a read-only or disabled field is reported as
+failed rather than silently claimed as done, and it reports a plain reason for every field
+it couldn't type into — an unquoted number in the YAML, a field that's no longer there, or
+one that's only reachable by clicking through the site (this first slice only reaches
+fields on the crawl's starting screen).
+
+```bash
+spoor apply-scaffold https://example.com ./interactive.yaml --sandbox
+```
+
 **The safety rule — read this before pointing it at anything real.** Some actions
 are destructive: deleting a record, buying, paying, logging out, submitting a form.
 On any normal site Spoor **always skips** those and tells you it skipped them — it

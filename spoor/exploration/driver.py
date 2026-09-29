@@ -91,6 +91,7 @@ from spoor.exploration.discovery import ActionableElement
 from spoor.exploration.explorer import (
     ActionError,
     ElementCovered,
+    ElementNotEditable,
     ElementNotLocated,
 )
 from spoor.exploration.settling import SettleResult, wait_for_quiescence
@@ -201,6 +202,18 @@ function() {
     };
   }
   return {hitsTarget, covering, cx, cy};
+}
+"""
+
+# Run on the element `fill` just typed into: the element's current editable content, so
+# `fill` can verify a read-only or disabled field actually changed rather than silently
+# swallowing the keystrokes it was sent (§2e, #131, finding 4). `'value' in this` covers
+# every field flavour `fill` targets (textbox/searchbox/combobox/listbox, per
+# `interactive_config.FIELD_ROLES`); the `textContent` fallback exists only in case a
+# future field role is contenteditable rather than a real form control.
+_FIELD_VALUE_JS = """
+function() {
+  return 'value' in this ? this.value : this.textContent;
 }
 """
 
@@ -863,6 +876,75 @@ class PlaywrightDriver:
         # that only changes the page in place and one that navigates both resolve
         # through DOM quiescence; a page that never settles is recorded, not fatal.
         self._wait_for_settle()
+
+    def fill(self, action: ActionableElement, value: str) -> None:
+        """Type `value` into `action`'s field (interactive-round scaffold, issue #131).
+
+        Shares `perform`'s exact relocate-and-verify path (`_actuation` — the same
+        `find_target` re-lookup, the same verified click point), so a field that
+        vanished or is covered raises the same `ElementNotLocated`/`ElementCovered` a
+        click would.
+        Clicks the verified point to focus the field (a real trusted click, same as
+        `perform`), selects any existing content with Ctrl+A so a re-run replaces rather
+        than appends, then types `value` with real, trusted keystrokes
+        (`page.keyboard.type`) — never a synthetic `.value =` DOM write, matching the
+        project's "real trusted input" precedent for clicks (7a). This only ever types;
+        it never presses Enter and never clicks anything else, so nothing here submits
+        or applies the value — that stays gated on issue #101 and the still-open
+        "how a filled field's value gets applied" design question (§2e).
+
+        Clicking and typing "succeed" even against a read-only or disabled field — the
+        browser accepts the click and simply drops the keystrokes, so a success verdict
+        from that alone would be dishonest (§2e, #131, finding 4). After typing, the
+        field is re-located (same `find_target` engine) and its live value read back
+        over CDP; a value that doesn't match what was typed raises `ElementNotEditable`
+        rather than reporting a fill that never actually landed.
+        """
+        verdict, cx, cy = self._actuation(action)
+        if verdict.verdict is Verdict.NOT_LOCATED:
+            raise ElementNotLocated(action.role, action.name)
+        if verdict.verdict is Verdict.COVERED:
+            assert verdict.covering is not None
+            raise ElementCovered(verdict.covering.role, verdict.covering.text)
+        assert cx is not None and cy is not None
+        self._inflight = 0
+        self._live_page.mouse.click(float(cx), float(cy))
+        self._live_page.keyboard.press("Control+A")
+        self._live_page.keyboard.type(value)
+        self._wait_for_settle()
+        if self._read_field_value(action) != value:
+            raise ElementNotEditable(action.role, action.name)
+
+    def _read_field_value(self, action: ActionableElement) -> str | None:
+        """The live value of `action`'s field right now, or `None` if it's gone.
+
+        Re-locates through `find_target` rather than reusing an earlier backend node
+        id — the same "never trust a stale handle" posture `_actuation` already takes,
+        since the element could in principle have been replaced by the typing itself.
+        """
+        target = find_target(self.ax_nodes(), action.role, action.name)
+        if target is None or target.backend_node_id is None:
+            return None
+        session = self._live_page.context.new_cdp_session(self._live_page)
+        try:
+            resolved = session.send(
+                "DOM.resolveNode", {"backendNodeId": target.backend_node_id}
+            )
+            object_id = resolved["object"]["objectId"]
+            result = session.send(
+                "Runtime.callFunctionOn",
+                {
+                    "objectId": object_id,
+                    "functionDeclaration": _FIELD_VALUE_JS,
+                    "returnByValue": True,
+                },
+            )
+        except PlaywrightError as exc:
+            raise ActionError("element could not be read back after fill") from exc
+        finally:
+            session.detach()
+        value = result.get("result", {}).get("value")
+        return value if isinstance(value, str) else None
 
     def _actuation(
         self, action: ActionableElement
