@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790689536473,
+  "lastUpdate": 1790690770371,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -3008,6 +3008,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5341.5,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bdc22dea02d10c0788e60ca8b5fd1a9e0f31aac0",
+          "message": "Move the live-docker-archetype integration tier off the PR gate to nightly (#139)\n\ndocker compose -f fixtures/docker-compose.yml up -d in ci.yml was unscoped, so\nit booted the whole archetype bench (Juice Shop, Sauce Demo -- built from\nsource on every run, no prebuilt image -- and PrestaShop, which has no\nintegration test consuming it yet) on every PR. That made the mandatory gate\n\"terribly long\" for a check that only needs to catch a genericity regression\nwithin a day, not synchronously with every push.\n\nci.yml now runs `pytest -m \"not integration\"` (fast tier + browser tier, no\nDocker at all) and no longer touches the archetype bench. The `integration`\nmarker moved to a new job in nightly.yml, on the existing daily schedule plus\nworkflow_dispatch for an on-demand run; it boots the full bench and runs\n`pytest -m integration`, same steps ci.yml used to run. Also dropped the\n\"Upload extraction output\" step from ci.yml -- test-output/ is only ever\nwritten by integration-marked tests, so it could never fire there anymore.\n\nRecorded as a decision in docs/ROADMAP.md (§5.1) rather than a silent config\ntweak, since it changes what a PR-blocking gate actually covers; CLAUDE.md's\nown description of the split is updated to match. This narrows *when* the\nlive-archetype proof runs, never *whether* it runs or what it's allowed to\nfind.\n\nVerified locally: `pytest -m \"not integration\"` passes in full (765 passed, 11\ndeselected -- exactly the integration-marked tests), matching what the new\nci.yml gate will run.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-29T17:00:51+03:00",
+          "tree_id": "e695ef160be4a14e24a394b7f0c5e93d5469ff0e",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/bdc22dea02d10c0788e60ca8b5fd1a9e0f31aac0"
+        },
+        "date": 1790690769442,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 235.987,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04421,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.2842,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.13226,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.1369,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0002,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06968,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 12.1392,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.12972,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 20.6394,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04413,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2959,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.58143,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.5659,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05578,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 14.1785,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.0352,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 133.2303,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.1044,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.6466,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01162,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.5215,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5316.3,
             "unit": "MB"
           }
         ]
