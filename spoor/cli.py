@@ -14,12 +14,17 @@ take and, if confirmed, runs that invocation as a subprocess.
 
 from __future__ import annotations
 
+import sys
+import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Annotated
+from typing import TYPE_CHECKING, Annotated
 
 import click
 import typer
+
+if TYPE_CHECKING:
+    from spoor.exploration.control import RunBudget, RunController
 
 from spoor.core import extract
 from spoor.core.config import load_config
@@ -93,6 +98,69 @@ def run(
     )
     typer.echo(f"Wrote {len(result.records)} record(s) to {output} ({fmt})")
     typer.echo(RunSummary.from_result(result).render())
+
+
+class _CliProgress:
+    """A dependency-free live spinner/bar for `spoor explore` (§2d observability).
+
+    Ticked from `explorer.explore`'s opt-in `progress` callback, on the same thread
+    the crawl runs on — never a second thread polling the driver, since Playwright's
+    sync API is not safe to touch from any thread but the one that created it. When
+    a `max_states` or `max_requests` bound is set, renders a determinate
+    `[####------] NN%` gauge against it (states take priority, since that is what a
+    reader usually means by "how much of the site is mapped"); unbounded, renders a
+    `|/-\\` spinner instead — there is no total to show a percentage of. Either way
+    the live counts (states, requests, elapsed seconds) are always shown alongside
+    it. Silently does nothing when stdout isn't a real terminal (piped, redirected
+    to a file, or running under a test runner), so non-interactive output is never
+    polluted with carriage-return control characters, and throttled to redraw at
+    most ~10 times a second so a fast crawl spends its time exploring, not
+    repainting a terminal.
+    """
+
+    _FRAMES = "|/-\\"
+    _MIN_INTERVAL_S = 0.1
+    _WIDTH = 20
+
+    def __init__(self, controller: RunController, budget: RunBudget) -> None:
+        self._controller = controller
+        self._budget = budget
+        self._frame = 0
+        self._last_render = 0.0
+        self._active = sys.stdout.isatty()
+
+    def tick(self) -> None:
+        """Called once per state discovered and once per action fired."""
+        if not self._active:
+            return
+        now = time.monotonic()
+        if now - self._last_render < self._MIN_INTERVAL_S:
+            return
+        self._last_render = now
+        self._render()
+
+    def _render(self) -> None:
+        self._frame += 1
+        states, requests = self._controller.states, self._controller.requests
+        elapsed = self._controller.elapsed()
+        total = self._budget.max_states or self._budget.max_requests
+        count = states if self._budget.max_states is not None else requests
+        if total is not None:
+            pct = min(100, int(100 * count / total))
+            filled = (pct * self._WIDTH) // 100
+            gauge = f"[{'#' * filled}{'-' * (self._WIDTH - filled)}] {pct:3d}%"
+        else:
+            gauge = self._FRAMES[self._frame % len(self._FRAMES)]
+        line = f"\r{gauge} {states} state(s), {requests} request(s), {elapsed:0.0f}s"
+        sys.stdout.write(line.ljust(78))
+        sys.stdout.flush()
+
+    def finish(self) -> None:
+        """Clear the line so whatever prints next starts clean."""
+        if not self._active:
+            return
+        sys.stdout.write("\r" + " " * 78 + "\r")
+        sys.stdout.flush()
 
 
 @app.command()
@@ -260,6 +328,7 @@ def explore(
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     controller = RunController(budget)
+    cli_progress = _CliProgress(controller, budget)
     # The opt-in screenshot sinks: dicts only when asked for, so a default run captures
     # no pixels at all (§2e slice 8). During exploration each image is written straight
     # to disk under the wiki directory as it is captured (§2e slice 8f) — and only when
@@ -294,6 +363,7 @@ def explore(
                         screenshots=shots,
                         element_screenshots=element_shots,
                         screenshot_dir=screenshot_dir,
+                        progress=cli_progress.tick,
                     )
                 except (ResumeError, ValueError) as exc:
                     raise typer.BadParameter(str(exc)) from exc
@@ -306,8 +376,10 @@ def explore(
                     screenshots=shots,
                     element_screenshots=element_shots,
                     screenshot_dir=screenshot_dir,
+                    progress=cli_progress.tick,
                 )
     finally:
+        cli_progress.finish()
         signal.signal(signal.SIGINT, previous_handler)
 
     # Remember this exploration in the local map so the read-only serving layer

@@ -179,6 +179,24 @@ def i_explore(context: dict[str, Any], root: str) -> None:
     )
 
 
+@when(parsers.parse('I explore from "{root}" with progress reporting'))
+def i_explore_with_progress(context: dict[str, Any], root: str) -> None:
+    app: _FakeApp = context["app"]
+    app.root = root
+    controller = RunController(context["budget"])
+    if context["kill"]:
+        controller.kill()
+    calls: list[None] = []
+    context["progress_calls"] = calls
+    context["graph"] = explore(
+        _FakeDriver(app),
+        target=context["target"],
+        controller=controller,
+        declared_sandbox=context["declared_sandbox"],
+        progress=lambda: calls.append(None),
+    )
+
+
 # --- Then ----------------------------------------------------------------
 
 
@@ -235,3 +253,8 @@ def action_is_skipped(context: dict[str, Any], label: str, frm: str) -> None:
         if t.from_state == from_id and t.action.name == label
     ]
     assert not fired, f"{label!r} was skipped but also fired"
+
+
+@then(parsers.parse("progress was reported at least {n:d} times"))
+def progress_reported_at_least(context: dict[str, Any], n: int) -> None:
+    assert len(context["progress_calls"]) >= n

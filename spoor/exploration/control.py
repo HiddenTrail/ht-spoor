@@ -115,6 +115,24 @@ class RunController:
         return self._killed.is_set()
 
     @property
+    def states(self) -> int:
+        """States recorded so far, for a caller reporting run progress."""
+        return self._states
+
+    @property
+    def requests(self) -> int:
+        """Requests recorded so far, for a caller reporting run progress."""
+        return self._requests
+
+    @property
+    def budget(self) -> RunBudget:
+        """The bounds this run is measured against, for rendering progress
+        against a known total (e.g. a `max_states`-bounded percentage) rather
+        than only an open-ended count.
+        """
+        return self._budget
+
+    @property
     def max_depth(self) -> int | None:
         """The run's depth bound, or None if unbounded (§2e slice 9).
 

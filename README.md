@@ -161,6 +161,13 @@ element it found can't actually be clicked (it disappeared, is hidden, or is
 covered by the time Spoor gets to it), that one action is recorded as skipped and
 the run keeps going — a single dead button never aborts the map.
 
+While it runs, a real terminal shows a live line of progress — a `[####------] NN%`
+gauge against `--max-states`/`--max-requests` when either is set, or a `|/-\` spinner
+when the run is unbounded — alongside states discovered, requests fired, and elapsed
+time, so a long crawl doesn't sit silent. It disappears automatically when output
+isn't a real terminal (piped, redirected to a file, or run in CI), so it never
+pollutes logged or scripted output.
+
 **Resuming from a screen you already mapped.** A big site is easier to map a piece
 at a time: run a shallow crawl first, then go deep only where it matters. Pass
 `--resume-from <selector>` to continue an earlier exploration of the same URL from a
