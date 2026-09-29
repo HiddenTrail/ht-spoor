@@ -102,3 +102,16 @@ Feature: The explorer builds a state-action graph
     When I explore from "home"
     Then the graph has states: home
     And the graph has no transitions
+
+  Scenario: An opt-in progress callback fires once per state and per action
+    # The CLI's live spinner/bar (§2d observability) reads this to redraw without
+    # the explorer knowing anything about a terminal — an opt-in, no-argument hook,
+    # off by default, exercised here the same in-process way as everything else.
+    Given a sandbox target
+    And an app whose actions are:
+      | from | label      | role   | to   |
+      | home | Open menu  | button | menu |
+      | menu | Close menu | button | home |
+    When I explore from "home" with progress reporting
+    Then the graph has states: home, menu
+    And progress was reported at least 3 times

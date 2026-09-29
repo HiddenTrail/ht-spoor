@@ -18,7 +18,7 @@ site-specific (§0): one resume path continues the walk for every target.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Callable, Mapping, MutableMapping
 from pathlib import Path
 from typing import Any
 
@@ -88,6 +88,7 @@ def resume_exploration(
     screenshots: MutableMapping[str, ImageRef] | None = None,
     element_screenshots: MutableMapping[str, list[ElementShot]] | None = None,
     screenshot_dir: Path | None = None,
+    progress: Callable[[], None] | None = None,
 ) -> ExplorationGraph:
     """Resume exploration of `target` from the anchor `selector` names in `saved_map`.
 
@@ -96,8 +97,8 @@ def resume_exploration(
     returning the loaded graph with the newly discovered states and transitions merged
     in. The depth budget on `controller` counts clicks from the anchor. The explorer
     refuses a stale map (a changed start page or an unreachable anchor) with a
-    `ValueError` that propagates unchanged. The screenshot sinks behave exactly as in
-    `explore`.
+    `ValueError` that propagates unchanged. The screenshot sinks and `progress` behave
+    exactly as in `explore`.
     """
     loaded = load_exploration_map(saved_map)
     anchor = resolve_resume_anchor(saved_map, selector)
@@ -111,4 +112,5 @@ def resume_exploration(
         screenshot_dir=screenshot_dir,
         resume_from=loaded,
         resume_anchor=anchor,
+        progress=progress,
     )

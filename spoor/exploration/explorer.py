@@ -50,7 +50,7 @@ not retried: there is nothing transient to wait out.
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Mapping, MutableMapping, Sequence
+from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -532,6 +532,7 @@ def explore(
     screenshot_dir: Path | None = None,
     resume_from: ExplorationGraph | None = None,
     resume_anchor: str | None = None,
+    progress: Callable[[], None] | None = None,
 ) -> ExplorationGraph:
     """Explore `target` through `driver`, returning the state-action graph (§2e).
 
@@ -600,6 +601,15 @@ def explore(
     when the anchor is not a state reachable from that root, or when it cannot replay to
     the anchor within the retry bound — never a silent remap. Both must be given at once
     (`resume_anchor` alone, or an anchor absent from `resume_from`, is a `ValueError`).
+
+    `progress` is an opt-in, no-argument callback fired synchronously — on this same
+    thread, right after `controller.record_state`/`record_request` — every time a new
+    state is captured or an action is fired, so a caller (the CLI's live spinner/bar)
+    can read `controller.states`/`controller.requests`/`controller.elapsed()` and
+    redraw. Deliberately no-argument: the controller it would read from is the same
+    one the caller already holds, so nothing new needs passing through. Left None
+    (the default), nothing changes — the same "opt-in, no cost unless asked for"
+    posture as the screenshot sinks.
     """
     if (
         screenshots is not None or element_screenshots is not None
@@ -716,6 +726,8 @@ def explore(
                 for clip, shot in zip(clips, opened, strict=True)
             ]
         controller.record_state()
+        if progress is not None:
+            progress()
         return sid, True
 
     def next_layer_action(
@@ -950,6 +962,8 @@ def explore(
                     graph.record_skip(state, action, f"could not be performed: {exc}")
                     continue
                 controller.record_request()
+                if progress is not None:
+                    progress()
                 after = driver.capture_signals()
                 # Read the URL path from the clean landed page, before `capture` may
                 # take an opened-element screenshot (§2e slice 8e), which clicks a
