@@ -103,43 +103,30 @@ def run(
 def _check_explore_output_paths(
     *, wiki: Path | None, gen_tests: Path | None, scaffold: Path | None
 ) -> None:
-    """Refuse, before any browser is launched, output flags that would collide.
+    """Refuse, before any browser is launched, an output flag whose path already
+    exists as something other than a directory.
 
-    `--wiki` and `--gen-tests` each write a whole directory of files; `--scaffold`
-    writes exactly one YAML file. Giving two of these the same path is always a
-    mistake — real incident: the same path handed to both `--wiki` and
-    `--scaffold` let the wiki's directory get created first, and then writing the
-    scaffold *to that same path* failed trying to open a directory as a file,
-    after a full crawl had already run. Checked up front, in one place, so the
-    failure is an immediate, clear message instead of a crawl that only then
-    crashes on write.
+    `--wiki`, `--gen-tests`, and `--scaffold` all write *into* a directory, each
+    under its own filename(s) that never collide with another's (a wiki's
+    `index.html`, a generated suite's `test_transition_N.py`, and the scaffold's
+    fixed `interactive.yaml` never clash) — so pointing several of these flags at
+    the *same* directory is fine, even a natural way to keep one run's output
+    together, and is not rejected here. What is still always wrong is a path that
+    already exists as something else (most commonly a plain file): the flag would
+    then fail trying to create a directory where a file already sits. Checked up
+    front, in one place, so that failure is an immediate, clear message instead of
+    a crawl that only then crashes on write.
     """
-    dir_flags = {"--wiki": wiki, "--gen-tests": gen_tests}
-    file_flags = {"--scaffold": scaffold}
-    seen: dict[Path, str] = {}
-    for name, maybe_path in (*dir_flags.items(), *file_flags.items()):
-        if maybe_path is None:
-            continue
-        if maybe_path in seen:
-            raise typer.BadParameter(
-                f"{seen[maybe_path]} and {name} both point at {maybe_path} — give "
-                "each a different path, or one will overwrite or collide with "
-                "what the other writes."
-            )
-        seen[maybe_path] = name
-    for name, path in dir_flags.items():
+    for name, path in (
+        ("--wiki", wiki),
+        ("--gen-tests", gen_tests),
+        ("--scaffold", scaffold),
+    ):
         if path is not None and path.exists() and not path.is_dir():
             raise typer.BadParameter(
                 f"{name} {path} already exists and is not a directory — {name} "
-                "writes a directory of files, so this path needs to be free or "
+                "writes into a directory, so this path needs to be free or "
                 "already be one."
-            )
-    for name, path in file_flags.items():
-        if path is not None and path.exists() and path.is_dir():
-            raise typer.BadParameter(
-                f"{name} {path} already exists as a directory — {name} writes "
-                "a single file there, so this path needs to be free or already "
-                "be a file."
             )
 
 
@@ -285,12 +272,13 @@ def explore(
         typer.Option(
             "--scaffold",
             help=(
-                "Also write a config-scaffold YAML file listing what a future, "
-                "not-yet-built interactive round would need: discovered fields with "
-                "a best-guess value type, discovered login points (flagged only — "
-                "Spoor never automates a login, point session: at a storage-state "
-                "file you already exported), and discovered actions skipped for "
-                "being destructive. Filling it in does nothing on its own today."
+                "Also write a config-scaffold YAML file (interactive.yaml) into "
+                "this directory, listing what a future, not-yet-built interactive "
+                "round would need: discovered fields with a best-guess value type, "
+                "discovered login points (flagged only — Spoor never automates a "
+                "login, point session: at a storage-state file you already "
+                "exported), and discovered actions skipped for being destructive. "
+                "Filling it in does nothing on its own today."
             ),
         ),
     ] = None,
@@ -329,9 +317,9 @@ def explore(
     blanked out the way captured text can). Pass --gen-tests to also write a runnable
     pytest regression suite of the map (one test per mapped transition) you can re-run
     against the live site later to catch drift. Pass --scaffold to also write a
-    config-scaffold YAML file naming discovered fields, login points, and destructive
-    actions — a starting point for a planned, not-yet-built interactive round; filling
-    it in does nothing on its own yet. The
+    config-scaffold YAML file (interactive.yaml) into a directory, naming discovered
+    fields, login points, and destructive actions — a starting point for a planned,
+    not-yet-built interactive round; filling it in does nothing on its own yet. The
     mapped graph is also saved to the local map, so `spoor serve`/`serve-mcp` can hand
     it back later without re-exploring.
     """
@@ -573,7 +561,13 @@ def apply_scaffold_cmd(
         str, typer.Argument(help="A URL already mapped by `spoor explore`.")
     ],
     scaffold: Annotated[
-        Path, typer.Argument(help="A scaffold YAML file, as written by --scaffold.")
+        Path,
+        typer.Argument(
+            help=(
+                "A scaffold YAML file — interactive.yaml inside the directory "
+                "--scaffold wrote."
+            )
+        ),
     ],
     sandbox: Annotated[
         bool,
@@ -601,8 +595,9 @@ def apply_scaffold_cmd(
     """Type a filled-in interactive-round scaffold's values into their fields.
 
     Reads a URL's saved exploration map and a scaffold file you've filled in (from
-    `spoor explore --scaffold <file>`) and types each field's pinned value into it —
-    only for fields on the screen the crawl started from. That is the whole of what
+    `spoor explore --scaffold <dir>`, at `<dir>/interactive.yaml`) and types each
+    field's pinned value into it — only for fields on the screen the crawl started
+    from. That is the whole of what
     this does: it never presses Enter, never clicks a submit control, and never fires
     any action beyond typing. Applying or submitting a value is a separate,
     not-yet-built capability (see ROADMAP.md §2e) — this command only gets a value
@@ -703,30 +698,6 @@ def _wizard_optional_float(question: str) -> float | None:
             typer.echo(f"  {raw!r} isn't a number — try again.")
 
 
-def _wizard_optional_output_path(
-    question: str, flag: str, used_paths: dict[str, str]
-) -> str | None:
-    """Like `_wizard_optional_str`, but rejects a path an earlier output flag in
-    this same answer set already claimed, re-asking instead of accepting it.
-
-    Catches the exact mistake that slips past a plain prompt: handing the same
-    directory to `--wiki` and a file to `--scaffold` builds a command that
-    crawls a whole site and only then crashes writing the scaffold, because the
-    wiki step already created that path as a directory. Caught here, before the
-    command is even built, the same way the CLI itself now also checks it (§2d)
-    — belt-and-suspenders, since the wizard exists precisely to prevent this
-    kind of mix-up.
-    """
-    while True:
-        answer = _wizard_optional_str(question)
-        if answer is None or answer not in used_paths:
-            return answer
-        typer.echo(
-            f"  {used_paths[answer]} already writes to {answer!r} — "
-            "give this a different path."
-        )
-
-
 def _wizard_choose_command() -> str:
     """Ask which command to build, by number, defaulting to the most common one."""
     options = {
@@ -771,21 +742,16 @@ def _wizard_explore_args() -> list[str]:
     resume_from = _wizard_optional_str("Resume from a selector (e.g. id:abc123)")
     if resume_from is not None:
         args += ["--resume-from", resume_from]
-    used_paths: dict[str, str] = {}
     wiki = _wizard_optional_str("Write a wiki to this directory")
     if wiki is not None:
         args += ["--wiki", wiki]
-        used_paths[wiki] = "--wiki"
         if typer.confirm("Include screenshots in the wiki?", default=False):
             args.append("--screenshots")
-    gen_tests = _wizard_optional_output_path(
-        "Write a generated test suite to this directory", "--gen-tests", used_paths
-    )
+    gen_tests = _wizard_optional_str("Write a generated test suite to this directory")
     if gen_tests is not None:
         args += ["--gen-tests", gen_tests]
-        used_paths[gen_tests] = "--gen-tests"
-    scaffold = _wizard_optional_output_path(
-        "Write a config scaffold to this file", "--scaffold", used_paths
+    scaffold = _wizard_optional_str(
+        "Write a config scaffold (interactive.yaml) into this directory"
     )
     if scaffold is not None:
         args += ["--scaffold", scaffold]
@@ -794,7 +760,9 @@ def _wizard_explore_args() -> list[str]:
 
 def _wizard_apply_scaffold_args() -> list[str]:
     url = typer.prompt("URL already mapped by `spoor explore`")
-    scaffold = typer.prompt("Scaffold YAML file, as written by --scaffold")
+    scaffold = typer.prompt(
+        "Scaffold YAML file (interactive.yaml inside the directory --scaffold wrote)"
+    )
     args = ["apply-scaffold", url, scaffold]
     if typer.confirm(
         "Declare this target a sandbox? (required for anything to be typed)",

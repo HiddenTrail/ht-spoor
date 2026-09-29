@@ -214,17 +214,20 @@ spoor explore https://example.com --gen-tests ./tests-from-map
 python -m pytest ./tests-from-map      # re-run later to catch drift
 ```
 
-**Scaffolding a config for a future interactive round.** Add `--scaffold <file>` to also
-write a YAML file naming what a planned, not-yet-built interactive round would need:
-every field it found (with a best guess at what kind of value it wants, and a blank spot
-to fill one in), every point where a login is required, and every action it skipped for
-being destructive. Filling this file in does nothing on its own today — it's a starting
-point, not a config anything reads yet. Spoor never automates a login itself: a login
-entry is a flag pointing at the same session file you'd already supply to a config, never
-a place to type a password.
+**Scaffolding a config for a future interactive round.** Add `--scaffold <dir>` to also
+write `interactive.yaml` into that directory, naming what a planned, not-yet-built
+interactive round would need: every field it found (with a best guess at what kind of
+value it wants, and a blank spot to fill one in), every point where a login is
+required, and every action it skipped for being destructive. Filling this file in does
+nothing on its own today — it's a starting point, not a config anything reads yet.
+Spoor never automates a login itself: a login entry is a flag pointing at the same
+session file you'd already supply to a config, never a place to type a password.
+`--scaffold` takes a directory rather than a file, the same as `--wiki`/`--gen-tests` —
+give it the same directory as either of those and everything lands together, since
+none of the three ever write the same filename.
 
 ```bash
-spoor explore https://example.com --scaffold ./interactive.yaml
+spoor explore https://example.com --scaffold ./interactive-round
 ```
 
 **Typing a filled-in scaffold's values in.** Once you've filled some `value:` fields in
@@ -247,7 +250,7 @@ marked as reached by typing a value rather than by a click, so it's never mistak
 something the site itself linked to.
 
 ```bash
-spoor apply-scaffold https://example.com ./interactive.yaml --sandbox --wiki ./wiki
+spoor apply-scaffold https://example.com ./interactive-round/interactive.yaml --sandbox --wiki ./wiki
 ```
 
 **The safety rule — read this before pointing it at anything real.** Some actions

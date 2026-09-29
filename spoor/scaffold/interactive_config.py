@@ -175,18 +175,31 @@ def build_scaffold(graph: ExplorationGraph, *, target: str) -> str:
     return "".join(parts)
 
 
-def render_scaffold(
-    graph: ExplorationGraph, out_path: Path, *, target: str
-) -> Path | None:
-    """Write the config scaffold for `graph` to `out_path` (thin writer, issue #131).
+SCAFFOLD_FILENAME = "interactive.yaml"
+"""The fixed filename every `render_scaffold` call writes, inside the given directory.
 
-    Mirrors `pytest_gen.render_suite`: pure `build_scaffold` first, then a plain UTF-8
-    write, creating parent directories if needed. A graph with no states writes
-    nothing and returns None, matching `render_suite`'s empty-graph contract.
+A named constant, not a caller-chosen name: `--scaffold` takes a directory, the same
+as `--wiki`/`--gen-tests`, so there is one flag *shape* to remember across every
+output a run can produce, not a mix of "this one wants a file, that one wants a
+folder" — the mismatch that let `--wiki` and `--scaffold` collide on the same path in
+a real incident before this changed (§2e issue #131 follow-up).
+"""
+
+
+def render_scaffold(
+    graph: ExplorationGraph, out_dir: Path, *, target: str
+) -> Path | None:
+    """Write the config scaffold for `graph` into `out_dir` (thin writer, issue #131).
+
+    Mirrors `pytest_gen.render_suite`/`wiki.render_wiki`: pure `build_scaffold` first,
+    then a plain UTF-8 write to `out_dir/{SCAFFOLD_FILENAME}`, creating `out_dir` if
+    needed. A graph with no states writes nothing and returns None, matching
+    `render_suite`'s empty-graph contract.
     """
     text = build_scaffold(graph, target=target)
     if not text:
         return None
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / SCAFFOLD_FILENAME
     out_path.write_text(text, encoding="utf-8")
     return out_path

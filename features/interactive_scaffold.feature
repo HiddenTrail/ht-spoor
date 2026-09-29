@@ -72,5 +72,5 @@ Feature: Scaffold an interactive-round config from an exploration graph
   @browser
   Scenario: A live crawl's password field becomes a login point in the written file
     Given a live crawl of "explore_login.html" was mapped at depth 1
-    When I write that crawl's scaffold to a file
+    When I write that crawl's scaffold to a directory
     Then the written scaffold file has a login point
