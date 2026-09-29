@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790685320638,
+  "lastUpdate": 1790689536473,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -2864,6 +2864,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 3550.8,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cb0e5824a47c89c11140de2d689b3d58d5b48617",
+          "message": "apply-scaffold observes and persists the state a fill reveals (§2e, #137) (#138)\n\nCloses the gap where filling in a scaffold and re-running spoor apply-scaffold\nupdated nothing but the live page: the saved map and wiki still described the\noriginal read-only crawl even when the typed value visibly changed the screen.\n\nActionableElement gains an optional fill_value field. A transition whose action\ncarries one is a typed edge, not a clicked one -- no new transition kind, every\nexisting consumer unaffected since the field defaults to None everywhere but here.\nAfter a successful fill, apply_scaffold observes the resulting page the same\nread-only way exploration observes after any click (discover_actions +\ncapture_signals, reused via a widened ApplyDriver protocol) and, if the page\nactually changed, adds a real state and transition to the graph -- idempotent, so\nre-running an unchanged scaffold against an unchanged target adds nothing twice.\nThe CLI persists the enriched graph back to MapStore (preserving the entry's\nexisting records/tier/api_surface/config) and refreshes the wiki via --wiki.\n\nPer explicit maintainer direction, these states/transitions are real and\nreplayable, not excluded from replay as this feature's own design note first\nproposed: pytest_gen.py's generated tests and _PATH replay now carry a role/name/\nfill_value triple per step and dispatch to a new fill() helper instead of fire()\nwhen appropriate. Both the wiki's state and transition pages clearly flag a\nconfig-derived entry so it's never mistaken for one the site itself linked to.\nfill_value stays raw in the local persisted map (like name already does) and is\nredacted only at the wiki/testgen/serving boundary -- verified the MCP/API\nredaction gate (redact_value) is structural, so the new field is covered by the\nexisting mechanism with no special-casing needed.\n\nVerified end-to-end against the live EcoEstate demo target: filling \"Search\npostcodes\" revealed a new state with a real signal diff (new network request,\naccessibility-node delta), correctly persisted under its URL and shown on the\nrefreshed wiki with both badges; a second run against the same target added\nnothing further, confirming idempotency empirically.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-29T16:41:04+03:00",
+          "tree_id": "24485b61f5bb35befac4c8e4d5957b17ecc62608",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/cb0e5824a47c89c11140de2d689b3d58d5b48617"
+        },
+        "date": 1790689534669,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 197.468,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.02593,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.3296,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.08505,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.0843,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06361,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 8.5832,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.08876,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 12.8865,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.03296,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.1929,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.54198,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 30.549,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.02804,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 8.0561,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.89682,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 124.0592,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.06133,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.3734,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.00672,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.2993,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5341.5,
             "unit": "MB"
           }
         ]
