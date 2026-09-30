@@ -1,11 +1,16 @@
 # Output pipeline — ROADMAP.md §2d.
 #
 # Pluggable sinks downstream of extraction. This Phase-1 pass covers the text
-# formats that need no dependencies — JSON, JSON Lines, CSV — with the field
-# schema from §2a validated (via pydantic) before anything is written. SQLite
+# formats that need no dependencies — JSON, JSON Lines, CSV, Markdown — with the
+# field schema from §2a validated (via pydantic) before anything is written. SQLite
 # and Parquet are named in §2d as further/optional sinks and land later (see the
 # §2d output-pipeline decision note). Extraction without a usable output path
 # isn't a finished tool, so the sink is a first-class stage, not a CLI afterthought.
+#
+# Markdown (issue #155) is cheap parity with a highly visible feature in
+# Crawl4AI/Firecrawl-style tools (docs/COMPETITIVE_PLAN.md §4): a table, not
+# clean-prose content extraction — Spoor's config already names the fields and
+# their order, a table is the direct, lossless rendering of that.
 #
 # An output file is a shared surface §2h names explicitly: known secret shapes in
 # a record's values are redacted on the way out, on by default, before anything is
@@ -35,6 +40,17 @@ Feature: Writing extracted records to a chosen output format
     Then the CSV header row is "title,price"
     And the CSV has 2 data rows
     And the missing price is written as an empty cell
+
+  Scenario: Records are written as a Markdown table
+    When I write the records to "out.md"
+    Then the Markdown table header row is "| title | price |"
+    And the Markdown table has 2 data rows
+    And the missing price is written as an empty Markdown cell
+
+  Scenario: A pipe or newline in a value is escaped in the Markdown table
+    Given a single record whose "title" contains a pipe and a newline
+    When I write the records to "out.md"
+    Then no Markdown table row is broken by the value
 
   Scenario: The format is taken from the file extension by default
     When I write the records to "out.csv"
