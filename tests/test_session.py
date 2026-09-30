@@ -52,6 +52,19 @@ def test_a_valid_state_with_no_cookies_loads_empty(tmp_path: Path) -> None:
     assert session.cookies == ()
 
 
+def test_raw_carries_the_parsed_state_verbatim(tmp_path: Path) -> None:
+    # `raw` is the exploration driver's re-application source (ROADMAP.md §2e):
+    # the parsed storage-state object itself, not routed through SessionCookie.
+    data = {
+        "cookies": [{"name": "a", "value": "b", "domain": "x", "path": "/"}],
+        "origins": [
+            {"origin": "http://x", "localStorage": [{"name": "n", "value": "v"}]}
+        ],
+    }
+    session = load_session(_write(tmp_path, data))
+    assert session.raw == data
+
+
 def test_a_state_missing_keys_loads_empty(tmp_path: Path) -> None:
     # A localStorage-only export may carry no `cookies` key at all.
     session = load_session(_write(tmp_path, {"origins": []}))

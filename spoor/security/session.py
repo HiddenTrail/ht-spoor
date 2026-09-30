@@ -57,10 +57,21 @@ class LoadedSession:
     Playwright applies cookies *and* localStorage. `cookies` is the subset the
     static (no-JS) tier can use; localStorage-gated auth has no static equivalent
     and naturally escalates to the browser tier, which applies the full state.
+
+    `raw` is the parsed storage-state object itself (`cookies` + `origins`, in
+    Playwright's own shape), kept for a browser-tier consumer that needs to
+    *re-apply* the session later, not just load it once at context creation —
+    `spoor/exploration/driver.py`'s reset-and-replay clears cookies/storage
+    before every navigation (so a reset is always a true first visit) and
+    restores this raw state afterwards. Re-parsing Playwright's own dicts
+    keeps that restoration exact (`secure`/`httpOnly`/`sameSite`/`expires` and
+    all), rather than lossily round-tripping through `SessionCookie`, which
+    only carries what the static tier's `httpx` cookie jar needs.
     """
 
     path: Path
     cookies: tuple[SessionCookie, ...]
+    raw: dict[str, object]
 
 
 def load_session(path: str | Path) -> LoadedSession:
@@ -82,7 +93,7 @@ def load_session(path: str | Path) -> LoadedSession:
         raise SessionError(f"session file is not valid JSON: {path}") from exc
     if not isinstance(data, dict):
         raise SessionError(f"session file must be a storage-state object: {path}")
-    return LoadedSession(path=file_path, cookies=_cookies_from(data))
+    return LoadedSession(path=file_path, cookies=_cookies_from(data), raw=data)
 
 
 def _cookies_from(data: dict[str, object]) -> tuple[SessionCookie, ...]:

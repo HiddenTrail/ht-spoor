@@ -243,6 +243,22 @@ def explore(
             ),
         ),
     ] = None,
+    session: Annotated[
+        Path | None,
+        typer.Option(
+            "--session",
+            help=(
+                "Explore as a logged-in user, using a session you already captured "
+                "yourself (a storage-state file from Playwright's "
+                "context.storage_state(), or from the same login flow the --scaffold "
+                "help text points at). Spoor never logs in on its own; this only "
+                "replays a session you already have. Combines freely with "
+                "--resume-from: that picks up where a crawl continues from, this "
+                "decides whether it's authenticated, and neither depends on the "
+                "other."
+            ),
+        ),
+    ] = None,
     wiki: Annotated[
         Path | None,
         typer.Option(
@@ -310,11 +326,14 @@ def explore(
     time. Pass --resume-from to continue an earlier exploration of this URL from a
     named screen instead of starting over: the crawl picks up there, any --max-depth is
     counted from that screen, and the newly found screens are merged into the saved map.
-    Pass --wiki to also write a browsable wiki of the result, and --screenshots
-    to include pictures in that wiki — a full-page shot of each screen, a clip of
-    each interactive element, and a shot of what a dropdown or list reveals when opened
-    (off by default, because a picture can't have secrets
-    blanked out the way captured text can). Pass --gen-tests to also write a runnable
+    Pass --session to explore as a logged-in user, using a session you captured
+    yourself — Spoor never logs in on its own, so anything behind a login stays
+    unmapped without one. Pass --wiki to also write a browsable wiki of the
+    result, and --screenshots to include pictures in that wiki — a full-page
+    shot of each screen, a clip of each interactive element, and a shot of what
+    a dropdown or list reveals when opened (off by default, because a picture
+    can't have secrets blanked out the way captured text can). Pass --gen-tests
+    to also write a runnable
     pytest regression suite of the map (one test per mapped transition) you can re-run
     against the live site later to catch drift. Pass --scaffold to also write a
     config-scaffold YAML file (interactive.yaml) into a directory, naming discovered
@@ -338,6 +357,13 @@ def explore(
             "the images in without it."
         )
     _check_explore_output_paths(wiki=wiki, gen_tests=gen_tests, scaffold=scaffold)
+    if session is not None:
+        from spoor.security.session import SessionError, load_session
+
+        try:
+            load_session(session)
+        except SessionError as exc:
+            raise typer.BadParameter(str(exc)) from exc
     # The saved map to continue, when resuming: the §2h-shareable projection an earlier
     # explore of this exact URL stored (§2f). Loaded up front so a missing map fails
     # before a browser is launched.
@@ -381,7 +407,9 @@ def explore(
     previous_handler = signal.getsignal(signal.SIGINT)
     signal.signal(signal.SIGINT, lambda *_: controller.kill())
     try:
-        with PlaywrightDriver(url) as driver:
+        with PlaywrightDriver(
+            url, session=str(session) if session is not None else None
+        ) as driver:
             if saved_map is not None:
                 assert resume_from is not None  # saved_map is set only when resuming
                 try:
@@ -425,6 +453,8 @@ def explore(
     )
 
     typer.echo(f"{'Resumed' if saved_map is not None else 'Explored'} {url}")
+    if session is not None:
+        typer.echo("  session:           supplied — explored as a logged-in user")
     typer.echo(f"  states discovered: {len(graph.states)}")
     typer.echo(f"  transitions:       {len(graph.transitions)}")
     typer.echo(f"  actions skipped:   {len(graph.skipped)}")
@@ -579,6 +609,17 @@ def apply_scaffold_cmd(
             ),
         ),
     ] = False,
+    session: Annotated[
+        Path | None,
+        typer.Option(
+            "--session",
+            help=(
+                "Apply the scaffold as a logged-in user, using a session you already "
+                "captured yourself. Only needed if the screen the scaffold's fields "
+                "live on is itself behind a login; Spoor never logs in on its own."
+            ),
+        ),
+    ] = None,
     wiki: Annotated[
         Path | None,
         typer.Option(
@@ -606,6 +647,8 @@ def apply_scaffold_cmd(
     Only runs against a target you declare a sandbox with --sandbox (a loopback
     address such as localhost, or this flag) — on any other site nothing is typed,
     the same rule exploration's own destructive-action gate already follows.
+    Pass --session if the scaffold's fields live behind a login, using a session
+    you already captured yourself; Spoor never logs in on its own.
 
     When a fill changes what's on the page, that new state is read the same
     read-only way exploration reads any other state, and saved into the map
@@ -623,10 +666,20 @@ def apply_scaffold_cmd(
     from spoor.exploration.persisted_map import load_exploration_map
     from spoor.scaffold.apply import apply_scaffold, load_scaffold
 
+    if session is not None:
+        from spoor.security.session import SessionError, load_session
+
+        try:
+            load_session(session)
+        except SessionError as exc:
+            raise typer.BadParameter(str(exc)) from exc
+
     graph = load_exploration_map(entry.exploration)
     scaffold_data = load_scaffold(scaffold)
     states_before, transitions_before = len(graph.states), len(graph.transitions)
-    with PlaywrightDriver(url) as driver:
+    with PlaywrightDriver(
+        url, session=str(session) if session is not None else None
+    ) as driver:
         applied, failed = apply_scaffold(
             driver, graph, scaffold_data, target=url, declared_sandbox=sandbox
         )
@@ -742,6 +795,11 @@ def _wizard_explore_args() -> list[str]:
     resume_from = _wizard_optional_str("Resume from a selector (e.g. id:abc123)")
     if resume_from is not None:
         args += ["--resume-from", resume_from]
+    session = _wizard_optional_str(
+        "Explore as a logged-in user, using a captured session file at"
+    )
+    if session is not None:
+        args += ["--session", session]
     wiki = _wizard_optional_str("Write a wiki to this directory")
     if wiki is not None:
         args += ["--wiki", wiki]
@@ -769,6 +827,11 @@ def _wizard_apply_scaffold_args() -> list[str]:
         default=False,
     ):
         args.append("--sandbox")
+    session = _wizard_optional_str(
+        "Apply as a logged-in user, using a captured session file at"
+    )
+    if session is not None:
+        args += ["--session", session]
     wiki = _wizard_optional_str(
         "Refresh a wiki at this directory (the one --wiki wrote earlier)"
     )
