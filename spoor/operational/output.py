@@ -8,8 +8,8 @@ of landing silently in the output. An output file is a shared surface, so per
 write. Per §0 there is nothing site-specific here — the schema is derived from
 the config, whatever the target.
 
-Phase-1 formats are the dependency-free text sinks (JSON, JSON Lines, CSV).
-SQLite and Parquet are named in §2d as further sinks and land later.
+Phase-1 formats are the dependency-free text sinks (JSON, JSON Lines, CSV,
+Markdown). SQLite and Parquet are named in §2d as further sinks and land later.
 """
 
 from __future__ import annotations
@@ -24,12 +24,13 @@ from pydantic import BaseModel, ConfigDict, create_model
 from spoor.core.config import ExtractionConfig
 from spoor.security.redaction import redact_records
 
-OutputFormat = Literal["json", "jsonl", "csv"]
+OutputFormat = Literal["json", "jsonl", "csv", "md"]
 
 _BY_SUFFIX: dict[str, OutputFormat] = {
     ".json": "json",
     ".jsonl": "jsonl",
     ".csv": "csv",
+    ".md": "md",
 }
 
 
@@ -43,8 +44,7 @@ def resolve_format(path: Path, explicit: str | None) -> OutputFormat:
     if explicit is not None:
         if explicit not in choices:
             raise ValueError(
-                f"unknown output format {explicit!r}; choose from "
-                f"{', '.join(choices)}"
+                f"unknown output format {explicit!r}; choose from {', '.join(choices)}"
             )
         return cast(OutputFormat, explicit)
     fmt = _BY_SUFFIX.get(path.suffix.lower())
@@ -99,8 +99,10 @@ def write_records(
     elif fmt == "jsonl":
         body = "".join(json.dumps(row) + "\n" for row in rows)
         path.write_text(body, encoding="utf-8")
-    else:  # csv
+    elif fmt == "csv":
         _write_csv(records=rows, config=config, path=path)
+    else:  # md
+        _write_markdown(records=rows, config=config, path=path)
 
 
 def _write_csv(
@@ -114,3 +116,30 @@ def _write_csv(
             writer.writerow(
                 {key: "" if value is None else value for key, value in row.items()}
             )
+
+
+def _md_cell(value: object) -> str:
+    """One Markdown table cell's text: escaped so it can never break the row.
+
+    A raw `|` would be read as a new column boundary and a raw newline as a new
+    row, so both are neutralized here rather than left to corrupt the table —
+    the same "never let a captured value break the format" posture CSV's quoting
+    already gives it for free via the stdlib `csv` module. `None` renders as an
+    empty cell, matching CSV's empty-cell convention for a missing field.
+    """
+    if value is None:
+        return ""
+    return str(value).replace("\\", "\\\\").replace("|", "\\|").replace("\n", " ")
+
+
+def _write_markdown(
+    records: list[dict[str, object]], config: ExtractionConfig, path: Path
+) -> None:
+    fieldnames = list(config.fields)
+    header = "| " + " | ".join(fieldnames) + " |"
+    separator = "| " + " | ".join("---" for _ in fieldnames) + " |"
+    lines = [header, separator]
+    for row in records:
+        cells = " | ".join(_md_cell(row.get(name)) for name in fieldnames)
+        lines.append(f"| {cells} |")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")

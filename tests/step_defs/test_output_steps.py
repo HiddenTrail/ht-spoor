@@ -60,9 +60,12 @@ def secret_record(context: dict[str, Any]) -> None:
     # An obviously-fake token in a declared field; the price is present-but-null
     # so the record still satisfies the config schema.
     context["raw_token"] = "abcdef1234567890x"
-    context["records"] = [
-        {"title": f"Bearer {context['raw_token']}", "price": None}
-    ]
+    context["records"] = [{"title": f"Bearer {context['raw_token']}", "price": None}]
+
+
+@given('a single record whose "title" contains a pipe and a newline')
+def pipe_and_newline_record(context: dict[str, Any]) -> None:
+    context["records"] = [{"title": "Mug | 12oz\nBlue", "price": None}]
 
 
 # --- When ----------------------------------------------------------------
@@ -133,9 +136,7 @@ def json_array(context: dict[str, Any], name: str, count: int) -> None:
         'the first object has "{field}" of "{value}" and "price" of {price:g}'
     )
 )
-def first_object(
-    context: dict[str, Any], field: str, value: str, price: float
-) -> None:
+def first_object(context: dict[str, Any], field: str, value: str, price: float) -> None:
     data = json.loads(_read(context))
     assert data[0][field] == value
     assert data[0]["price"] == price
@@ -171,6 +172,41 @@ def csv_row_count(context: dict[str, Any], count: int) -> None:
 def csv_empty_cell(context: dict[str, Any]) -> None:
     rows = list(csv.DictReader(_read(context).splitlines()))
     assert rows[1]["price"] == ""
+
+
+def _md_rows(context: dict[str, Any]) -> list[str]:
+    return [line for line in _read(context).splitlines() if line.strip()]
+
+
+@then(parsers.parse('the Markdown table header row is "{header}"'))
+def md_header(context: dict[str, Any], header: str) -> None:
+    assert _md_rows(context)[0] == header
+
+
+@then(parsers.parse("the Markdown table has {count:d} data rows"))
+def md_row_count(context: dict[str, Any], count: int) -> None:
+    # header + separator + one line per data row
+    assert len(_md_rows(context)) - 2 == count
+
+
+@then("the missing price is written as an empty Markdown cell")
+def md_empty_cell(context: dict[str, Any]) -> None:
+    rows = _md_rows(context)
+    # Second data row (index 3: header, separator, row 1, row 2) is the one
+    # missing its price -- an empty cell between two pipes, not the word "None".
+    assert rows[3] == "| Steel Flask |  |"
+
+
+@then("no Markdown table row is broken by the value")
+def md_row_not_broken(context: dict[str, Any]) -> None:
+    rows = _md_rows(context)
+    # header + separator + exactly one data row: the embedded newline must not
+    # have split it into an extra line.
+    assert len(rows) == 3
+    # the pipe was escaped, not left as a raw column-breaking character
+    assert "\\|" in rows[2]
+    # the newline was neutralized, not left as a raw line-breaking character
+    assert "\n" not in rows[2]
 
 
 @then(parsers.parse('the output was written as "{fmt}"'))

@@ -66,7 +66,7 @@ def run(
         typer.Option(
             "-f",
             "--format",
-            help="Output format (json, jsonl, csv); inferred from -o if omitted.",
+            help="Output format (json, jsonl, csv, md); inferred from -o if omitted.",
         ),
     ] = None,
 ) -> None:
@@ -781,7 +781,9 @@ def _wizard_run_args() -> list[str]:
     config = typer.prompt("Config file")
     output = typer.prompt("Output path", default="output.json")
     args = ["run", config, "-o", output]
-    fmt = _wizard_optional_str("Output format (json/jsonl/csv; blank infers from -o)")
+    fmt = _wizard_optional_str(
+        "Output format (json/jsonl/csv/md; blank infers from -o)"
+    )
     if fmt is not None:
         args += ["-f", fmt]
     return args
