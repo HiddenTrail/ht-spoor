@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790754153143,
+  "lastUpdate": 1790757228864,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -4160,6 +4160,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5358.8,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "48e1e9800184aaa3dc0fab0a4c29102f32c4b3a6",
+          "message": "§2a/§2d: add a Markdown table output sink (#158)\n\nCloses #155. docs/COMPETITIVE_PLAN.md flagged Crawl4AI/Firecrawl's page-to-\nmarkdown output as cheap parity with a highly visible competitor feature.\nSpoor's version is a direct table rendering of the config's own field\nschema (the config already names the fields and their order), not clean-\nprose content extraction.\n\nAdded as a fourth OutputFormat (\"md\", inferred from a .md extension or\n--format md) alongside the existing JSON/JSON Lines/CSV sinks, sharing the\nsame schema-validate-then-redact pipeline write_records already runs before\nany sink writes a byte. A cell's pipe/backslash/newline characters are\nescaped so a captured value can never break a table row into extra columns\nor lines -- the same \"never let a value corrupt the format\" guarantee CSV's\nquoting already gives it via the stdlib csv module.\n\nCovered by two new BDD scenarios in output.feature (a normal table render,\nand a value containing a pipe and a newline), following the existing\nfake-config-and-records pattern in test_output_steps.py -- no browser, no\nnetwork. Full gate green (736 passed); manually verified the rendered\noutput against a config with an embedded pipe and newline.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-30T11:28:58+03:00",
+          "tree_id": "a61ec2197610977fb9ec739b48dcd4d498282260",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/48e1e9800184aaa3dc0fab0a4c29102f32c4b3a6"
+        },
+        "date": 1790757227804,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 218.068,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03569,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.7883,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12016,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.8873,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.05943,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 10.9339,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.10731,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 17.0853,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04712,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.27,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.56948,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 31.9182,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.04455,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 11.778,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.97325,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 125.8591,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.08679,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5429,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01002,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4392,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5329.4,
             "unit": "MB"
           }
         ]
