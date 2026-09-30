@@ -1,14 +1,11 @@
 # Seed videos
 
-`seed/catalog.json` names one `.mp4` per title (e.g. `ridge-and-static.mp4`), but no
-video bytes ship in this repo yet — generating a real, valid, tiny clip needs an
-encoder this environment doesn't have.
+One short, low-bitrate `.mp4` per catalog entry, matching the filenames in
+`seed/catalog.json` (e.g. `ridge-and-static.mp4`) — same discipline
+`seed/posters/` follows: small enough that the repo stays light (each clip is
+a few seconds, well under 1 MB).
 
-Drop real files here, one per catalog entry, matching the filenames already in
-`catalog.json`. Keep each clip short (a few seconds) and low-bitrate so the repo stays
-light, the same discipline `seed/posters/` already follows.
-
-Until a file exists, the detail view's `<video>` element 404s gracefully and the
-frontend shows "Preview unavailable" instead of failing — the catalog, login gate, and
-API are fully usable without real video bytes. Add the clips before relying on the
-`<video>` playback-state surface (ROADMAP.md §2c) for anything beyond wiring.
+If a file is ever missing (a new catalog entry added without its clip yet),
+the detail view's `<video>` element 404s gracefully and the frontend shows
+"Preview unavailable" instead of failing — the catalog, login gate, and API
+stay fully usable either way.

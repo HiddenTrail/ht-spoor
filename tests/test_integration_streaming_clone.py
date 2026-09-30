@@ -80,3 +80,19 @@ def test_wrong_password_is_rejected(streaming_clone: str) -> None:
         timeout=3.0,
     )
     assert response.status_code == 401
+
+
+def test_every_seeded_title_has_a_playable_video(streaming_clone: str) -> None:
+    # The §2c media/streaming-capture signal this archetype exists to exercise
+    # needs a real, servable clip behind every title, not just the wiring.
+    with httpx.Client(base_url=streaming_clone, timeout=3.0) as client:
+        client.post("/api/login", json={"username": _USERNAME, "password": _PASSWORD})
+        catalog = client.get("/api/catalog").json()
+        titles = [title for row in catalog["rows"] for title in row["titles"]]
+        assert titles
+        for title in titles:
+            detail = client.get(f"/api/titles/{title['id']}")
+            assert detail.status_code == 200
+            video_response = client.get(detail.json()["video"])
+            assert video_response.status_code == 200
+            assert video_response.headers["content-type"] == "video/mp4"

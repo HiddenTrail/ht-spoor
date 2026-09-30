@@ -39,11 +39,12 @@ Present:
   for the full list), so this one is a small, purpose-built Express app: a
   same-origin JSON API behind a login-gated session cookie, a static frontend,
   and a checked-in seed catalog (`streaming-clone/seed/catalog.json`) with
-  generated placeholder posters. **The seed video clips are not checked in** —
-  `streaming-clone/seed/videos/README.md` documents the filename contract; drop
-  real short clips there to exercise the `<video>` playback-state signal
-  (ROADMAP §2c). Without them, the detail view still works and shows "Preview
-  unavailable."
+  generated placeholder posters and one short, low-bitrate video clip per
+  title (`streaming-clone/seed/videos/`), so the `<video>` playback-state
+  signal (ROADMAP §2c) is exercised out of the box — see
+  `streaming-clone/seed/videos/README.md` for the filename contract if a
+  catalog entry's clip is ever missing (the detail view degrades to "Preview
+  unavailable" rather than failing).
 
 Planned (added as their phases need them):
 
