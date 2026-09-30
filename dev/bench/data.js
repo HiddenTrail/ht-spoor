@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790767397244,
+  "lastUpdate": 1790767884039,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -4880,6 +4880,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5373.5,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4577bbd1bcba681dfbdaa493690825f51184843d",
+          "message": "§2e/§2h: bring-your-own-session for spoor explore/apply-scaffold (#165)\n\nCloses #164. spoor run had session: from the start; exploration mode never\ndid -- PlaywrightDriver(url) was always constructed anonymously, a\ndeliberate scope narrowing (the \"Sauce Demo dropped from the exploration\nbench\" decision), not an oversight, but one that left streaming-clone's\nwhole reason for existing (a rich, login-gated catalog/detail surface)\nunreachable: spoor explore against it mapped exactly one state, the login\nscreen.\n\nThe real fork wasn't \"add a flag\": PlaywrightDriver.reset() deliberately\nclears cookies and web storage before every navigation so a reset is\nalways a true first visit. Loading a session only at context creation\nwould get silently wiped by the very first reset(). Resolution: a\nsupplied session redefines \"true first visit\" as \"as this session, not\nanonymous\" -- cookies are re-added via context.add_cookies() right after\nevery clear_cookies() in reset(); localStorage is restored by one\ncontext.add_init_script() registered once at __enter__ that runs before\nany page script on every document the context ever loads, so it needs no\nper-reset action. Proven together live: an anonymous crawl against a\nloopback fixture whose second page is cookie-gated and third is\nlocalStorage-gated maps 1 state, a cookie-only session reaches 2, a full\nsession reaches all 3 -- across the crawl's several reset() calls, not\njust the first.\n\nspoor/security/session.py:LoadedSession gained a raw field (the parsed\nstorage-state object itself) so the driver re-applies Playwright's own\ncookie/origin shapes exactly, rather than round-tripping through\nSessionCookie (built only for the static tier's httpx jar). --session\nlands on both explore and apply-scaffold, validated up front via\nload_session so a bad file fails before any browser launches; composes\nfreely with --resume-from (orthogonal). Spoor still performs no login\nitself (§2h/§0). No change to the BrowserDriver Protocol, so every\nexisting fake driver is untouched.\n\nManually verifying this against the fixture that motivated it surfaced a\nsecond, real gap in the same session: streaming-clone's tiles were <div>s\nwith a JS click handler and no ARIA role, invisible to the accessibility\ntree Spoor's discovery reads from -- an authenticated crawl reached the\nreal catalog (confirmed by screenshot) but still mapped only 1 state.\nConverted each tile to a real <button> (restyled to look identical); the\nsame session then reaches all 6 detail screens -- 7 states, 15\ntransitions, real screenshots including the seeded <video> preview.\n\nVerified: pytest -m browser (44 passed, no regressions), fast tier (742\npassed, +6 new), ruff/mypy/check_genericity.py clean, all 6 streaming-clone\nintegration tests still pass against the button-based tiles. Manual run:\nspoor explore http://127.0.0.1:3002/ --session <captured> --wiki --screenshots\nagainst the live fixture produced a real 7-state wiki with screenshots of\nthe catalog and every detail modal (video preview included) -- not just\nthe login screen. docs/ROADMAP.md, README.md, and fixtures/README.md\nupdated.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-30T14:26:29+03:00",
+          "tree_id": "dd048661f320263dad58e258d1677c0a1577ed36",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/4577bbd1bcba681dfbdaa493690825f51184843d"
+        },
+        "date": 1790767882629,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 211.536,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03244,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.9332,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.10945,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.5862,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06321,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 9.8485,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.10074,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 16.5999,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.03589,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.241,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.56716,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.0251,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.03868,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 10.7609,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.92804,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 124.8082,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.06921,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.4211,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.00899,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.392,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5379.9,
             "unit": "MB"
           }
         ]
