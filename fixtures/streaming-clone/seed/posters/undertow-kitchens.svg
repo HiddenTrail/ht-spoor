@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450">
+  <rect width="300" height="450" fill="#264a2b"/>
+  <text x="150" y="215" font-family="sans-serif" font-size="24" fill="#eef7ee" text-anchor="middle">Undertow</text>
+  <text x="150" y="250" font-family="sans-serif" font-size="24" fill="#eef7ee" text-anchor="middle">Kitchens</text>
+  <text x="150" y="420" font-family="sans-serif" font-size="14" fill="#bfe0c2" text-anchor="middle">Documentary</text>
+</svg>
