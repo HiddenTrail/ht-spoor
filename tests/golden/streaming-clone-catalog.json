@@ -1,0 +1,32 @@
+[
+  {
+    "category": "Drama",
+    "poster": "/media/posters/coastline-protocol.svg",
+    "title": "Coastline Protocol"
+  },
+  {
+    "category": "Comedy",
+    "poster": "/media/posters/loose-bolt.svg",
+    "title": "Loose Bolt"
+  },
+  {
+    "category": "Comedy",
+    "poster": "/media/posters/nightshift-arcade.svg",
+    "title": "Nightshift Arcade"
+  },
+  {
+    "category": "Documentary",
+    "poster": "/media/posters/perihelion.svg",
+    "title": "Perihelion"
+  },
+  {
+    "category": "Drama",
+    "poster": "/media/posters/ridge-and-static.svg",
+    "title": "Ridge & Static"
+  },
+  {
+    "category": "Documentary",
+    "poster": "/media/posters/undertow-kitchens.svg",
+    "title": "Undertow Kitchens"
+  }
+]

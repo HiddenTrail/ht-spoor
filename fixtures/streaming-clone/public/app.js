@@ -94,6 +94,16 @@ async function loadCatalog() {
       label.textContent = title.title;
       tile.appendChild(label);
 
+      // Hidden, not shown in the row's own heading (which is one per row, not
+      // per tile) -- carried per-tile so an item-mode extraction config can
+      // read a title's category straight off its own row without reaching
+      // outside it.
+      const category = document.createElement("span");
+      category.className = "tile-category";
+      category.hidden = true;
+      category.textContent = row.category;
+      tile.appendChild(category);
+
       tile.addEventListener("click", () => openDetail(title.id));
       tiles.appendChild(tile);
     }
