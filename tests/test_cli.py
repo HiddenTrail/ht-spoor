@@ -145,6 +145,112 @@ def test_explore_resume_without_saved_map_aborts_before_browser(
     assert "nosavedexplorationmap" in _flatten_cli_error(result.output)
 
 
+def test_explore_bad_session_aborts_before_browser(tmp_path: Path) -> None:
+    # A missing --session file is rejected before any browser is launched, the
+    # same posture --resume-from and --screenshots already take (ROADMAP.md §2h).
+    from spoor.exploration import driver as driver_mod
+
+    def _boom(*_a: object, **_k: object) -> object:
+        raise AssertionError("a browser must not be launched with a bad session")
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(driver_mod, "PlaywrightDriver", _boom)
+        result = runner.invoke(
+            cli.app,
+            [
+                "explore",
+                "http://localhost:8000/",
+                "--session",
+                str(tmp_path / "does-not-exist.json"),
+            ],
+        )
+    assert result.exit_code != 0
+    assert "sessionfile" in _flatten_cli_error(result.output).lower()
+
+
+def test_explore_session_is_threaded_into_the_driver(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A valid --session reaches PlaywrightDriver's own session kwarg, not just
+    # past the up-front check.
+    from spoor.exploration import driver as driver_mod
+
+    session_file = tmp_path / "session.json"
+    session_file.write_text('{"cookies": [], "origins": []}', encoding="utf-8")
+    seen: dict[str, object] = {}
+
+    class _FakeDriver:
+        def __init__(self, target: str, *, session: str | None = None) -> None:
+            seen["target"] = target
+            seen["session"] = session
+
+        def __enter__(self) -> _FakeDriver:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            pass
+
+    from spoor.exploration.graph import ExplorationGraph
+
+    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _FakeDriver)
+    monkeypatch.setattr(
+        "spoor.exploration.explorer.explore", lambda *a, **k: ExplorationGraph()
+    )
+    result = runner.invoke(
+        cli.app,
+        ["explore", "http://localhost:8000/", "--session", str(session_file)],
+    )
+    assert result.exit_code == 0, result.output
+    assert seen["session"] == str(session_file)
+
+
+def test_apply_scaffold_session_is_threaded_into_the_driver(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spoor.exploration import driver as driver_mod
+    from spoor.exploration.graph import ExplorationGraph
+    from spoor.security import storage
+    from spoor.serving.store import MapStore, shareable_exploration_map
+
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path)
+    url = "http://localhost:8000/"
+    graph = ExplorationGraph()
+    graph.add_state("s1", [])
+    MapStore().record(url, [], exploration=shareable_exploration_map(graph))
+    scaffold_file = tmp_path / "interactive.yaml"
+    scaffold_file.write_text("fields: []\n", encoding="utf-8")
+    session_file = tmp_path / "session.json"
+    session_file.write_text('{"cookies": [], "origins": []}', encoding="utf-8")
+    seen: dict[str, object] = {}
+
+    class _FakeDriver:
+        def __init__(self, target: str, *, session: str | None = None) -> None:
+            seen["session"] = session
+
+        def __enter__(self) -> _FakeDriver:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            pass
+
+    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _FakeDriver)
+    monkeypatch.setattr(
+        "spoor.scaffold.apply.apply_scaffold", lambda *a, **k: ([], [])
+    )
+    result = runner.invoke(
+        cli.app,
+        [
+            "apply-scaffold",
+            url,
+            str(scaffold_file),
+            "--session",
+            str(session_file),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert seen["session"] == str(session_file)
+
+
 # --- wizard --------------------------------------------------------------------
 
 
@@ -154,8 +260,9 @@ def test_wizard_declining_run_prints_command_and_does_not_execute(
     calls: list[list[str]] = []
     monkeypatch.setattr("subprocess.run", lambda argv, **_k: calls.append(argv))
     # 1=explore, url, sandbox=n, states/requests/seconds blank, depth=2, resume
-    # blank, wiki=./wiki, screenshots=n, gen-tests/scaffold blank, run-now=n.
-    answers = "1\nhttp://localhost:8000/\nn\n\n\n\n2\n\n./wiki\nn\n\n\nn\n"
+    # blank, session blank, wiki=./wiki, screenshots=n, gen-tests/scaffold blank,
+    # run-now=n.
+    answers = "1\nhttp://localhost:8000/\nn\n\n\n\n2\n\n\n./wiki\nn\n\n\nn\n"
     result = runner.invoke(cli.app, ["wizard"], input=answers)
     assert result.exit_code == 0, result.output
     assert calls == []
@@ -176,7 +283,7 @@ def test_wizard_confirming_run_invokes_the_resolved_command(
         calls.append(argv)
 
     monkeypatch.setattr("subprocess.run", _record)
-    answers = "1\nhttp://localhost:8000/\ny\n\n\n\n\n\n\n\n\ny\n"
+    answers = "1\nhttp://localhost:8000/\ny\n\n\n\n\n\n\n\n\n\ny\n"
     result = runner.invoke(cli.app, ["wizard"], input=answers)
     assert result.exit_code == 0, result.output
     assert calls == [
@@ -197,7 +304,7 @@ def test_wizard_reprompts_on_a_non_numeric_answer(
     calls: list[list[str]] = []
     monkeypatch.setattr("subprocess.run", lambda argv, **_k: calls.append(argv))
     # max-states gets a bad answer ("abc") once before a good one ("5").
-    answers = "1\nhttp://localhost:8000/\nn\nabc\n5\n\n\n\n\n\n\n\nn\n"
+    answers = "1\nhttp://localhost:8000/\nn\nabc\n5\n\n\n\n\n\n\n\n\nn\n"
     result = runner.invoke(cli.app, ["wizard"], input=answers)
     assert result.exit_code == 0, result.output
     assert "isn't a whole number" in result.output
@@ -209,8 +316,9 @@ def test_wizard_apply_scaffold_builds_the_right_command(
 ) -> None:
     calls: list[list[str]] = []
     monkeypatch.setattr("subprocess.run", lambda argv, **_k: calls.append(argv))
-    # 2=apply-scaffold, url, scaffold path, sandbox=y, wiki blank, run-now=n.
-    answers = "2\nhttp://localhost:5173\n./interactive.yaml\ny\n\nn\n"
+    # 2=apply-scaffold, url, scaffold path, sandbox=y, session blank, wiki blank,
+    # run-now=n.
+    answers = "2\nhttp://localhost:5173\n./interactive.yaml\ny\n\n\nn\n"
     result = runner.invoke(cli.app, ["wizard"], input=answers)
     assert result.exit_code == 0, result.output
     assert calls == []
@@ -262,10 +370,10 @@ def test_wizard_allows_scaffold_directory_to_match_wiki(
 ) -> None:
     calls: list[list[str]] = []
     monkeypatch.setattr("subprocess.run", lambda argv, **_k: calls.append(argv))
-    # 1=explore, url, sandbox=n, states/requests/seconds/depth/resume blank,
-    # wiki=demo/out, screenshots=n, gen-tests blank, scaffold=demo/out (same
-    # directory as wiki -- fine now), run-now=n.
-    answers = "1\nhttp://localhost:8000/\nn\n\n\n\n\n\ndemo/out\nn\n\ndemo/out\nn\n"
+    # 1=explore, url, sandbox=n, states/requests/seconds/depth/resume/session
+    # blank, wiki=demo/out, screenshots=n, gen-tests blank, scaffold=demo/out
+    # (same directory as wiki -- fine now), run-now=n.
+    answers = "1\nhttp://localhost:8000/\nn\n\n\n\n\n\n\ndemo/out\nn\n\ndemo/out\nn\n"
     result = runner.invoke(cli.app, ["wizard"], input=answers)
     assert result.exit_code == 0, result.output
     assert calls == []

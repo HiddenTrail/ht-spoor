@@ -185,6 +185,17 @@ spoor explore https://example.com --max-depth 1          # map the shallow layer
 spoor explore https://example.com --resume-from id:9f3c --max-depth 2   # then go deep there
 ```
 
+**Exploring a logged-in site.** Spoor never logs in on its own — anything behind
+a login stays out of reach without help. Pass `--session <file>` with a session
+you already captured yourself (Playwright's `context.storage_state()`, the same
+file `spoor run`'s `session:` config field takes) to explore as that logged-in
+user instead. It's replayed for the whole crawl, not just the first page, and
+composes freely with `--resume-from`.
+
+```bash
+spoor explore https://example.com --session ./my-session.json --wiki ./site-map
+```
+
 Add `--wiki <dir>` to also write a **browsable wiki** of the map to that directory —
 one HTML page per state and per transition, plus an overview page with a diagram of
 the whole graph. States are labelled by their page title so the map reads at a glance,
@@ -247,7 +258,8 @@ everything else Spoor maps, and added to the saved map as a real, replayable sta
 transition — never overwriting what the earlier crawl found, only adding to it. Pass
 `--wiki` (the same directory an earlier `--wiki` wrote to) to see it there too, clearly
 marked as reached by typing a value rather than by a click, so it's never mistaken for
-something the site itself linked to.
+something the site itself linked to. If the scaffold's fields live behind a login, pass
+`--session <file>` the same way `spoor explore` does — Spoor still never logs in itself.
 
 ```bash
 spoor apply-scaffold https://example.com ./interactive-round/interactive.yaml --sandbox --wiki ./wiki

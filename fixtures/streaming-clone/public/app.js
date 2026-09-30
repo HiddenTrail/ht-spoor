@@ -80,7 +80,12 @@ async function loadCatalog() {
     const tiles = document.createElement("div");
     tiles.className = "tiles";
     for (const title of row.titles) {
-      const tile = document.createElement("div");
+      // A real <button>, not a <div> with a click handler: Spoor's exploration
+      // (and any keyboard/screen-reader user) discovers actionable elements via
+      // the accessibility tree, which a plain div with no role/tabindex never
+      // joins -- a button is focusable and accessible for free.
+      const tile = document.createElement("button");
+      tile.type = "button";
       tile.className = "tile";
       tile.dataset.id = title.id;
 

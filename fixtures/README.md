@@ -44,7 +44,10 @@ Present:
   signal (ROADMAP §2c) is exercised out of the box — see
   `streaming-clone/seed/videos/README.md` for the filename contract if a
   catalog entry's clip is ever missing (the detail view degrades to "Preview
-  unavailable" rather than failing).
+  unavailable" rather than failing). Since it's login-gated, `spoor explore`
+  needs a captured session (`--session`, added alongside this archetype) to
+  map anything past the login screen — see `README.md`'s "Exploring a
+  logged-in site" for how to capture one.
 
 Planned (added as their phases need them):
 

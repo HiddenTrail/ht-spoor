@@ -23,6 +23,7 @@ the settle wait resolves instantly and deterministically.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -98,12 +99,16 @@ class _FakeContext:
     def __init__(self, session: _FakeCDPSession) -> None:
         self._session = session
         self.cookies_cleared = 0
+        self.cookies_added: list[list[dict[str, Any]]] = []
 
     def new_cdp_session(self, page: object) -> _FakeCDPSession:
         return self._session
 
     def clear_cookies(self) -> None:
         self.cookies_cleared += 1
+
+    def add_cookies(self, cookies: list[dict[str, Any]]) -> None:
+        self.cookies_added.append(cookies)
 
 
 class _FakeMouse:
@@ -142,7 +147,9 @@ class _FakePage:
         self.goto_urls.append(url)
 
 
-def _driver_with_page(page: _FakePage) -> PlaywrightDriver:
+def _driver_with_page(
+    page: _FakePage, *, session: str | None = None
+) -> PlaywrightDriver:
     # A fake clock advanced only by the fake sleep, so the settle wait's quiet window
     # elapses in a handful of no-op iterations rather than real wall-clock time.
     clock = {"now": 0.0}
@@ -152,6 +159,7 @@ def _driver_with_page(page: _FakePage) -> PlaywrightDriver:
 
     driver = PlaywrightDriver(
         "http://127.0.0.1:0/",
+        session=session,
         clock=lambda: clock["now"],
         sleep=fake_sleep,
     )
@@ -186,6 +194,31 @@ def test_reset_clears_cookies_and_storage_then_navigates() -> None:
     assert page.context.cookies_cleared == 1
     assert any("localStorage" in expr for expr in page.evaluated)
     assert page.goto_urls == ["http://127.0.0.1:0/"]
+
+
+def test_reset_reapplies_a_supplied_sessions_cookies(tmp_path: Path) -> None:
+    # A supplied session (§2h) redefines "true first visit" as "as this session":
+    # reset() clears cookies for fidelity, then re-adds the session's own, verbatim.
+    session_path = tmp_path / "session.json"
+    session_path.write_text(
+        '{"cookies": [{"name": "a", "value": "b", "domain": "x", "path": "/"}], '
+        '"origins": []}',
+        encoding="utf-8",
+    )
+    page = _FakePage(probe_value=_HITS_TARGET)
+    driver = _driver_with_page(page, session=str(session_path))
+    driver.reset()
+    assert page.context.cookies_cleared == 1
+    assert page.context.cookies_added == [
+        [{"name": "a", "value": "b", "domain": "x", "path": "/"}]
+    ]
+
+
+def test_reset_without_a_session_never_calls_add_cookies() -> None:
+    page = _FakePage(probe_value=_HITS_TARGET)
+    driver = _driver_with_page(page)
+    driver.reset()
+    assert page.context.cookies_added == []
 
 
 def test_reset_scopes_console_and_network_buffers() -> None:

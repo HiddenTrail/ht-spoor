@@ -62,9 +62,10 @@ from __future__ import annotations
 
 import base64
 import binascii
+import json
 import time
 from collections.abc import Callable, Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urljoin, urlparse
 
 from playwright.sync_api import (
@@ -95,6 +96,7 @@ from spoor.exploration.explorer import (
     ElementNotLocated,
 )
 from spoor.exploration.settling import SettleResult, wait_for_quiescence
+from spoor.security.session import LoadedSession, load_session
 
 # JS that lists both web-storage areas' keys — the "storage-state diff" §2e signal.
 _STORAGE_KEYS_JS = (
@@ -145,6 +147,74 @@ _MUTATION_OBSERVER_JS = """
 # Clears both web-storage areas so a reset is a true first visit (§2e, 7b). Run on the
 # previous document before navigating; harmless if an area is empty or unavailable.
 _CLEAR_STORAGE_JS = "() => { localStorage.clear(); sessionStorage.clear(); }"
+
+
+def _session_restore_script(raw: Mapping[str, object]) -> str:
+    """An init script restoring a supplied session's per-origin localStorage.
+
+    `reset()` clears storage before every navigation so a reset is always a true
+    first visit (see the module docstring) — with a supplied session (ROADMAP.md
+    §2h) that becomes "a true first visit *as this session*", so the values this
+    builds from the session's `origins` must survive every reset, not just the
+    first page load `new_context(storage_state=...)` already covers. Registered
+    once via `add_init_script`, which Playwright guarantees runs before any page
+    script on *every* document the context loads — so, unlike cookies (re-added
+    explicitly in `reset()`, since there is no init-script equivalent for the
+    cookie jar), this needs no per-reset action at all. Only localStorage: a
+    storage-state capture never includes sessionStorage (Playwright's own format
+    omits it — it is tab-scoped, not something a capture can meaningfully carry),
+    so `_CLEAR_STORAGE_JS` clearing it has nothing to restore.
+
+    Values are embedded as a JSON literal (never string-interpolated), so a
+    session value containing a quote or backslash cannot break out of the script.
+    A storage-state file with no `origins` key, or a malformed entry, yields an
+    empty map — the script becomes a no-op, never a crash.
+    """
+    by_origin: dict[str, list[list[str]]] = {}
+    origins = raw.get("origins", [])
+    if isinstance(origins, list):
+        for entry in origins:
+            if not isinstance(entry, dict):
+                continue
+            origin = entry.get("origin")
+            local_storage = entry.get("localStorage", [])
+            if not isinstance(origin, str) or not isinstance(local_storage, list):
+                continue
+            pairs: list[list[str]] = []
+            for item in local_storage:
+                if not isinstance(item, dict):
+                    continue
+                name, value = item.get("name"), item.get("value")
+                if isinstance(name, str) and isinstance(value, str):
+                    pairs.append([name, value])
+            if pairs:
+                by_origin[origin] = pairs
+    return f"""
+(() => {{
+  const bySpoorOrigin = {json.dumps(by_origin)};
+  const entries = bySpoorOrigin[location.origin];
+  if (!entries) return;
+  for (const [name, value] of entries) {{
+    try {{ localStorage.setItem(name, value); }} catch (e) {{ /* unavailable */ }}
+  }}
+}})();
+"""
+
+
+def _cookies_for_playwright(raw: Mapping[str, object]) -> list[dict[str, Any]]:
+    """A supplied session's cookies, in the exact shape `add_cookies` expects.
+
+    Kept verbatim from the storage-state file (name/value/domain/path/expires/
+    httpOnly/secure/sameSite as Playwright itself wrote them) rather than routed
+    through `SessionCookie` — that model only carries what the static tier's
+    `httpx` cookie jar needs, and would lose fields a real re-add can depend on.
+    A non-list `cookies` or a non-dict entry is dropped rather than raising —
+    `reset()` degrades to "that cookie isn't restored", never a crashed run.
+    """
+    raw_cookies = raw.get("cookies", [])
+    if not isinstance(raw_cookies, list):
+        return []
+    return [entry for entry in raw_cookies if isinstance(entry, dict)]
 
 # Reads the cumulative mutation count the observer maintains; missing (a fresh document
 # before the init script ran) reads as 0, i.e. quiet.
@@ -407,6 +477,7 @@ class PlaywrightDriver:
         self,
         target: str,
         *,
+        session: str | None = None,
         clock: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
         quiet_window: float = _QUIET_WINDOW_S,
@@ -414,6 +485,15 @@ class PlaywrightDriver:
         poll_interval: float = _POLL_INTERVAL_S,
     ) -> None:
         self._target = target
+        # Bring-your-own-session (ROADMAP.md §2h), the exploration-mode counterpart
+        # of `extract.py`'s tiers: validated eagerly (`load_session` raises
+        # `SessionError` on a missing/malformed file) so a bad `--session` fails
+        # loudly before a browser ever launches, matching the static/browser tiers'
+        # own posture. Spoor performs no login itself (§2h, §0) — this only replays
+        # an already-captured session.
+        self._session: LoadedSession | None = (
+            load_session(session) if session is not None else None
+        )
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
         self._context: BrowserContext | None = None
@@ -451,11 +531,23 @@ class PlaywrightDriver:
         self._context = self._browser.new_context(
             viewport={"width": _VIEWPORT_WIDTH, "height": _VIEWPORT_HEIGHT},
             device_scale_factor=1,
+            # Loads the supplied session's cookies *and* origins/localStorage for
+            # this first page load (ROADMAP.md §2h); every reset after this one
+            # re-applies it explicitly (see `reset`), since Playwright only ever
+            # reads `storage_state` at context creation.
+            storage_state=str(self._session.path) if self._session else None,
         )
         # Install the mutation counter on every document the context loads, so the
         # settle wait (§2e, 7b) has a real rendering-stopped signal after each reset
         # and each in-page navigation.
         self._context.add_init_script(_MUTATION_OBSERVER_JS)
+        if self._session is not None:
+            # Runs before any page script on every document this context ever
+            # loads (including the very first), so a supplied session's
+            # localStorage survives every future `reset()` clear with no
+            # per-reset action needed — unlike cookies, which have no init-script
+            # equivalent and are re-added explicitly in `reset` instead.
+            self._context.add_init_script(_session_restore_script(self._session.raw))
         self._page = self._context.new_page()
         self._page.on("console", self._on_console)
         self._page.on("request", self._on_request)
@@ -526,6 +618,20 @@ class PlaywrightDriver:
         """
         page = self._live_page
         self._live_context.clear_cookies()
+        if self._session is not None:
+            # A supplied session (§2h) makes "a true first visit" mean "as this
+            # session", not anonymous — cookies have no init-script equivalent
+            # (unlike localStorage, restored automatically on navigation; see
+            # `_session_restore_script`), so they are re-added explicitly, every
+            # reset. A cookie Playwright's jar rejects (e.g. an invalid domain in
+            # a hand-edited file) degrades to "not restored" rather than aborting
+            # the run — the same tolerant posture `_cookies_from` already takes.
+            try:
+                self._live_context.add_cookies(
+                    cast(Any, _cookies_for_playwright(self._session.raw))
+                )
+            except PlaywrightError:
+                pass
         try:
             page.evaluate(_CLEAR_STORAGE_JS)
         except PlaywrightError:
