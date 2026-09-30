@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790757698264,
+  "lastUpdate": 1790760434546,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -4448,6 +4448,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5271.9,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bbeeef5a5101976395ca47fd77b9fc62bfaebf5c",
+          "message": "fixtures/streaming-clone: add the seed video clips (#161)\n\n* fixtures/streaming-clone: add the seed video clips\n\nseed/videos/README.md (added in #160) documented the filename contract but\nshipped no video bytes -- generating a real, valid mp4 needed an encoder that\nenvironment didn't have. Six short, low-bitrate clips (one per catalog title,\nmatching the filenames in seed/catalog.json) are added here, so the fixture's\nwhole point -- exercising the <video> playback-state signal ROADMAP.md §2c\nnames -- actually works out of the box rather than only degrading gracefully.\n\nfixtures/README.md and the ROADMAP.md §5.1 decision note updated to say the\nclips are checked in, not pending. tests/test_integration_streaming_clone.py\ngained a fourth test asserting every seeded title's video is actually\nfetchable as video/mp4, not just that the catalog/login wiring works.\n\nVerified: rebuilt the image, booted the container, confirmed all six clips\nserve 200 video/mp4 over HTTP and pass an mp4 header sanity check (ftyp isom),\npytest -m integration -k streaming_clone (4 passed), fast tier unaffected\n(736 passed), ruff/mypy/check_genericity.py all clean.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n* fixtures/streaming-clone: swap in the final seed video clips\n\nSame six filenames as before (matching seed/catalog.json) -- only the video\nbytes changed. Rebuilt the image, booted the container, and reran the\nstreaming-clone integration tests against the new clips (4 passed, including\nthe per-title playable-video check) to confirm the swap didn't break\nanything.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-30T12:22:19+03:00",
+          "tree_id": "4874cd93fb2f05f296e5e809c9ee95edfa3299ba",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/bbeeef5a5101976395ca47fd77b9fc62bfaebf5c"
+        },
+        "date": 1790760433914,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 226.115,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04142,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.2326,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12828,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.1108,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.0719,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 11.779,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11232,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 18.7682,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04678,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2839,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.584,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.4601,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05093,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.1346,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.01402,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.5131,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09296,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5446,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01068,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4735,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5328,
             "unit": "MB"
           }
         ]
