@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790713675860,
+  "lastUpdate": 1790750414653,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -3728,6 +3728,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5395.5,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "af257a1506ceecef61ee9d0086e8b6cbb3b8a32b",
+          "message": "Docs: fix Phase column regressions in features/README.md, fill a README.md gap (#145)\n\nAudited every README against the current main (post PR #144) to answer \"is\nevery README up to date\": ran spoor --help for every command and compared\nagainst README.md's documented flags/examples, and cross-checked every\nfeatures/README.md row's last column against its .feature file.\n\nFound a real mistake made across three earlier PRs this session: the table's\nlast column is \"Phase\" (the project phase number), not a scenario count --\nevery other §2e row already correctly reads 5. Three rows I edited this\nsession (exploration_loop.feature, interactive_scaffold.feature,\ninteractive_scaffold_apply.feature) had that 5 overwritten with a scenario\ncount (8, 8, 14) by mistake. Reverted all three to 5, matching every sibling\n§2e row.\n\nAlso found a real gap, not a regression: README.md's \"Available now\" capability\nlist never mentioned the scaffold-generation/apply-scaffold feature at all,\ndespite the detailed walkthrough earlier in the same file -- added a bullet,\nand a short mention of the live progress indicator in the exploration bullet.\n\nNoted, not fixed (pre-existing, unrelated to this session's work): features/\nREADME.md still lists `interaction.feature` under Phase 2, but that file was\nnever created under features/ -- a stale forward-reference from before this\nsession, left for a maintainer to triage rather than guessed at here.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-30T09:35:17+03:00",
+          "tree_id": "95a1780ac7f789ff3658cf51b6e3b0781a564f8a",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/af257a1506ceecef61ee9d0086e8b6cbb3b8a32b"
+        },
+        "date": 1790750414120,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 227.444,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.041,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.1061,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.13041,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.0613,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.07464,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 12.6033,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11997,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 19.5635,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04582,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2874,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.58215,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.6139,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05263,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.5583,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.02009,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.8962,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09263,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5774,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01061,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4675,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5303.7,
             "unit": "MB"
           }
         ]
