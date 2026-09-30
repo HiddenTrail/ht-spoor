@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="450" viewBox="0 0 300 450">
+  <rect width="300" height="450" fill="#b3541e"/>
+  <text x="150" y="215" font-family="sans-serif" font-size="24" fill="#fff4e8" text-anchor="middle">Nightshift</text>
+  <text x="150" y="250" font-family="sans-serif" font-size="24" fill="#fff4e8" text-anchor="middle">Arcade</text>
+  <text x="150" y="420" font-family="sans-serif" font-size="14" fill="#ffd9b3" text-anchor="middle">Comedy</text>
+</svg>

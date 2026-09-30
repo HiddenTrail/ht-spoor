@@ -19,9 +19,22 @@
 # state abstraction, and the mapping-coverage work the 7-series has been hardening,
 # where an SPA whose whole app lives at one URL does not. Unlike the distroless SPAs
 # it needs a database, so it ships as two services (prestashop + prestashop-db) and
-# auto-installs on first boot. A self-hosted ERPNext/Odoo and a Netflix-clone still
-# wait for their phases (API discovery §2b/§2.5, richer exploration) — standing them
-# up now would be scaffolding for capabilities that do not yet exist.
+# auto-installs on first boot.
+#
+# streaming-clone is the fourth archetype, joining for API discovery (§2b) and richer
+# exploration. Third-party "Netflix clone" candidates were vetted and ruled out (see
+# fixtures/streaming-clone/Dockerfile for the full list and why each failed) — every
+# one was either a production media server needing real video files or a thin
+# frontend hard-wired to an external SaaS, neither matching this bench's pattern of a
+# self-contained app with its own data and no external accounts. So it's purpose-built:
+# a small Express app with its own same-origin JSON API, a login gate (a second,
+# differently-shaped proof point for bring-your-own-session §2h alongside Sauce
+# Demo's), and a per-title detail view with a <video> element — the first fixture to
+# exercise the media/streaming-capture signal ROADMAP §2c already names. No database,
+# so (like the two SPAs) it's a single service; it's built from our own checked-in
+# source, the same way Sauce Demo is built rather than pulled as a prebuilt image.
+# A self-hosted ERPNext/Odoo still waits for its phase (API discovery §2b/§2.5) —
+# standing it up now would be scaffolding for a capability that does not yet exist.
 
 services:
   juice-shop:
@@ -97,6 +110,23 @@ services:
       ADMIN_PASSWD: spoor-admin-pw
     volumes:
       - ps-data:/var/www/html
+    # Same §5.1 sandbox label as the others: a dedicated test target §2e exploration
+    # mode may exercise freely.
+    labels:
+      spoor.sandbox: "true"
+
+  streaming-clone:
+    # The fourth live archetype: a purpose-built streaming-clone (see the header
+    # comment above and fixtures/streaming-clone/Dockerfile for why it's authored by
+    # us rather than adopted). Built from our own source, same as Sauce Demo, since
+    # there is no upstream project to pin.
+    build: ./streaming-clone
+    ports:
+      # Host port defaults to 3002 (the next port after Sauce Demo's 3001) and is
+      # overridable so a machine already using 3002 can still run the bench:
+      # `STREAMING_CLONE_PORT=3003 docker compose ... up -d`. The container serves
+      # on 80, same convention as the other single-service archetypes.
+      - "${STREAMING_CLONE_PORT:-3002}:80"
     # Same §5.1 sandbox label as the others: a dedicated test target §2e exploration
     # mode may exercise freely.
     labels:

@@ -1,0 +1,14 @@
+{
+  "name": "spoor-streaming-clone-fixture",
+  "private": true,
+  "version": "1.0.0",
+  "description": "ROADMAP.md §5.1 archetype bench -- purpose-built streaming-clone fixture.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "cookie-session": "^2.1.0"
+  }
+}

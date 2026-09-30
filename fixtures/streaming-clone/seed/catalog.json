@@ -1,0 +1,50 @@
+[
+  {
+    "id": "t1",
+    "title": "Ridge & Static",
+    "category": "Drama",
+    "poster": "ridge-and-static.svg",
+    "video": "ridge-and-static.mp4",
+    "synopsis": "A signal engineer chases a ghost frequency across three towns."
+  },
+  {
+    "id": "t2",
+    "title": "Coastline Protocol",
+    "category": "Drama",
+    "poster": "coastline-protocol.svg",
+    "video": "coastline-protocol.mp4",
+    "synopsis": "An audit uncovers a decade of quietly rerouted harbor traffic."
+  },
+  {
+    "id": "t3",
+    "title": "Nightshift Arcade",
+    "category": "Comedy",
+    "poster": "nightshift-arcade.svg",
+    "video": "nightshift-arcade.mp4",
+    "synopsis": "Four overnight-mall employees run a very small, very illegal arcade."
+  },
+  {
+    "id": "t4",
+    "title": "Loose Bolt",
+    "category": "Comedy",
+    "poster": "loose-bolt.svg",
+    "video": "loose-bolt.mp4",
+    "synopsis": "A hardware store's worst repairman becomes its best-loved mascot."
+  },
+  {
+    "id": "t5",
+    "title": "Perihelion",
+    "category": "Documentary",
+    "poster": "perihelion.svg",
+    "video": "perihelion.mp4",
+    "synopsis": "A season with the amateur astronomers who still hand-grind their lenses."
+  },
+  {
+    "id": "t6",
+    "title": "Undertow Kitchens",
+    "category": "Documentary",
+    "poster": "undertow-kitchens.svg",
+    "video": "undertow-kitchens.mp4",
+    "synopsis": "Three coastal restaurants, one dwindling fish stock, one hard season."
+  }
+]
