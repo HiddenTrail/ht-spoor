@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790760434546,
+  "lastUpdate": 1790763367770,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -4592,6 +4592,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5328,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "553fa042aa406c057aa1411918a34f417e6283e7",
+          "message": "§2h/§5.1: wire streaming-clone into Spoor's extraction pipeline (#162)\n\nFollow-on to #160/#161, deferred there the same way PrestaShop's own landing\ndeferred it: stand the archetype up and prove its own contract first, wire it\ninto the real pipeline after. This is that wiring.\n\nfixtures/configs/streaming-clone-catalog.yaml extracts the title catalog via\na new item-mode config (item: \".tile\", fields for title/category/poster).\npublic/app.js gained a hidden per-tile .tile-category span, since a field\nselector resolves *within* its matched element (a descendant query), not\nagainst the element itself -- a category attribute on the tile div wouldn't\nhave been reachable.\n\ntests/test_integration_streaming_clone_extraction.py mirrors Sauce Demo's\ntest shape and gives streaming-clone its own end-to-end bring-your-own-\nsession (§2h) proof, structurally different from Sauce Demo's: a session-less\nrun escalates to the browser tier but extracts nothing (no .tile ever attaches\nwithout the fetch a login gates); an authenticated run (session captured by\ndriving a real Chromium through the login form -- Spoor performs no login\nitself, §2h/§0) extracts the catalog and matches a committed golden master\n(§5.4) -- an exact match fits here, unlike PrestaShop's deferred golden\nmaster, since the catalog is static checked-in seed data. No core code\nchanged (§0): both the config and the frontend tweak are fixture-side.\n\nVerified: pytest -m integration -k streaming_clone (6 passed, ~4min --\ntier 2's real Chromium overhead, not a hang: bisected a spurious \"hang\"\nduring development down to impatient test timeouts, confirmed with a\ntimed direct call to Tier2Resolver.run() before settling this in). Fast\ntier unaffected (736 passed). ruff/mypy/check_genericity.py all clean.\ndocs/ROADMAP.md §5.1 gained a decision note recording this wiring.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-30T13:11:14+03:00",
+          "tree_id": "6bbe097db1226223346a982b3c131a09271fc7ec",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/553fa042aa406c057aa1411918a34f417e6283e7"
+        },
+        "date": 1790763367183,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 222.447,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.0416,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.9404,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12475,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.9273,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06836,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 11.4142,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11239,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 18.0553,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04952,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2858,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.57484,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.2559,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.0526,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 12.8516,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.9883,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.4571,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.08316,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.527,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01055,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4576,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5333.1,
             "unit": "MB"
           }
         ]
