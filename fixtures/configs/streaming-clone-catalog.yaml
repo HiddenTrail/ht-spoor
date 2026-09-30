@@ -1,0 +1,20 @@
+# ROADMAP.md §5.1 archetype-bench config — streaming-clone, the media-browsing app.
+#
+# Extracts the title catalog from a live, self-hosted streaming-clone. The catalog is
+# a client-rendered list fetched from /api/catalog after login, so this config only
+# resolves under the browser tier (tier 1 sees the empty app shell) AND only when the
+# run carries an authenticated session — the integration test supplies one it captured
+# by logging in as a user would (bring-your-own-session, §2h). Without that session the
+# app never fetches or renders the catalog, so no ".tile" ever attaches and the browser
+# tier extracts nothing — the same gate Sauce Demo's config proves.
+#
+# Site-specific selectors are fine here: this is a fixture config, not core code (§0
+# applies to spoor/core/, not to configs pointed at a target). The default target port
+# matches docker-compose.yml's default (3002); the integration test rewrites the base
+# URL when the bench runs on a different host port.
+target: http://127.0.0.1:3002/
+item: ".tile"
+fields:
+  title: { selector: ".tile-title" }
+  category: { selector: ".tile-category" }
+  poster: { selector: "img", attr: "src" }
