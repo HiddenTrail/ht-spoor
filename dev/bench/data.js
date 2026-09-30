@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790757228864,
+  "lastUpdate": 1790757698264,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -4304,6 +4304,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5329.4,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c895af4ba19ba483c19c1028708ac658d04c7e7c",
+          "message": "§5.1: add streaming-clone, the fourth fixture archetype (#160)\n\nThe planned \"self-hosted Netflix-clone\" archetype had no clean adopt-as-is\ncandidate. Every third-party project vetted (devopsinsiders/netflix-clone,\nApestein/nextflix, zoriya/Kyoo, an aiworklabs clone, ridhwaans/homehost, the\nLocalFlix/netflix-local family) was either a production media server needing\nreal video files and a transcoding pipeline, or a thin frontend hard-wired to\na mandatory external SaaS (Clerk/Stripe/Neon/TMDB/Spotify in various\ncombinations) -- neither matches the bench's pattern of a self-contained app\nwith its own data and no external accounts.\n\nSo this one is purpose-built: a small Express app (fixtures/streaming-clone/)\nwith a same-origin JSON API, a server-set-session login gate (a second,\ndifferently-shaped bring-your-own-session proof point alongside Sauce Demo's\nSPA-token pattern), and a per-title detail view with a <video> element -- the\nfirst fixture to exercise the media/streaming-capture signal ROADMAP.md §2c\nnames but none of the others trigger. No database, built from our own\nchecked-in source (no upstream commit to pin, unlike Sauce Demo). Catalog and\nposters are checked in; seed video clips are deliberately not (see\nseed/videos/README.md) -- the app degrades gracefully to \"Preview\nunavailable\" until real short clips are dropped in.\n\nJoins docker-compose.yml on port 3002 (STREAMING_CLONE_PORT), same\nspoor.sandbox label as the rest of the bench. tests/test_integration_\nstreaming_clone.py proves the fixture's own contract (login, gated catalog,\nunauthenticated rejection) against the live container, the same\nstand-it-up-first step PrestaShop's own decision note took before wiring it\ninto Spoor's exploration/extraction bench. No .feature file: this is fixture\ninfrastructure (§5.1), not a Spoor capability with runtime behavior to spec --\nsame precedent as the existing Sauce Demo/PrestaShop compose additions.\n\nVerified: image builds, container boots, login/catalog/gate/missing-video-404\nall checked live over HTTP, pytest -m integration -k streaming_clone (3\npassed), fast tier unchanged (734 passed), ruff/mypy/check_genericity.py all\nclean. fixtures/README.md and docs/ROADMAP.md §5.1 updated to describe four\nlive archetypes.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-09-30T11:36:38+03:00",
+          "tree_id": "7d1eb122b201dd0bdb888819fe9f14ef4b257c61",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/c895af4ba19ba483c19c1028708ac658d04c7e7c"
+        },
+        "date": 1790757696961,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 222.485,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03937,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.0889,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12278,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.9616,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06366,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 11.424,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.10905,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 17.8345,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04126,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2566,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.57234,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.0204,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05116,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 12.9084,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.9939,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.5909,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.08295,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5056,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.0105,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4648,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5271.9,
             "unit": "MB"
           }
         ]
