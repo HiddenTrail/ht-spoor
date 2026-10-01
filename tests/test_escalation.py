@@ -45,6 +45,7 @@ class _FakeResolver:
         *,
         sleep: Callable[[float], None] = time.sleep,
         healer: extract.Healer | None = None,
+        hooks: extract.RunHooks | None = None,
     ) -> RunResult:
         self.ran = True
         return self._result

@@ -55,6 +55,7 @@ from spoor.core.self_healing import Healer, HealEvent, Screenshotter
 from spoor.core.visual import InvalidImageError, perceptual_hash
 from spoor.operational.challenge import ChallengeSignal, detect_challenge
 from spoor.operational.change_detection import detector_for_target
+from spoor.operational.hooks import RunHooks
 from spoor.operational.politeness import Politeness
 from spoor.operational.retry import (
     FetchFailure,
@@ -467,6 +468,7 @@ class Resolver(Protocol):
         *,
         sleep: Callable[[float], None] = time.sleep,
         healer: Healer | None = None,
+        hooks: RunHooks | None = None,
     ) -> RunResult: ...
 
 
@@ -493,6 +495,7 @@ class Tier1Resolver:
         *,
         sleep: Callable[[float], None] = time.sleep,
         healer: Healer | None = None,
+        hooks: RunHooks | None = None,
     ) -> RunResult:
         """Fetch and extract, following next-link pagination to the end.
 
@@ -501,7 +504,10 @@ class Tier1Resolver:
         applied between fetches. `sleep` is injectable so timing can be asserted.
         When a `healer` is supplied, single-record field selectors are remembered
         on success and healed on failure through it (§2); its events are surfaced
-        by the dispatcher.
+        by the dispatcher. When `hooks` is supplied (ROADMAP.md §2d, #150),
+        `hooks.on_request` may add headers to a URL the gate already decided to
+        fetch, and `hooks.on_response` may replace the fetched HTML extraction
+        reads from — both called only for a URL that passed the politeness gate.
 
         A supplied session (`config.session`, ROADMAP.md §2h) is validated up
         front — before the client is even built — so a missing or malformed
@@ -550,6 +556,10 @@ class Tier1Resolver:
                 # Conditional-request validators from a prior run, when change
                 # detection is on (empty on a first run or a plain run) (§2d).
                 headers = detector.conditional_headers(url) if detector else None
+                if hooks is not None and hooks.on_request is not None:
+                    extra_headers = hooks.on_request(url)
+                    if extra_headers:
+                        headers = {**(headers or {}), **extra_headers}
                 outcome = fetcher.get(url, headers=headers)
                 if isinstance(outcome, FetchFailure):
                     # Classified fetch failure: record it. A failed page offers
@@ -574,18 +584,25 @@ class Tier1Resolver:
                         frontier.append((next_url, depth))
                     frontier.extend(_discover_links(outcome.text, url, depth, config))
                     continue
+                # Remember this page's validators against the *real* server
+                # response before any hook runs — change detection compares
+                # against what the origin actually sent, not a hook's rewrite.
+                if detector is not None:
+                    detector.record(url, outcome)
+                html = outcome.text
+                if hooks is not None and hooks.on_response is not None:
+                    rewritten = hooks.on_response(url, html)
+                    if rewritten is not None:
+                        html = rewritten
                 # Recognize an anti-bot challenge in the fetched page (§2d): a
                 # 2xx challenge would otherwise be scraped as if it were data.
                 # First page to look like one names the run's challenge.
                 if result.challenge is None:
-                    result.challenge = detect_challenge(outcome.text)
-                result.records.extend(extract_records(outcome.text, config, healer))
-                # Remember this page's validators for the next run's comparison.
-                if detector is not None:
-                    detector.record(url, outcome)
-                if next_url := _next_url(outcome.text, url, config):
+                    result.challenge = detect_challenge(html)
+                result.records.extend(extract_records(html, config, healer))
+                if next_url := _next_url(html, url, config):
                     frontier.append((next_url, depth))
-                frontier.extend(_discover_links(outcome.text, url, depth, config))
+                frontier.extend(_discover_links(html, url, depth, config))
         finally:
             result.retries = fetcher.retries
             if detector is not None:
@@ -680,6 +697,7 @@ class Tier2Resolver:
         *,
         sleep: Callable[[float], None] = time.sleep,
         healer: Healer | None = None,
+        hooks: RunHooks | None = None,
     ) -> RunResult:
         """Render and extract, following the same politeness gate as tier 1.
 
@@ -780,6 +798,7 @@ class Tier2Resolver:
                             headers,
                             recorder,
                             healer,
+                            hooks,
                         )
                         # Storage state is a context-level capture (cookies +
                         # localStorage span pages), taken once after the crawl and
@@ -841,6 +860,7 @@ class Tier2Resolver:
         headers: HeaderCollector | None = None,
         recorder: CheckpointRecorder | None = None,
         healer: Healer | None = None,
+        hooks: RunHooks | None = None,
     ) -> None:
         seen: set[str] = set()
         # A frontier, not a single chain — see Tier1Resolver.run's identical
@@ -860,10 +880,17 @@ class Tier2Resolver:
                 continue
             gate.before_fetch(url)
             page = context.new_page()
-            # Attach before navigating so load-time console output and errors count.
-            if console is not None:
-                console.attach(page)
             try:
+                # Attach before navigating so load-time console output and
+                # errors count.
+                if console is not None:
+                    console.attach(page)
+                # Inside the try so a hook that raises still closes the page
+                # via the finally below, instead of leaking it.
+                if hooks is not None and hooks.on_request is not None:
+                    extra_headers = hooks.on_request(url)
+                    if extra_headers:
+                        page.set_extra_http_headers(extra_headers)
                 # Mark the navigation just before it fires, so layer-5 correlation
                 # can attribute the load's requests to it (§2b). One "load" mark per
                 # page; a paginated crawl records several.
@@ -904,9 +931,14 @@ class Tier2Resolver:
                 if _requires_browser(config):
                     _exhaust_infinite_scroll(page, recorder)
                 html = page.content()
-                # Snapshot the a11y tree after the page has fully rendered.
+                # Snapshot the a11y tree after the page has fully rendered — the
+                # *actual* rendered DOM, before any on_response hook's rewrite.
                 if a11y is not None:
                     a11y.capture(page)
+                if hooks is not None and hooks.on_response is not None:
+                    rewritten = hooks.on_response(url, html)
+                    if rewritten is not None:
+                        html = rewritten
                 # Extract while the page is still open, so tier 3 can screenshot
                 # elements for the perceptual-hash visual signal (§2 tier table).
                 # The screenshotter is bound to this live page and cleared after,
@@ -1023,6 +1055,7 @@ def run_report(
     *,
     sleep: Callable[[float], None] = time.sleep,
     tiers: tuple[Resolver, ...] = DEFAULT_TIERS,
+    hooks: RunHooks | None = None,
 ) -> RunResult:
     """Resolve `config` through the dispatcher and return the full run report.
 
@@ -1039,6 +1072,11 @@ def run_report(
     success and healed on failure. Its newly-learned fingerprints are persisted
     after the walk, and its heal events (confident fills + uncertain matches) are
     stamped on the result for the run summary (§2d).
+
+    `hooks` (ROADMAP.md §2d, #150), when supplied, is threaded unchanged into
+    whichever tier resolves the config — an operator-supplied extension point,
+    not config `load_config` can express (§0: a hook is code, not per-target
+    declarative config).
     """
     candidates = [resolver for resolver in tiers if resolver.accepts(config)]
     if not candidates:
@@ -1048,7 +1086,7 @@ def run_report(
     result = RunResult()
     attempted: list[int] = []
     for resolver in candidates:
-        result = resolver.run(config, client, sleep=sleep, healer=healer)
+        result = resolver.run(config, client, sleep=sleep, healer=healer, hooks=hooks)
         attempted.append(resolver.tier)
         if not _should_escalate(result):
             break

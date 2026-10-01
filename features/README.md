@@ -20,6 +20,7 @@ are authored when their phase begins, not up front.
 | `operational.feature` | Politeness & rate limiting | §2d | `spoor/operational` | 1 |
 | `output.feature` | Output pipeline (pluggable sinks) | §2d | `spoor/operational` | 1 / 3.5 |
 | `interaction.feature` | Interaction execution (native/jittered) | §2 | `spoor/core` | 2 |
+| `request_response_hooks.feature` | Operator-supplied request/response hooks (Python API, `extract.run_report(hooks=...)`); Crawljax-style exploration hooks are a separate, deferred follow-on | §2d | `spoor/operational`, `spoor/core` | 2 |
 | `api_discovery.feature` | API surface discovery (spec + GraphQL introspection) | §2b | `spoor/api_discovery` | 2.5 |
 | `capture.feature` | Raw network capture (HAR) to local-only cache | §2b/§2c/§2h | `spoor/core`, `spoor/security` | 2.5 |
 | `signals.feature`, `accessibility.feature`, `response_headers.feature`, `storage_state.feature` | Client-side signals catalog (console, a11y tree, response headers, storage state) | §2c | `spoor/signals` | 2.5 |
