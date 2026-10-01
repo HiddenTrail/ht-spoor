@@ -25,6 +25,24 @@ def _product_page(title: str) -> str:
     return f'<html><body><h1 class="product-title">{title}</h1></body></html>'
 
 
+def _urlset_xml(urls: list[str]) -> str:
+    entries = "".join(f"<url><loc>{u}</loc></url>" for u in urls)
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{entries}</urlset>"
+    )
+
+
+def _sitemapindex_xml(sitemap_urls: list[str]) -> str:
+    entries = "".join(f"<sitemap><loc>{u}</loc></sitemap>" for u in sitemap_urls)
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+        f"{entries}</sitemapindex>"
+    )
+
+
 def _catalog_page(n: int, total: int) -> str:
     nxt = (
         ""
@@ -72,6 +90,35 @@ def robots_503(context: dict[str, Any]) -> None:
     context["routes"]["/robots.txt"] = (503, "service unavailable")
 
 
+@given(parsers.parse('a site whose robots.txt names a sitemap at "{url}"'))
+def robots_sitemap(context: dict[str, Any], url: str) -> None:
+    context["routes"]["/robots.txt"] = (
+        200,
+        f"User-agent: *\nAllow: /\nSitemap: {url}\n",
+    )
+
+
+@given(parsers.parse('a sitemap at "{path}" listing:'))
+def sitemap_listing(
+    context: dict[str, Any], path: str, datatable: list[list[str]]
+) -> None:
+    urls = [row[0] for row in datatable]
+    context["routes"][path] = (200, _urlset_xml(urls))
+
+
+@given(parsers.parse('a sitemap index at "{path}" listing child sitemaps:'))
+def sitemap_index_listing(
+    context: dict[str, Any], path: str, datatable: list[list[str]]
+) -> None:
+    urls = [row[0] for row in datatable]
+    context["routes"][path] = (200, _sitemapindex_xml(urls))
+
+
+@given(parsers.parse('a malformed sitemap at "{path}"'))
+def malformed_sitemap(context: dict[str, Any], path: str) -> None:
+    context["routes"][path] = (200, "<not valid xml")
+
+
 @given(parsers.parse('a page at "{path}" with title "{title}"'))
 def page_with_title(context: dict[str, Any], path: str, title: str) -> None:
     context["routes"][path] = (200, _product_page(title))
@@ -100,6 +147,52 @@ def config_opt_out(context: dict[str, Any], url: str) -> None:
         '  title: { selector: "h1.product-title" }\n'
         "politeness:\n"
         "  respect_robots: false\n"
+    )
+
+
+@given(
+    parsers.parse(
+        'a config targeting "{url}" with crawl sitemap seeding enabled'
+    )
+)
+def config_sitemap_seeding(context: dict[str, Any], url: str) -> None:
+    context["config_text"] = (
+        f"target: {url}\n"
+        'fields:\n'
+        '  title: { selector: "h1.product-title" }\n'
+        "crawl:\n"
+        "  sitemap: true\n"
+    )
+
+
+@given(
+    parsers.parse(
+        'a config targeting "{url}" with crawl sitemap seeding enabled, '
+        'excluding "{pattern}"'
+    )
+)
+def config_sitemap_seeding_excluding(
+    context: dict[str, Any], url: str, pattern: str
+) -> None:
+    context["config_text"] = (
+        f"target: {url}\n"
+        'fields:\n'
+        '  title: { selector: "h1.product-title" }\n'
+        "crawl:\n"
+        "  sitemap: true\n"
+        f'  exclude: ["{pattern}"]\n'
+    )
+
+
+@given(
+    parsers.parse('a config targeting "{url}" with crawl enabled, no sitemap seeding')
+)
+def config_crawl_no_sitemap(context: dict[str, Any], url: str) -> None:
+    context["config_text"] = (
+        f"target: {url}\n"
+        'fields:\n'
+        '  title: { selector: "h1.product-title" }\n'
+        "crawl: {}\n"
     )
 
 

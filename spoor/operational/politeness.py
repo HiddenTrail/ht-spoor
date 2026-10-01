@@ -14,6 +14,8 @@ until a request pool / retry mechanism exists (see the ROADMAP §2d note).
 from __future__ import annotations
 
 import time
+import xml.etree.ElementTree as ET
+from collections import deque
 from collections.abc import Callable
 from urllib.parse import urlsplit
 from urllib.robotparser import RobotFileParser
@@ -24,6 +26,61 @@ from spoor.core.config import PolitenessPolicy
 
 # The product token we present to robots.txt for user-agent matching.
 USER_AGENT = "spoor"
+
+# Bounds on sitemap-seed discovery (ROADMAP.md §2d) — a sitemap is a remote,
+# origin-declared resource, so these guard the same way _MAX_PAGES guards the
+# crawl itself: a cyclic or unbounded sitemap index must not hang a run or
+# flood it with more seeds than any real site needs.
+_MAX_SITEMAPS_FETCHED = 50
+_MAX_SITEMAP_URLS = 50_000
+
+
+def _local_tag(tag: str) -> str:
+    """An XML tag's name without its namespace prefix (`{ns}urlset` -> `urlset`).
+
+    Real-world sitemaps declare the sitemaps.org namespace; some don't. Both
+    are read the same way rather than requiring one specific namespace.
+    """
+    return tag.rsplit("}", 1)[-1]
+
+
+def _fetch_sitemap(client: httpx.Client, url: str) -> tuple[list[str], list[str]]:
+    """One sitemap's page URLs and, if it's an index, its child sitemap URLs.
+
+    A `<urlset>` yields its `<url><loc>` entries as pages; a `<sitemapindex>`
+    yields its `<sitemap><loc>` entries as more sitemaps to fetch, never as
+    pages themselves. A fetch failure, a non-200, or XML that doesn't parse
+    (or whose root is neither) yields nothing from that source — the same
+    tolerant degrade `Politeness._parser` already takes for a missing or
+    unreadable robots.txt, never a crashed run.
+    """
+    try:
+        response = client.get(url)
+    except httpx.HTTPError:
+        return [], []
+    if response.status_code != 200:
+        return [], []
+    try:
+        root = ET.fromstring(response.content)
+    except ET.ParseError:
+        return [], []
+    if _local_tag(root.tag) == "urlset":
+        return [
+            loc.text.strip()
+            for entry in root
+            if _local_tag(entry.tag) == "url"
+            for loc in entry
+            if _local_tag(loc.tag) == "loc" and loc.text
+        ], []
+    if _local_tag(root.tag) == "sitemapindex":
+        return [], [
+            loc.text.strip()
+            for entry in root
+            if _local_tag(entry.tag) == "sitemap"
+            for loc in entry
+            if _local_tag(loc.tag) == "loc" and loc.text
+        ]
+    return [], []
 
 
 class Politeness:
@@ -74,6 +131,37 @@ class Politeness:
             parser.parse([])
         self._robots[origin] = parser
         return parser
+
+    def sitemap_seed_urls(self, target: str) -> list[str]:
+        """Every page URL named by the target origin's robots.txt `Sitemap:`
+        directive(s) (ROADMAP.md §2d).
+
+        Reads whichever `Sitemap:` lines the already-fetched/cached robots.txt
+        declares (`RobotFileParser.site_maps()` — the same parser `can_fetch`
+        already uses, so this costs no extra robots.txt fetch), then fetches
+        and parses each one via `_fetch_sitemap`, following a sitemap index's
+        children breadth-first, bounded by `_MAX_SITEMAPS_FETCHED` and
+        `_MAX_SITEMAP_URLS` against a cyclic or unbounded index. No `Sitemap:`
+        directive, or every sitemap failing to fetch/parse, yields an empty
+        list — the caller composes this with its own scope rules, so an empty
+        result here just means no sitemap seeds, not a run-wide failure.
+        """
+        queue: deque[str] = deque(self._parser(target).site_maps() or [])
+        fetched: set[str] = set()
+        urls: list[str] = []
+        while (
+            queue
+            and len(fetched) < _MAX_SITEMAPS_FETCHED
+            and len(urls) < _MAX_SITEMAP_URLS
+        ):
+            sitemap_url = queue.popleft()
+            if sitemap_url in fetched:
+                continue
+            fetched.add(sitemap_url)
+            pages, children = _fetch_sitemap(self._client, sitemap_url)
+            urls.extend(pages)
+            queue.extend(children)
+        return urls[:_MAX_SITEMAP_URLS]
 
     def can_fetch(self, url: str) -> bool:
         """Whether robots.txt permits fetching `url` (always True when opted out)."""
