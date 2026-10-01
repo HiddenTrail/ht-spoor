@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790839203743,
+  "lastUpdate": 1790845154611,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -5456,6 +5456,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5354.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e1d31069d9394f011390cb75a989bfb18be99750",
+          "message": "Record D1: do not adopt Crawlee (closes #146) (#176)\n\nThe hands-on spike found Crawlee's base package lean and its\nRequestQueue/SitemapRequestLoader/AutoscaledPool usable standalone --\nthe adoption case looked real. It didn't hold up against what actually\ngot built next: #169 (link following with scope rules) and #170\n(sitemap/robots.txt seeding) -- the two biggest items the competitive\nplan marked Depend or Depend-or-Adapt -- both shipped with zero Crawlee\ndependency, at no higher cost than adopting would have been.\n\nThat leaves autoscaling concurrency and resumable persisted crawl\nstate -- and the second was never simply free from Crawlee either,\nsince reconciling its storage model with Spoor's existing local-cache\nconventions and the already-shipped exploration resume story is real\ndesign work regardless. The deciding cost against the narrowed\nremainder: Crawlee is asyncio-native throughout, Spoor is synchronous\nthroughout, and adopting even just AutoscaledPool means bridging sync\nand async for one feature -- an ongoing structural cost, not a\none-time task. A plain stdlib ThreadPoolExecutor with per-domain\nsemaphores covers Spoor's actual bottleneck (politeness-gated HTTP\nfetches, not CPU-bound work) without ever leaving its synchronous\nworld.\n\nCorrects the real ROADMAP/code mismatch the competitive plan flagged:\nsection 2.1's \"Crawlee's autoscaling pool already handles per-domain\nconcurrency\" was asserted as current fact while crawlee was never a\ndependency. Fixed in both the §2d prose and the §7 tech-stack\nreference table. #148 (the crawl-engine mega-issue) is closed,\nreplaced by #174 (concurrency) and #175 (resumable state), each scoped\nand in-house.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-01T11:54:14+03:00",
+          "tree_id": "565db1a4603201236e910ea5ce96c78088572c09",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/e1d31069d9394f011390cb75a989bfb18be99750"
+        },
+        "date": 1790845152852,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 222.34,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03693,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.8956,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12502,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.9968,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06469,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 10.8514,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11258,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 18.3365,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.05447,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2819,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.57234,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.219,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.0517,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 12.9389,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.99693,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.5387,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.08261,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.4948,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01037,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4732,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5424.3,
             "unit": "MB"
           }
         ]
