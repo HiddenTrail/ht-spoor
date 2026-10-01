@@ -68,6 +68,30 @@ class CrawlScope(BaseModel):
     same_origin: bool = True
 
 
+class ProxyPolicy(BaseModel):
+    """Operator-supplied proxy for a run (ROADMAP.md §2d).
+
+    Spoor never discovers or provides a proxy itself — only routes through
+    one already in hand (the same bring-your-own posture as `session:` for
+    authenticated targets, §2h). `server` is the proxy URL (e.g.
+    `http://proxy.example:8080` or `socks5://proxy.example:1080`).
+    `username`/`password`, when set, authenticate to it, and apply to every
+    tier (including the politeness gate's robots.txt and sitemap requests,
+    since they reuse the same client). `bypass` is a comma-separated list of
+    hosts to reach directly, skipping the proxy (the same shape Playwright's
+    own `proxy.bypass` takes) — it only governs tier 2's browser traffic,
+    since httpx's single proxy-URL `proxy=` setting has no equivalent
+    per-host bypass of its own.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    server: str
+    username: str | None = None
+    password: str | None = None
+    bypass: str | None = None
+
+
 class PolitenessPolicy(BaseModel):
     """Operator-facing politeness knobs (ROADMAP.md §2d, §6).
 
@@ -182,6 +206,10 @@ class ExtractionConfig(BaseModel):
     # secret-bearing input — its contents are never echoed to shared output (§2h).
     # Spoor performs no login/MFA/SSO flow itself (§2h, §0).
     session: str | None = None
+    # Operator-supplied proxy (ROADMAP.md §2d "bring-your-own-proxy"); omitted
+    # means a direct connection, unchanged. Spoor never discovers or provides
+    # a proxy itself, only routes through one already in hand.
+    proxy: ProxyPolicy | None = None
 
 
 def load_config(text: str) -> ExtractionConfig:

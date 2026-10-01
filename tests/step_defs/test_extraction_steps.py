@@ -230,10 +230,12 @@ def config_has_no_tier_logic(context: dict[str, Any]) -> None:
     # HAR, §2b/§2h), `politeness`/`retry`/`change_detection` say *how to behave
     # toward the origin* (robots + rate-limiting, §6; transient-error retry, §2d;
     # skip unchanged pages, §2d), `session` says *who to authenticate as* (a
-    # supplied browser storage state, §2h bring-your-own-session), and
-    # `pagination`/`crawl` say *which pages to visit beyond the first* (a single
-    # next-link chain; discovered links filtered by scope rules, §2d) — none
-    # names or selects a tier or decides when to escalate (§2a, §0).
+    # supplied browser storage state, §2h bring-your-own-session), `proxy`
+    # says *what to route traffic through* (an operator-supplied proxy, §2d
+    # bring-your-own-proxy), and `pagination`/`crawl` say *which pages to
+    # visit beyond the first* (a single next-link chain; discovered links
+    # filtered by scope rules, §2d) — none names or selects a tier or decides
+    # when to escalate (§2a, §0).
     assert set(ExtractionConfig.model_fields) == {
         "target",
         "item",
@@ -245,6 +247,7 @@ def config_has_no_tier_logic(context: dict[str, Any]) -> None:
         "change_detection",
         "capture",
         "session",
+        "proxy",
     }
     assert set(FieldSpec.model_fields) == {"selector", "attr", "type"}
 
