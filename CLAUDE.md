@@ -28,13 +28,19 @@ Every named capability in ROADMAP.md (§2a extraction, §2d operational essentia
 2. Add or update step definitions (`pytest-bdd`).
 3. Implement.
 4. Run the full local gate (below) before considering the feature done.
-5. Self-review the diff before opening a PR — see "Self-review" below. This is not optional and not something to wait to be asked for; a green gate is necessary but not sufficient.
+5. Self-review the diff before opening a PR — see "Self-review" below. This is not optional and not something to wait to be asked for; a green gate is necessary but not sufficient, and a skim of the files you remember editing is not a self-review.
 
 BDD scenarios sit *above* the rest of the test pyramid, not instead of it. Property-based/mutation testing (`hypothesis`, §5.3) and golden-master diffing (§5.4) stay in place for tier 3's internals and regression safety — those validate "generate hundreds of variants and check a statistical property," which isn't a shape Gherkin scenarios are suited for.
 
 ## Self-review — before every PR, not only when asked
 
-A passing gate proves the happy paths run; it does not prove the code is correct, honest, or free of regressions. After the gate is green and before opening the PR, read your own diff end to end as if reviewing someone else's work — adversarially, trying to *break* it, not to confirm it works. Hunt specifically for:
+A passing gate proves the happy paths run; it does not prove the code is correct, honest, or free of regressions. After the gate is green and before opening the PR, do a **real review of the full diff, not a glance.** Concretely:
+
+- Run the actual diff (`git diff` against the merge base, or equivalent) and read **every changed hunk in every changed file**, in order — not just the files you remember touching, not a sample, not a recollection of what you meant to write. Writing a file and reviewing it are two different acts; this step is the second one, done against the diff's actual text, not against your memory of your own intent.
+- Read it **end to end as if reviewing someone else's work** — adversarially, trying to *break* it, not to confirm it works. A pass that only confirms "yes, this looks like what I intended" is not a review; the question is "what's wrong with this," asked seriously.
+- This is a dedicated step, not something satisfied in passing while writing the PR description. Do it before drafting that description, so the description reflects what the review actually found rather than what you assumed going in.
+
+Hunt specifically for:
 
 - **Edge cases and boundaries** — empty / `None` / zero / negative / very large inputs, off-by-one, unicode and whitespace, duplicate or cyclic data, the first and last iteration. Probe the new logic with concrete values (a throwaway script is fine), don't just eyeball it.
 - **Regressions from a "fix"** — did the change narrow, widen, or alter existing behavior as a side effect? Re-check it against the scenarios that already exercised that path. (A real example: a coercion fix whose lookbehind also silently rejected a previously-handled input.)
