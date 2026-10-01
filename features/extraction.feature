@@ -151,6 +151,132 @@ Feature: Declarative extraction from a config file
     Then items are extracted from all 3 pages
     And the run stops after the page with no "a.next-page" link
 
+  # Link following with scope rules (§2d, issue #169): unlike pagination's
+  # single next-link chain, `crawl` discovers every <a href> on a page and
+  # follows the ones that pass its scope rules — generic link discovery, not
+  # a new mechanism (the same parsel/urljoin `_next_url` already uses).
+
+  Scenario: Omitting crawl entirely follows no discovered links
+    # A regression guard, not just a new-feature test: a config with no
+    # `crawl` block behaves exactly as it did before this capability existed.
+    Given a fixture page at "http://localhost:8000/crawl_hub.html"
+    And a config:
+      """
+      target: http://localhost:8000/crawl_hub.html
+      fields:
+        title: { selector: "h2.item-title" }
+      """
+    When I run the config
+    Then the output contains one item
+    And the item field "title" equals "Hub"
+
+  Scenario: An include pattern restricts which discovered links are followed
+    Given a fixture page at "http://localhost:8000/crawl_hub.html"
+    And a config:
+      """
+      target: http://localhost:8000/crawl_hub.html
+      fields:
+        title: { selector: "h2.item-title" }
+      crawl:
+        include: ["/crawl_product_*"]
+      """
+    When I run the config
+    Then the extracted titles are "Hub", "Product A", "Product B"
+    And the extracted titles do not include "Admin"
+    And the extracted titles do not include "Deep page"
+
+  Scenario: An exclude pattern wins over a matching include
+    Given a fixture page at "http://localhost:8000/crawl_hub.html"
+    And a config:
+      """
+      target: http://localhost:8000/crawl_hub.html
+      fields:
+        title: { selector: "h2.item-title" }
+      crawl:
+        include: ["/crawl_*"]
+        exclude: ["/crawl_admin.html"]
+      """
+    When I run the config
+    Then the extracted titles do not include "Admin"
+    And the extracted titles include "Product A"
+
+  Scenario: max_depth bounds how many hops a discovered link may be
+    Given a fixture page at "http://localhost:8000/crawl_hub.html"
+    And a config:
+      """
+      target: http://localhost:8000/crawl_hub.html
+      fields:
+        title: { selector: "h2.item-title" }
+      crawl:
+        include: ["/crawl_product_*", "/crawl_deep.html"]
+        max_depth: 1
+      """
+    When I run the config
+    Then the extracted titles include "Product A"
+    And the extracted titles do not include "Deep page"
+
+  Scenario: same_origin defaults to dropping an off-origin link
+    Given a fixture page at "http://localhost:8000/crawl_hub.html"
+    And a config:
+      """
+      target: http://localhost:8000/crawl_hub.html
+      fields:
+        title: { selector: "h2.item-title" }
+      crawl:
+        include: ["/crawl_offsite.html"]
+      """
+    When I run the config
+    Then the extracted titles do not include "Offsite"
+
+  Scenario: same_origin false follows an off-origin link
+    Given a fixture page at "http://localhost:8000/crawl_hub.html"
+    And a config:
+      """
+      target: http://localhost:8000/crawl_hub.html
+      fields:
+        title: { selector: "h2.item-title" }
+      crawl:
+        include: ["/crawl_offsite.html"]
+        same_origin: false
+      """
+    When I run the config
+    Then the extracted titles include "Offsite"
+
+  Scenario: A pagination hop never counts against max_depth
+    # pagination.next continues the same listing rather than branching to a
+    # new part of the site, so it composes with crawl's depth bound without
+    # either mechanism interfering with the other.
+    Given a fixture page at "http://localhost:8000/crawl_paginated_1.html"
+    And a config:
+      """
+      target: http://localhost:8000/crawl_paginated_1.html
+      fields:
+        title: { selector: "h2.item-title" }
+      pagination:
+        next: "a.next-page"
+      crawl:
+        include: ["/crawl_product_*"]
+        max_depth: 0
+      """
+    When I run the config
+    Then the extracted titles are "Paginated 1", "Paginated 2"
+    And the extracted titles do not include "Product A"
+
+  @browser
+  Scenario: Link following with scope rules works through a real browser too
+    Given a live fixture server
+    And a config:
+      """
+      target: SERVER_BASE/crawl_hub.html
+      fields:
+        title: { selector: "h2.item-title" }
+      crawl:
+        include: ["/crawl_product_*"]
+      """
+    When I run the config through a real browser
+    Then the extracted titles are "Hub", "Product A", "Product B"
+    And the extracted titles do not include "Admin"
+
   @browser
   Scenario: Infinite-scroll pagination is driven by a flag (tier 2)
     Given a live fixture server
