@@ -73,3 +73,74 @@ Feature: Polite crawling — robots.txt and crawl-delay
     When I run the config with politeness
     Then the output contains one item
     And the item field "title" equals "Secret"
+
+  # Sitemap seeding (§2d, issue #170): robots.txt's `Sitemap:` directive names a
+  # sitemap, which can additionally seed the crawl with every URL it lists —
+  # opt-in (`crawl: { sitemap: true }`), since pulling in a whole sitemap at
+  # once is a bigger behavior change than `crawl:` being set alone implies.
+
+  Scenario: A sitemap named by robots.txt seeds the crawl
+    Given a site whose robots.txt names a sitemap at "http://localhost:8000/sitemap.xml"
+    And a sitemap at "/sitemap.xml" listing:
+      | http://localhost:8000/product-a.html |
+      | http://localhost:8000/product-b.html |
+    And a page at "/hub.html" with title "Hub"
+    And a page at "/product-a.html" with title "Product A"
+    And a page at "/product-b.html" with title "Product B"
+    And a config targeting "http://localhost:8000/hub.html" with crawl sitemap seeding enabled
+    When I run the config with politeness
+    Then the output contains 3 items
+
+  Scenario: Sitemap seeds are still filtered by the crawl's own scope rules
+    Given a site whose robots.txt names a sitemap at "http://localhost:8000/sitemap.xml"
+    And a sitemap at "/sitemap.xml" listing:
+      | http://localhost:8000/product-a.html |
+      | http://localhost:8000/discontinued.html |
+    And a page at "/hub.html" with title "Hub"
+    And a page at "/product-a.html" with title "Product A"
+    And a page at "/discontinued.html" with title "Discontinued"
+    And a config targeting "http://localhost:8000/hub.html" with crawl sitemap seeding enabled, excluding "/discontinued.html"
+    When I run the config with politeness
+    Then the output contains 2 items
+    And no request is made to "/discontinued.html"
+
+  Scenario: No Sitemap directive in robots.txt yields no extra seeds
+    Given a site with no robots.txt
+    And a page at "/hub.html" with title "Hub"
+    And a config targeting "http://localhost:8000/hub.html" with crawl sitemap seeding enabled
+    When I run the config with politeness
+    Then the output contains one item
+
+  Scenario: A sitemap index is followed to its child sitemaps
+    Given a site whose robots.txt names a sitemap at "http://localhost:8000/sitemap-index.xml"
+    And a sitemap index at "/sitemap-index.xml" listing child sitemaps:
+      | http://localhost:8000/sitemap-a.xml |
+      | http://localhost:8000/sitemap-b.xml |
+    And a sitemap at "/sitemap-a.xml" listing:
+      | http://localhost:8000/product-a.html |
+    And a sitemap at "/sitemap-b.xml" listing:
+      | http://localhost:8000/product-b.html |
+    And a page at "/hub.html" with title "Hub"
+    And a page at "/product-a.html" with title "Product A"
+    And a page at "/product-b.html" with title "Product B"
+    And a config targeting "http://localhost:8000/hub.html" with crawl sitemap seeding enabled
+    When I run the config with politeness
+    Then the output contains 3 items
+
+  Scenario: A malformed sitemap degrades to no extra seeds, not a crash
+    Given a site whose robots.txt names a sitemap at "http://localhost:8000/sitemap.xml"
+    And a malformed sitemap at "/sitemap.xml"
+    And a page at "/hub.html" with title "Hub"
+    And a config targeting "http://localhost:8000/hub.html" with crawl sitemap seeding enabled
+    When I run the config with politeness
+    Then the output contains one item
+
+  Scenario: Sitemap seeding is off unless explicitly enabled
+    Given a site whose robots.txt names a sitemap at "http://localhost:8000/sitemap.xml"
+    And a sitemap at "/sitemap.xml" listing:
+      | http://localhost:8000/product-a.html |
+    And a page at "/hub.html" with title "Hub"
+    And a config targeting "http://localhost:8000/hub.html" with crawl enabled, no sitemap seeding
+    When I run the config with politeness
+    Then the output contains one item
+    And no request is made to "/sitemap.xml"

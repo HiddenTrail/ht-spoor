@@ -381,6 +381,29 @@ def _discover_links(
     return discovered
 
 
+def _sitemap_seeds(
+    gate: Politeness, config: ExtractionConfig
+) -> list[tuple[str, int]]:
+    """In-scope sitemap seed URLs, ready to add to the frontier (ROADMAP.md §2d).
+
+    Returns nothing unless `config.crawl.sitemap` is on — sitemap seeding is a
+    bigger behavior change than `crawl:` alone implies (it can pull in a whole
+    site at once, not just page-by-page), so it stays opt-in. Every URL
+    `gate.sitemap_seed_urls` finds is still filtered by the config's own scope
+    rules (same-origin/include/exclude) — turning this on never bypasses the
+    rest of the config — and seeded at depth 0, the same tier as the target
+    itself: a sitemap names known entry points, not links discovered *from* a
+    page, so it isn't a hop from anything.
+    """
+    if config.crawl is None or not config.crawl.sitemap:
+        return []
+    return [
+        (url, 0)
+        for url in gate.sitemap_seed_urls(config.target)
+        if _in_scope(url, config.target, config.crawl)
+    ]
+
+
 class TierUnavailableError(RuntimeError):
     """The dispatcher escalated to a resolution tier that is not yet implemented.
 
@@ -475,6 +498,7 @@ class Tier1Resolver:
         # version did: nothing is ever discovered beyond one next-link, so the
         # frontier never holds more than one item at a time.
         frontier: deque[tuple[str, int]] = deque([(config.target, 0)])
+        frontier.extend(_sitemap_seeds(gate, config))
         try:
             if session is not None:
                 apply_cookies(session, client)
@@ -781,6 +805,7 @@ class Tier2Resolver:
         # config with no `crawl` block never discovers more than one link at a
         # time, so this is unchanged from the single-chain version for it.
         frontier: deque[tuple[str, int]] = deque([(config.target, 0)])
+        frontier.extend(_sitemap_seeds(gate, config))
         while frontier and len(seen) < _MAX_PAGES:
             url, depth = frontier.popleft()
             if url in seen:

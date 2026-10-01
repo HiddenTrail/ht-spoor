@@ -57,7 +57,10 @@ class CrawlScope(BaseModel):
     target a followed link may be (`None` is unbounded, still capped by the
     run's own page-count ceiling) — a `pagination.next` hop never counts
     against it, since advancing through one listing is not branching to a new
-    part of the site the way a `crawl`-discovered link is.
+    part of the site the way a `crawl`-discovered link is. `sitemap`, when
+    true, additionally seeds the crawl with every URL the target origin's
+    `robots.txt` `Sitemap:` directive(s) name — filtered by this same scope,
+    same as any other discovered link.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -66,6 +69,13 @@ class CrawlScope(BaseModel):
     exclude: list[str] | None = None
     max_depth: int | None = Field(default=None, ge=0)
     same_origin: bool = True
+    # Seed the crawl with every URL robots.txt's `Sitemap:` directive(s) name,
+    # in addition to the target itself — each still filtered by this same
+    # scope (include/exclude/same_origin), so turning this on never bypasses
+    # the rest of the config. Opt-in and default off: unlike discovering links
+    # page by page, this can pull in a site's whole sitemap in one step, a
+    # bigger behavior change than `crawl:` being set alone implies.
+    sitemap: bool = False
 
 
 class PolitenessPolicy(BaseModel):

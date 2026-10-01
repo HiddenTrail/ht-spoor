@@ -105,6 +105,7 @@ crawl:
   exclude: ["/products/out-of-stock/*"]  # always wins over include
   max_depth: 2                # hops from the target; omit for unbounded
   same_origin: true            # default — never follows an off-site link unless set false
+  sitemap: false                # opt-in: also seed the crawl from robots.txt's declared sitemap(s)
 ```
 
 Every page Spoor fetches is checked for `<a href>` links; each is resolved,
@@ -114,6 +115,15 @@ the same config, just like `pagination` already does. `crawl` and
 never counts against `max_depth`), while a `crawl`-discovered link is a real
 hop to a new part of the site. Omit `crawl` entirely and nothing changes —
 Spoor follows only a declared `pagination.next`, exactly as before.
+
+Set `sitemap: true` to also seed the crawl from whatever sitemap(s) the
+target's `robots.txt` declares (a `Sitemap:` line) — a sitemap index is
+followed to its child sitemaps automatically. Every seeded URL still passes
+through the same `include`/`exclude`/`same_origin` rules above, so turning
+this on never bypasses the rest of the config; a site with no declared
+sitemap, or one that fails to fetch or parse, simply adds no extra seeds.
+Off by default — pulling in a whole sitemap at once is a bigger step than
+`crawl:` being set alone implies.
 
 ## Runtime behavior (important defaults)
 
@@ -309,7 +319,7 @@ or one you declared with `--sandbox`).
 
 ### Available now
 
-- Tier-1 extraction: single-record and listing (`item`) extraction, text/`attr` field values, `number` coercion, next-link pagination, and broader link following with scope rules (`crawl:` — include/exclude glob patterns, max depth, same-origin)
+- Tier-1 extraction: single-record and listing (`item`) extraction, text/`attr` field values, `number` coercion, next-link pagination, and broader link following with scope rules (`crawl:` — include/exclude glob patterns, max depth, same-origin, and opt-in sitemap seeding from robots.txt)
 - Tier-2 browser slice: escalation for infinite-scroll pages, then extraction from rendered DOM
 - Run observability: structured run summary for each run
 - API discovery: OpenAPI/Swagger discovery, GraphQL introspection, HAR-based synthesis, and action-to-endpoint correlation
