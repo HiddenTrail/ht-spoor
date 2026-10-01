@@ -52,6 +52,12 @@ serve = [
     "uvicorn>=0.29",
     "mcp>=2",
 ]
+# Parquet output sink (§2d): kept optional since the other sinks (JSON/CSV/MD,
+# and SQLite via stdlib) need no extra dependency and most runs need none of
+# this either.
+parquet = [
+    "pyarrow>=14",
+]
 dev = [
     "ruff",
     "mypy",
@@ -66,6 +72,8 @@ dev = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "mcp>=2",
+    # Parquet-sink scenarios need pyarrow in the gate too.
+    "pyarrow>=14",
 ]
 
 [project.scripts]

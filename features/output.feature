@@ -1,11 +1,12 @@
 # Output pipeline — ROADMAP.md §2d.
 #
-# Pluggable sinks downstream of extraction. This Phase-1 pass covers the text
-# formats that need no dependencies — JSON, JSON Lines, CSV, Markdown — with the
-# field schema from §2a validated (via pydantic) before anything is written. SQLite
-# and Parquet are named in §2d as further/optional sinks and land later (see the
-# §2d output-pipeline decision note). Extraction without a usable output path
-# isn't a finished tool, so the sink is a first-class stage, not a CLI afterthought.
+# Pluggable sinks downstream of extraction, with the field schema from §2a
+# validated (via pydantic) before anything is written: JSON, JSON Lines, CSV,
+# and Markdown need no extra dependency; SQLite uses stdlib `sqlite3`; Parquet
+# needs the optional `pyarrow` extra (`pip install 'ht-spoor[parquet]'`) and
+# fails with a clear install hint, before writing, when it's missing. Extraction
+# without a usable output path isn't a finished tool, so the sink is a
+# first-class stage, not a CLI afterthought.
 #
 # Markdown (issue #155) is cheap parity with a highly visible feature in
 # Crawl4AI/Firecrawl-style tools (docs/COMPETITIVE_PLAN.md §4): a table, not
@@ -63,6 +64,23 @@ Feature: Writing extracted records to a chosen output format
   Scenario: An unrecognized extension with no explicit format is rejected
     When I try to write the records to "data.dat"
     Then it fails before writing with an error naming the format
+
+  Scenario: Records are written as a SQLite database, one row per record
+    When I write the records to "out.sqlite"
+    Then the SQLite "records" table has columns "title,price"
+    And the SQLite "records" table has 2 rows
+    And the missing price is a SQL NULL
+
+  Scenario: Writing SQLite to an existing file replaces its contents
+    Given "out.sqlite" already holds a stale "records" table
+    When I write the records to "out.sqlite"
+    Then the SQLite "records" table has 2 rows
+
+  Scenario: Records are written as a Parquet file
+    When I write the records to "out.parquet"
+    Then the Parquet file has columns "title,price"
+    And the Parquet file has 2 rows
+    And the missing price is a Parquet null
 
   Scenario: A record with a field not in the config schema is rejected before writing
     Given an extra record carrying an undeclared "sku" field
