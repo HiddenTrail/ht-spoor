@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790845154611,
+  "lastUpdate": 1790845823393,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -5600,6 +5600,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5424.3,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "43e367c703273ca423c6a3cee4c8c591d425aec1",
+          "message": "§2d: sitemap.xml and robots.txt as crawl seed sources (closes #170) (#173)\n\nThe second of the two D1-independent pieces split out of #148 alongside\n#169, for the same reason: no dependency needed -- a sitemap is plain\nXML and robots.txt is already fetched and parsed by Politeness.\n\nurllib.robotparser.RobotFileParser -- the parser Politeness._parser\nalready builds and caches per origin -- turned out to already expose\nsite_maps(), reading a robots.txt's Sitemap: directive(s) for free; no\nnew robots.txt fetch or parsing needed, just a new public\nPoliteness.sitemap_seed_urls(target) that fetches and parses whatever\nit names. A <urlset> yields its page URLs directly; a <sitemapindex>'s\nentries are child sitemaps, fetched the same way breadth-first, bounded\nby a fetched-sitemaps cap and a total-URL cap against a cyclic or\nunbounded index. xml.etree.ElementTree (stdlib) parses tolerantly of a\nmissing/non-sitemaps.org namespace by comparing tag local names, not\nfull namespaced tags. A fetch failure, non-200, or unparseable/\nunrecognized-root XML yields nothing from that source -- the same\ntolerant degrade the rest of this module already takes for a missing\nrobots.txt.\n\nOpt-in (crawl.sitemap: true, default false): pulling in a whole site's\nsitemap in one step is a bigger behavior change than crawl: being set\nalone implies, the same reasoning change_detection and every capture.*\nflag already follow. Seeded URLs are filtered through the same\n_in_scope check #169 already built, and added to the frontier at depth\n0 -- a sitemap names known entry points, not links discovered from a\npage.\n\nfeatures/operational.feature gained the scenario matrix (seeds the\ncrawl, seeds still scope-filtered, no Sitemap: yields nothing extra, a\nsitemap index follows to its children, malformed XML degrades rather\nthan crashes, off-by-default regression guard) -- reusing that file's\nexisting per-scenario dynamic-routing-table pattern rather than a\nshared static fixture, since a shared fixtures/static/robots.txt would\nhave silently changed every other test on localhost:8000.\n\nVerified: 6 new scenarios pass, fast tier 761 passed (no regressions),\nthe two browser-tier extraction scenarios touched by the Tier2Resolver\nchange still pass, ruff/mypy/check_genericity.py clean. docs/ROADMAP.md\nand README.md updated.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-01T12:04:54+03:00",
+          "tree_id": "d70e1336cd903f14098dee6e34bf30e7a07048eb",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/43e367c703273ca423c6a3cee4c8c591d425aec1"
+        },
+        "date": 1790845822403,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 232.667,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04612,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.3339,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.13701,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.2868,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0002,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.08507,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 13.4593,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.13196,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 21.5718,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.05822,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.3608,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.59827,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.5657,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05989,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 14.7902,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.01444,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 127.1652,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09518,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.569,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01149,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.5261,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5334.6,
             "unit": "MB"
           }
         ]
