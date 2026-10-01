@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790839138926,
+  "lastUpdate": 1790839203743,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -5312,6 +5312,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5294.1,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "02a4bd4ae3791e48b6b443941835e22e6458ac2e",
+          "message": "§2d: link following with scope rules (closes #169) (#172)\n\ndocs/COMPETITIVE_PLAN.md names this Spoor's single biggest concrete gap\nagainst Scrapy/Crawlee: pagination.next follows exactly one declared\nlink in a straight chain; there was no way to discover and follow\nmultiple links per page. Split out of the bigger crawl-engine issue\n(#148), which is blocked on the still-open D1 Crawlee decision (#146)\n-- this piece isn't, since link discovery and scope filtering are\nSpoor-side generic logic no matter what (if anything) eventually sits\nunderneath as a request-queue/concurrency layer.\n\nNew CrawlScope config (spoor/core/config.py): include/exclude glob\npatterns (fnmatch.fnmatchcase against the URL path, case-sensitive),\nmax_depth, same_origin (default true). Both tiers' page-following loops\nwere structurally identical -- a single url variable, a seen set, the\nexisting _MAX_PAGES cycle guard, url = _next_url(...) at the bottom --\nso this generalizes that single-URL chain into a deque[tuple[str, int]]\nfrontier rather than inventing a parallel mechanism. Every other\nper-page behavior (politeness, retry, change detection, challenge\ndetection, signal capture, the _MAX_PAGES ceiling) is unchanged -- these\nare just more frontier items flowing through the identical loop body.\n\nTwo non-obvious design points, both pinned by scenarios: a\npagination.next hop never counts against max_depth (continues the same\nlisting rather than branching, so the two compose without surprise);\nand break became continue on a blocked/dead-lettered frontier item in\nboth loops (unobservable with a single chain, but necessary so one\nfailed branch doesn't abort sibling branches still waiting their turn\n-- a regression scenario confirms the no-crawl-at-all case is still\nbyte-for-byte unchanged).\n\nfeatures/extraction.feature gained the fast-tier scope-rule matrix\n(include, exclude-wins-over-include, max_depth, same-origin default and\nopt-out, the pagination-composition case, the regression guard) plus\none @browser scenario for tier parity. A live multi-page proof against\nPrestaShop is a natural immediate follow-on, deferred the same way\nPrestaShop's own onboarding deferred its integration test.\n\nVerified: pytest -m browser (45 passed, +1, no regressions), fast tier\n(752 passed, +7), ruff/mypy/check_genericity.py clean. Manually\nconfirmed the one edge case worth double-checking rather than assuming:\nan empty `crawl: {}` block follows every same-origin link and excludes\nnothing, never the opposite. docs/ROADMAP.md and README.md updated.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-01T10:14:56+03:00",
+          "tree_id": "9e43615a227a0fe0da030c4a30c42cd45852d63d",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/02a4bd4ae3791e48b6b443941835e22e6458ac2e"
+        },
+        "date": 1790839202684,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 227.907,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04241,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.2105,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12666,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.0128,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.07054,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 12.2957,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.12572,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 20.2609,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.05625,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.3101,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.5769,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.3444,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05418,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 14.0683,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.00467,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.5529,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09136,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5588,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01081,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4705,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5354.6,
             "unit": "MB"
           }
         ]
