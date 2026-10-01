@@ -458,11 +458,27 @@ def explore(
     typer.echo(f"  states discovered: {len(graph.states)}")
     typer.echo(f"  transitions:       {len(graph.transitions)}")
     typer.echo(f"  actions skipped:   {len(graph.skipped)}")
-    if not sandbox and graph.skipped:
-        typer.echo(
-            "  (destructive actions were skipped — this target is not a declared "
-            "sandbox)"
+    if graph.skipped:
+        from spoor.exploration.safety import DESTRUCTIVE_SKIP_REASON
+
+        # An action can be skipped for two unrelated reasons, and only one of them
+        # is about the sandbox gate — check each skip's own reason (the safety
+        # module names DESTRUCTIVE_SKIP_REASON for exactly this, so a skip isn't
+        # misreported as destructive when it wasn't) rather than assuming every
+        # skip here came from the gate.
+        destructive = sum(
+            1 for skip in graph.skipped if skip.reason == DESTRUCTIVE_SKIP_REASON
         )
+        other = len(graph.skipped) - destructive
+        if destructive and not sandbox:
+            typer.echo(
+                f"  ({destructive} destructive, skipped — this target is not a "
+                "declared sandbox)"
+            )
+        if other:
+            typer.echo(
+                f"  ({other} could not be reached or performed after replay)"
+            )
 
     if gen_tests is not None:
         from spoor.testgen import render_suite

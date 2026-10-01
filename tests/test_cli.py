@@ -251,6 +251,71 @@ def test_apply_scaffold_session_is_threaded_into_the_driver(
     assert seen["session"] == str(session_file)
 
 
+def _explore_with_skips(monkeypatch: pytest.MonkeyPatch, reasons: list[str]) -> str:
+    """Run `explore` against a fake driver whose graph has one skip per reason."""
+    from spoor.exploration import driver as driver_mod
+    from spoor.exploration.discovery import ActionableElement
+    from spoor.exploration.graph import ExplorationGraph
+
+    class _FakeDriver:
+        def __init__(self, target: str, **_kwargs: object) -> None:
+            pass
+
+        def __enter__(self) -> _FakeDriver:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            pass
+
+    graph = ExplorationGraph()
+    graph.add_state("s1", [])
+    for i, reason in enumerate(reasons):
+        graph.record_skip("s1", ActionableElement("button", f"b{i}", None), reason)
+
+    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _FakeDriver)
+    monkeypatch.setattr("spoor.exploration.explorer.explore", lambda *a, **k: graph)
+    result = runner.invoke(cli.app, ["explore", "http://localhost:8000/"])
+    assert result.exit_code == 0, result.output
+    return result.output
+
+
+def test_actuation_failure_skips_are_not_reported_as_destructive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A skip whose reason has nothing to do with the safety gate (an element that
+    # could not be relocated after replay) must not be blamed on "not a sandbox" --
+    # DESTRUCTIVE_SKIP_REASON exists precisely so this distinction isn't lost.
+    output = _explore_with_skips(
+        monkeypatch,
+        ["could not be performed: button 'play' not located after replay"],
+    )
+    assert "destructive" not in output
+    assert "could not be reached or performed after replay" in output
+
+
+def test_destructive_skips_are_still_reported(monkeypatch: pytest.MonkeyPatch) -> None:
+    from spoor.exploration.safety import DESTRUCTIVE_SKIP_REASON
+
+    output = _explore_with_skips(monkeypatch, [DESTRUCTIVE_SKIP_REASON])
+    assert "1 destructive, skipped" in output
+    assert "could not be reached" not in output
+
+
+def test_a_mix_of_skip_reasons_reports_both(monkeypatch: pytest.MonkeyPatch) -> None:
+    from spoor.exploration.safety import DESTRUCTIVE_SKIP_REASON
+
+    output = _explore_with_skips(
+        monkeypatch,
+        [
+            DESTRUCTIVE_SKIP_REASON,
+            "could not be performed: button 'play' not located after replay",
+            "could not be performed: button 'mute' not located after replay",
+        ],
+    )
+    assert "1 destructive, skipped" in output
+    assert "2 could not be reached or performed after replay" in output
+
+
 # --- wizard --------------------------------------------------------------------
 
 
