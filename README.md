@@ -127,7 +127,7 @@ Off by default — pulling in a whole sitemap at once is a bigger step than
 
 ## Runtime behavior (important defaults)
 
-- Output formats: JSON, JSON Lines, CSV, Markdown table (schema-validated before writing)
+- Output formats: JSON, JSON Lines, CSV, Markdown table, SQLite, Parquet (schema-validated before writing). Parquet needs the optional `pyarrow` extra — install with `pip install 'ht-spoor[parquet]'`
 - Politeness: `robots.txt` respected by default; crawl-delay honored by default
 - Retry: transient failures (timeouts, dropped connections, 5xx, 429) retry with backoff and `Retry-After`; other 4xx are dead-lettered. Browser-tier page navigations retry on the same policy, so a transient navigation failure is dead-lettered rather than crashing the run
 - Anti-bot detection: a fetch landing on a known anti-bot wall (a reCAPTCHA/hCaptcha widget, a Cloudflare interstitial) is flagged loudly on the run summary rather than scraped as data — whether the wall arrives in a normal response or behind a 403/503 error status (where the run is both dead-lettered and reported as a challenge). Detection only, never a bypass attempt

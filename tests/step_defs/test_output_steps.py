@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import csv
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any
 
+import pyarrow.parquet as pq
 import pytest
 from pydantic import ValidationError
 from pytest_bdd import given, parsers, scenarios, then, when
@@ -66,6 +68,19 @@ def secret_record(context: dict[str, Any]) -> None:
 @given('a single record whose "title" contains a pipe and a newline')
 def pipe_and_newline_record(context: dict[str, Any]) -> None:
     context["records"] = [{"title": "Mug | 12oz\nBlue", "price": None}]
+
+
+@given(parsers.parse('"{name}" already holds a stale "records" table'))
+def stale_sqlite_file(context: dict[str, Any], tmp_path: Path, name: str) -> None:
+    path = tmp_path / name
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute("CREATE TABLE records (stale TEXT)")
+        conn.execute("INSERT INTO records VALUES ('leftover')")
+        conn.commit()
+    finally:
+        conn.close()
+    context["path"] = path
 
 
 # --- When ----------------------------------------------------------------
@@ -207,6 +222,52 @@ def md_row_not_broken(context: dict[str, Any]) -> None:
     assert "\\|" in rows[2]
     # the newline was neutralized, not left as a raw line-breaking character
     assert "\n" not in rows[2]
+
+
+def _sqlite_rows(context: dict[str, Any]) -> list[sqlite3.Row]:
+    conn = sqlite3.connect(context["path"])
+    try:
+        conn.row_factory = sqlite3.Row
+        return conn.execute("SELECT * FROM records").fetchall()
+    finally:
+        conn.close()
+
+
+@then(parsers.parse('the SQLite "records" table has columns "{columns}"'))
+def sqlite_columns(context: dict[str, Any], columns: str) -> None:
+    rows = _sqlite_rows(context)
+    assert list(rows[0].keys()) == columns.split(",")
+
+
+@then(parsers.parse('the SQLite "records" table has {count:d} rows'))
+def sqlite_row_count(context: dict[str, Any], count: int) -> None:
+    assert len(_sqlite_rows(context)) == count
+
+
+@then("the missing price is a SQL NULL")
+def sqlite_null_price(context: dict[str, Any]) -> None:
+    rows = _sqlite_rows(context)
+    assert rows[1]["price"] is None
+
+
+def _parquet_table(context: dict[str, Any]) -> Any:
+    return pq.read_table(context["path"])
+
+
+@then(parsers.parse('the Parquet file has columns "{columns}"'))
+def parquet_columns(context: dict[str, Any], columns: str) -> None:
+    assert _parquet_table(context).column_names == columns.split(",")
+
+
+@then(parsers.parse("the Parquet file has {count:d} rows"))
+def parquet_row_count(context: dict[str, Any], count: int) -> None:
+    assert _parquet_table(context).num_rows == count
+
+
+@then("the missing price is a Parquet null")
+def parquet_null_price(context: dict[str, Any]) -> None:
+    prices = _parquet_table(context).column("price").to_pylist()
+    assert prices[1] is None
 
 
 @then(parsers.parse('the output was written as "{fmt}"'))

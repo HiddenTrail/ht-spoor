@@ -8,14 +8,18 @@ of landing silently in the output. An output file is a shared surface, so per
 write. Per §0 there is nothing site-specific here — the schema is derived from
 the config, whatever the target.
 
-Phase-1 formats are the dependency-free text sinks (JSON, JSON Lines, CSV,
-Markdown). SQLite and Parquet are named in §2d as further sinks and land later.
+Phase-1 shipped the dependency-free text sinks (JSON, JSON Lines, CSV,
+Markdown). SQLite (stdlib `sqlite3`) and Parquet (optional `pyarrow` extra,
+`pip install 'ht-spoor[parquet]'`) round out the §2d sink list; both still go
+through the same validate-before-write and redact-before-write pipeline as
+every other format, a plain table of the config's fields in declared order.
 """
 
 from __future__ import annotations
 
 import csv
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any, Literal, cast, get_args
 
@@ -24,13 +28,15 @@ from pydantic import BaseModel, ConfigDict, create_model
 from spoor.core.config import ExtractionConfig
 from spoor.security.redaction import redact_records
 
-OutputFormat = Literal["json", "jsonl", "csv", "md"]
+OutputFormat = Literal["json", "jsonl", "csv", "md", "sqlite", "parquet"]
 
 _BY_SUFFIX: dict[str, OutputFormat] = {
     ".json": "json",
     ".jsonl": "jsonl",
     ".csv": "csv",
     ".md": "md",
+    ".sqlite": "sqlite",
+    ".parquet": "parquet",
 }
 
 
@@ -101,8 +107,12 @@ def write_records(
         path.write_text(body, encoding="utf-8")
     elif fmt == "csv":
         _write_csv(records=rows, config=config, path=path)
-    else:  # md
+    elif fmt == "md":
         _write_markdown(records=rows, config=config, path=path)
+    elif fmt == "sqlite":
+        _write_sqlite(records=rows, config=config, path=path)
+    else:  # parquet
+        _write_parquet(records=rows, config=config, path=path)
 
 
 def _write_csv(
@@ -143,3 +153,57 @@ def _write_markdown(
         cells = " | ".join(_md_cell(row.get(name)) for name in fieldnames)
         lines.append(f"| {cells} |")
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _write_sqlite(
+    records: list[dict[str, object]], config: ExtractionConfig, path: Path
+) -> None:
+    # A fresh file each write, like every other sink: re-running against the
+    # same path replaces its contents rather than erroring on a pre-existing
+    # "records" table or silently appending to a stale one.
+    path.unlink(missing_ok=True)
+    fieldnames = list(config.fields)
+    columns = ", ".join(
+        f'"{name}" {"REAL" if config.fields[name].type == "number" else "TEXT"}'
+        for name in fieldnames
+    )
+    placeholders = ", ".join("?" for _ in fieldnames)
+    quoted_names = ", ".join(f'"{name}"' for name in fieldnames)
+    # sqlite3.Connection used as a context manager commits/rolls back the
+    # transaction but does *not* close the connection, which leaves the file
+    # handle open (and, on Windows, the file locked against a later write to
+    # the same path) — closed explicitly here instead.
+    conn = sqlite3.connect(path)
+    try:
+        conn.execute(f"CREATE TABLE records ({columns})")
+        conn.executemany(
+            f"INSERT INTO records ({quoted_names}) VALUES ({placeholders})",
+            [tuple(row.get(name) for name in fieldnames) for row in records],
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _write_parquet(
+    records: list[dict[str, object]], config: ExtractionConfig, path: Path
+) -> None:
+    try:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+    except ImportError as exc:
+        raise ImportError(
+            "Parquet output requires pyarrow; install with "
+            "pip install 'ht-spoor[parquet]'"
+        ) from exc
+    fieldnames = list(config.fields)
+    pa_type = {
+        name: pa.float64() if config.fields[name].type == "number" else pa.string()
+        for name in fieldnames
+    }
+    columns = {
+        name: pa.array([row.get(name) for row in records], type=pa_type[name])
+        for name in fieldnames
+    }
+    table = pa.table(columns)
+    pq.write_table(table, path)

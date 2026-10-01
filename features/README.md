@@ -81,11 +81,11 @@ adversarial counterpart — empty, non-HTML, unclosed/malformed, pathologically 
 and non-ASCII pages must degrade gracefully (extract what's there, leave the rest
 null) rather than crash the run. `operational.feature` (§2d) covers politeness —
 respecting `robots.txt` (default on) and honoring the crawl-delay. `output.feature`
-(§2d) covers the output pipeline — schema-validated JSON/JSON Lines/CSV sinks with
-format chosen by extension or `--format`, and — because an output file is a shared
-surface — secret redaction (§2h) of record values before any write, on by default
-(SQLite/Parquet sinks and the remaining Phase-3.5 item — change detection — are
-specified for later turns; see the Phase column). `retry.feature` (§2d) covers the tier-1 retry/error-classification
+(§2d) covers the output pipeline — schema-validated JSON/JSON Lines/CSV/Markdown/
+SQLite/Parquet sinks with format chosen by extension or `--format` (Parquet needs
+the optional `pyarrow` extra and fails with a clear install hint before writing
+when it's absent), and — because an output file is a shared surface — secret
+redaction (§2h) of record values before any write, on by default. `retry.feature` (§2d) covers the tier-1 retry/error-classification
 slice: a transient fetch failure (timeout, dropped connection, 5xx, 429) is
 retried with backoff — honoring a server-sent `Retry-After` — while a permanent
 one (other 4xx) is not, and a URL that can't be fetched lands in a dead-letter
