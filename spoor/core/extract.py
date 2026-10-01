@@ -15,15 +15,17 @@ site-specific logic: everything is driven by the config.
 
 from __future__ import annotations
 
+import fnmatch
 import functools
 import math
 import re
 import time
+from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from parsel import Selector
@@ -41,6 +43,7 @@ from spoor.api_discovery.discovery import DiscoveredSpec, discover_spec
 from spoor.api_discovery.graphql import DiscoveredGraphQL, discover_graphql
 from spoor.api_discovery.synthesis import SynthesizedSpec, synthesize_from_har
 from spoor.core.config import (
+    CrawlScope,
     ExtractionConfig,
     FieldSpec,
     PolitenessPolicy,
@@ -320,6 +323,64 @@ def _next_url(html: str, current_url: str, config: ExtractionConfig) -> str | No
     return urljoin(current_url, href) if href else None
 
 
+def _in_scope(url: str, target: str, scope: CrawlScope) -> bool:
+    """Whether a discovered link passes the config's scope rules (ROADMAP.md §2d).
+
+    Same-origin first (unless opted out), then `exclude` (any match drops it),
+    then `include` (set means a link must match at least one; unset means
+    everything not already excluded passes). Patterns are glob (`fnmatch`,
+    case-sensitive via `fnmatchcase` — no OS-dependent case folding) matched
+    against the URL's *path*, not the whole URL, so a pattern like
+    `/products/*` means what it looks like regardless of host.
+    """
+    if scope.same_origin and urlparse(url).netloc != urlparse(target).netloc:
+        return False
+    path = urlparse(url).path
+    if scope.exclude and any(fnmatch.fnmatchcase(path, pat) for pat in scope.exclude):
+        return False
+    if scope.include and not any(
+        fnmatch.fnmatchcase(path, pat) for pat in scope.include
+    ):
+        return False
+    return True
+
+
+def _discover_links(
+    html: str, current_url: str, depth: int, config: ExtractionConfig
+) -> list[tuple[str, int]]:
+    """Every in-scope link a fetched page offers to follow (ROADMAP.md §2d).
+
+    Returns nothing when `config.crawl` is unset — link discovery never runs,
+    so a config without it behaves exactly as it did before this existed.
+    Set, every `<a href>` is resolved against `current_url` the same way
+    `_next_url` already resolves a pagination link (`urljoin`, so a relative
+    href works the same for both), dropped by `_in_scope`, and — if it
+    survives — paired with `depth + 1`: a `crawl`-discovered link is always a
+    hop deeper than the page that offered it, unlike a `pagination.next`
+    link, which continues the same listing rather than branching (handled by
+    the caller, not here — this function only ever adds depth, never holds it
+    level). A link whose resulting depth would exceed `max_depth` is dropped
+    before the scope check, not after, so a disallowed depth never has to
+    pass `_in_scope` to be rejected.
+    """
+    if config.crawl is None:
+        return []
+    scope = config.crawl
+    next_depth = depth + 1
+    if scope.max_depth is not None and next_depth > scope.max_depth:
+        return []
+    hrefs = Selector(text=html).css("a::attr(href)").getall()
+    discovered: list[tuple[str, int]] = []
+    seen_this_page: set[str] = set()
+    for href in hrefs:
+        url = urljoin(current_url, href)
+        if url in seen_this_page or not _in_scope(url, config.target, scope):
+            continue
+        seen_this_page.add(url)
+        discovered.append((url, next_depth))
+    return discovered
+
+
 class TierUnavailableError(RuntimeError):
     """The dispatcher escalated to a resolution tier that is not yet implemented.
 
@@ -406,38 +467,52 @@ class Tier1Resolver:
         )
         result = RunResult(tier=self.tier)
         seen: set[str] = set()
-        url: str | None = config.target
+        # A frontier, not a single chain: (url, depth) pairs, seeded with the
+        # target at depth 0. `pagination.next` (unchanged) always re-queues at
+        # the *same* depth — continuing a listing, not branching — while
+        # `crawl`-discovered links (ROADMAP.md §2d) queue at depth + 1. A plain
+        # config with no `crawl` block behaves exactly as the single-chain
+        # version did: nothing is ever discovered beyond one next-link, so the
+        # frontier never holds more than one item at a time.
+        frontier: deque[tuple[str, int]] = deque([(config.target, 0)])
         try:
             if session is not None:
                 apply_cookies(session, client)
-            while url and url not in seen and len(seen) < _MAX_PAGES:
+            while frontier and len(seen) < _MAX_PAGES:
+                url, depth = frontier.popleft()
+                if url in seen:
+                    continue
                 seen.add(url)
                 if not gate.can_fetch(url):
                     result.blocked.append(url)
-                    break
+                    continue
                 gate.before_fetch(url)
                 # Conditional-request validators from a prior run, when change
                 # detection is on (empty on a first run or a plain run) (§2d).
                 headers = detector.conditional_headers(url) if detector else None
                 outcome = fetcher.get(url, headers=headers)
                 if isinstance(outcome, FetchFailure):
-                    # Classified fetch failure: record it and stop this crawl —
-                    # a failed page has no next-link to follow (§2d). If a challenge
-                    # was recognized *behind* the error status, surface it too — the
-                    # failure was a wall, not just an opaque error (§2d).
+                    # Classified fetch failure: record it. A failed page offers
+                    # no next-link or discovered links either (§2d) — other
+                    # frontier branches, if any, still get their turn. If a
+                    # challenge was recognized *behind* the error status,
+                    # surface it too — the failure was a wall, not just an
+                    # opaque error.
                     result.dead_letter.append(outcome)
                     if result.challenge is None and outcome.challenge is not None:
                         result.challenge = outcome.challenge
-                    break
+                    continue
                 result.pages_fetched += 1
                 # Change detection (§2d): an unchanged page (304, or a body whose
                 # content hash matches a prior run) is recorded and *not* re-
-                # extracted. A 304 carries no body, so `_next_url` finds no next
-                # link and the crawl ends naturally; a hash-matched 200 still has a
-                # body, so pagination continues past it.
+                # extracted. A 304 carries no body, so nothing further is found on
+                # it; a hash-matched 200 still has a body, so pagination/crawl
+                # still continues past it.
                 if detector is not None and detector.is_unchanged(url, outcome):
                     result.unchanged.append(url)
-                    url = _next_url(outcome.text, url, config)
+                    if next_url := _next_url(outcome.text, url, config):
+                        frontier.append((next_url, depth))
+                    frontier.extend(_discover_links(outcome.text, url, depth, config))
                     continue
                 # Recognize an anti-bot challenge in the fetched page (§2d): a
                 # 2xx challenge would otherwise be scraped as if it were data.
@@ -448,7 +523,9 @@ class Tier1Resolver:
                 # Remember this page's validators for the next run's comparison.
                 if detector is not None:
                     detector.record(url, outcome)
-                url = _next_url(outcome.text, url, config)
+                if next_url := _next_url(outcome.text, url, config):
+                    frontier.append((next_url, depth))
+                frontier.extend(_discover_links(outcome.text, url, depth, config))
         finally:
             result.retries = fetcher.retries
             if detector is not None:
@@ -698,12 +775,20 @@ class Tier2Resolver:
         healer: Healer | None = None,
     ) -> None:
         seen: set[str] = set()
-        url: str | None = config.target
-        while url and url not in seen and len(seen) < _MAX_PAGES:
+        # A frontier, not a single chain — see Tier1Resolver.run's identical
+        # comment: `pagination.next` re-queues at the same depth,
+        # `crawl`-discovered links (ROADMAP.md §2d) at depth + 1, and a plain
+        # config with no `crawl` block never discovers more than one link at a
+        # time, so this is unchanged from the single-chain version for it.
+        frontier: deque[tuple[str, int]] = deque([(config.target, 0)])
+        while frontier and len(seen) < _MAX_PAGES:
+            url, depth = frontier.popleft()
+            if url in seen:
+                continue
             seen.add(url)
             if not gate.can_fetch(url):
                 result.blocked.append(url)
-                break
+                continue
             gate.before_fetch(url)
             page = context.new_page()
             # Attach before navigating so load-time console output and errors count.
@@ -742,7 +827,7 @@ class Tier2Resolver:
                     if result.challenge is None and response.status is not None:
                         result.challenge = detect_challenge(page.content())
                     result.dead_letter.append(response)
-                    break
+                    continue
                 # Record the main document's response headers (§2c), if any.
                 if headers is not None and response is not None:
                     headers.capture(response.headers)
@@ -767,7 +852,9 @@ class Tier2Resolver:
                 page.close()
             result.pages_fetched += 1
             result.records.extend(page_records)
-            url = _next_url(html, url, config)
+            if next_url := _next_url(html, url, config):
+                frontier.append((next_url, depth))
+            frontier.extend(_discover_links(html, url, depth, config))
 
     def _extract_on_live_page(
         self,

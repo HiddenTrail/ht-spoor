@@ -183,6 +183,25 @@ def run_stops_at_last_page(context: dict[str, Any], selector: str) -> None:
     assert len(context["result"]) == context["expected_pages"]
 
 
+@then(parsers.parse("the extracted titles are {titles}"))
+def extracted_titles_are(context: dict[str, Any], titles: str) -> None:
+    expected = [t.strip().strip('"') for t in titles.split(",")]
+    actual = [item["title"] for item in context["result"]]
+    assert actual == expected
+
+
+@then(parsers.parse('the extracted titles include "{title}"'))
+def extracted_titles_include(context: dict[str, Any], title: str) -> None:
+    actual = [item["title"] for item in context["result"]]
+    assert title in actual
+
+
+@then(parsers.parse('the extracted titles do not include "{title}"'))
+def extracted_titles_exclude(context: dict[str, Any], title: str) -> None:
+    actual = [item["title"] for item in context["result"]]
+    assert title not in actual
+
+
 @then("more than one screen of items is extracted")
 def more_than_one_screen(context: dict[str, Any]) -> None:
     # The feed renders 3 cards initially and loads more only on scroll; tier 2
@@ -210,14 +229,17 @@ def config_has_no_tier_logic(context: dict[str, Any]) -> None:
     # cross-cutting operational policy. `capture` says *what to record* (opt-in
     # HAR, §2b/§2h), `politeness`/`retry`/`change_detection` say *how to behave
     # toward the origin* (robots + rate-limiting, §6; transient-error retry, §2d;
-    # skip unchanged pages, §2d), and `session` says *who to authenticate as* (a
-    # supplied browser storage state, §2h bring-your-own-session) — none names or
-    # selects a tier or decides when to escalate (§2a, §0).
+    # skip unchanged pages, §2d), `session` says *who to authenticate as* (a
+    # supplied browser storage state, §2h bring-your-own-session), and
+    # `pagination`/`crawl` say *which pages to visit beyond the first* (a single
+    # next-link chain; discovered links filtered by scope rules, §2d) — none
+    # names or selects a tier or decides when to escalate (§2a, §0).
     assert set(ExtractionConfig.model_fields) == {
         "target",
         "item",
         "fields",
         "pagination",
+        "crawl",
         "politeness",
         "retry",
         "change_detection",

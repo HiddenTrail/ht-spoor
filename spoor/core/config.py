@@ -42,6 +42,32 @@ class Pagination(BaseModel):
     infinite_scroll: bool = False
 
 
+class CrawlScope(BaseModel):
+    """Which discovered links a crawl follows, beyond a single `pagination.next`
+    chain (ROADMAP.md §2d).
+
+    Omitted entirely (the default), link discovery never runs — behavior is
+    byte-for-byte what it was before this existed. Set, every `<a href>` on a
+    fetched page is a candidate; each is dropped first for leaving the
+    target's origin (unless `same_origin` is false), then for matching an
+    `exclude` pattern, then — if `include` is set — for matching none of it.
+    `include`/`exclude` are glob patterns (`fnmatch`, case-sensitive) matched
+    against the URL's path, not the whole URL, so `/products/*` means what it
+    looks like regardless of host. `max_depth` bounds how many hops from the
+    target a followed link may be (`None` is unbounded, still capped by the
+    run's own page-count ceiling) — a `pagination.next` hop never counts
+    against it, since advancing through one listing is not branching to a new
+    part of the site the way a `crawl`-discovered link is.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    include: list[str] | None = None
+    exclude: list[str] | None = None
+    max_depth: int | None = Field(default=None, ge=0)
+    same_origin: bool = True
+
+
 class PolitenessPolicy(BaseModel):
     """Operator-facing politeness knobs (ROADMAP.md §2d, §6).
 
@@ -124,6 +150,10 @@ class ExtractionConfig(BaseModel):
     item: str | None = None
     fields: dict[str, FieldSpec]
     pagination: Pagination | None = None
+    # Which discovered links (beyond pagination's single next-link chain) a run
+    # follows (ROADMAP.md §2d); omitted means none — today's single-chain
+    # behavior, unchanged.
+    crawl: CrawlScope | None = None
     # Politeness is a first-class object (ROADMAP.md §2d), not a README promise;
     # omitted means the default policy (respect robots.txt, honor crawl-delay).
     politeness: PolitenessPolicy | None = None

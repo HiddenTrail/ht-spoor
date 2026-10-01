@@ -92,6 +92,29 @@ command does.
 spoor wizard
 ```
 
+## Following links beyond a single page
+
+`pagination.next` (above) follows one declared link in a straight chain —
+good for "page 2, page 3, …" of the same listing. For a broader crawl —
+follow every in-scope link a page offers, not just one declared next-link —
+add `crawl:`:
+
+```yaml
+crawl:
+  include: ["/products/*"]    # glob patterns against the URL's path; omit to allow everything not excluded
+  exclude: ["/products/out-of-stock/*"]  # always wins over include
+  max_depth: 2                # hops from the target; omit for unbounded
+  same_origin: true            # default — never follows an off-site link unless set false
+```
+
+Every page Spoor fetches is checked for `<a href>` links; each is resolved,
+filtered by these rules, and — if it survives — fetched and extracted with
+the same config, just like `pagination` already does. `crawl` and
+`pagination` compose: a `pagination.next` hop continues the same listing (it
+never counts against `max_depth`), while a `crawl`-discovered link is a real
+hop to a new part of the site. Omit `crawl` entirely and nothing changes —
+Spoor follows only a declared `pagination.next`, exactly as before.
+
 ## Runtime behavior (important defaults)
 
 - Output formats: JSON, JSON Lines, CSV, Markdown table (schema-validated before writing)
@@ -286,7 +309,7 @@ or one you declared with `--sandbox`).
 
 ### Available now
 
-- Tier-1 extraction: single-record and listing (`item`) extraction, text/`attr` field values, `number` coercion, next-link pagination
+- Tier-1 extraction: single-record and listing (`item`) extraction, text/`attr` field values, `number` coercion, next-link pagination, and broader link following with scope rules (`crawl:` — include/exclude glob patterns, max depth, same-origin)
 - Tier-2 browser slice: escalation for infinite-scroll pages, then extraction from rendered DOM
 - Run observability: structured run summary for each run
 - API discovery: OpenAPI/Swagger discovery, GraphQL introspection, HAR-based synthesis, and action-to-endpoint correlation
