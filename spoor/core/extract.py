@@ -22,6 +22,8 @@ import re
 import time
 from collections import deque
 from collections.abc import Callable
+from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor
+from concurrent.futures import wait as futures_wait
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
@@ -71,6 +73,13 @@ from spoor.signals.storage_state import StorageStateCollector, StorageStateSigna
 
 # Guard against a pagination cycle running forever on a self-linking page.
 _MAX_PAGES = 1000
+# Thread-pool ceiling for tier-1 bounded concurrent fetching (ROADMAP.md §2d,
+# #174). Independent of `max_concurrent_per_domain`: the per-domain semaphore
+# is the real concurrency bound for any one domain, so this just needs enough
+# headroom that a multi-domain `crawl:` doesn't serialize on pool size itself
+# — oversizing it beyond what any domain's cap allows costs an idle thread
+# blocked on that domain's semaphore, not a correctness problem.
+_MAX_WORKERS = 8
 # Guard against an infinite feed that never stops growing (tier 2).
 _MAX_SCROLLS = 100
 # Grace window for a scroll to load more content before we call it the end of
@@ -541,18 +550,16 @@ class Tier1Resolver:
         # frontier never holds more than one item at a time.
         frontier: deque[tuple[str, int]] = deque([(config.target, 0)])
         frontier.extend(_sitemap_seeds(gate, config))
-        try:
-            if session is not None:
-                apply_cookies(session, client)
-            while frontier and len(seen) < _MAX_PAGES:
-                url, depth = frontier.popleft()
-                if url in seen:
-                    continue
-                seen.add(url)
-                if not gate.can_fetch(url):
-                    result.blocked.append(url)
-                    continue
-                gate.before_fetch(url)
+
+        def _dispatch(url: str) -> httpx.Response | FetchFailure:
+            # Runs in a worker thread (ROADMAP.md §2d, #174): `gate.acquire`
+            # blocks for this domain's concurrency slot and crawl-delay
+            # spacing, the fetch itself then runs concurrently with any other
+            # domain's (or this domain's, up to its cap) in-flight fetch, and
+            # `gate.release` always runs so a raising hook can never leak the
+            # slot and stall the rest of that domain's crawl.
+            gate.acquire(url)
+            try:
                 # Conditional-request validators from a prior run, when change
                 # detection is on (empty on a first run or a plain run) (§2d).
                 headers = detector.conditional_headers(url) if detector else None
@@ -560,49 +567,92 @@ class Tier1Resolver:
                     extra_headers = hooks.on_request(url)
                     if extra_headers:
                         headers = {**(headers or {}), **extra_headers}
-                outcome = fetcher.get(url, headers=headers)
-                if isinstance(outcome, FetchFailure):
-                    # Classified fetch failure: record it. A failed page offers
-                    # no next-link or discovered links either (§2d) — other
-                    # frontier branches, if any, still get their turn. If a
-                    # challenge was recognized *behind* the error status,
-                    # surface it too — the failure was a wall, not just an
-                    # opaque error.
-                    result.dead_letter.append(outcome)
-                    if result.challenge is None and outcome.challenge is not None:
-                        result.challenge = outcome.challenge
-                    continue
-                result.pages_fetched += 1
-                # Change detection (§2d): an unchanged page (304, or a body whose
-                # content hash matches a prior run) is recorded and *not* re-
-                # extracted. A 304 carries no body, so nothing further is found on
-                # it; a hash-matched 200 still has a body, so pagination/crawl
-                # still continues past it.
-                if detector is not None and detector.is_unchanged(url, outcome):
-                    result.unchanged.append(url)
-                    if next_url := _next_url(outcome.text, url, config):
-                        frontier.append((next_url, depth))
-                    frontier.extend(_discover_links(outcome.text, url, depth, config))
-                    continue
-                # Remember this page's validators against the *real* server
-                # response before any hook runs — change detection compares
-                # against what the origin actually sent, not a hook's rewrite.
-                if detector is not None:
-                    detector.record(url, outcome)
-                html = outcome.text
-                if hooks is not None and hooks.on_response is not None:
-                    rewritten = hooks.on_response(url, html)
-                    if rewritten is not None:
-                        html = rewritten
-                # Recognize an anti-bot challenge in the fetched page (§2d): a
-                # 2xx challenge would otherwise be scraped as if it were data.
-                # First page to look like one names the run's challenge.
-                if result.challenge is None:
-                    result.challenge = detect_challenge(html)
-                result.records.extend(extract_records(html, config, healer))
-                if next_url := _next_url(html, url, config):
-                    frontier.append((next_url, depth))
-                frontier.extend(_discover_links(html, url, depth, config))
+                return fetcher.get(url, headers=headers)
+            finally:
+                gate.release(url)
+
+        try:
+            if session is not None:
+                apply_cookies(session, client)
+            # Fetches run concurrently (worker threads, bounded per domain by
+            # `gate`); every per-page decision below — change detection,
+            # hooks, extraction, frontier growth — stays on this thread as
+            # each fetch completes, so none of it needs its own locking (§2d,
+            # #174). `max_concurrent_per_domain`'s default of 1 means at most
+            # one fetch is ever in flight, reproducing the old single-threaded
+            # loop's behavior exactly.
+            with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
+                _Pending = Future[httpx.Response | FetchFailure]
+                in_flight: dict[_Pending, tuple[str, int]] = {}
+                while frontier or in_flight:
+                    while frontier and len(seen) < _MAX_PAGES:
+                        url, depth = frontier.popleft()
+                        if url in seen:
+                            continue
+                        seen.add(url)
+                        if not gate.can_fetch(url):
+                            result.blocked.append(url)
+                            continue
+                        in_flight[executor.submit(_dispatch, url)] = (url, depth)
+                    if not in_flight:
+                        break
+                    done, _pending = futures_wait(
+                        in_flight, return_when=FIRST_COMPLETED
+                    )
+                    for future in done:
+                        url, depth = in_flight.pop(future)
+                        outcome = future.result()
+                        if isinstance(outcome, FetchFailure):
+                            # Classified fetch failure: record it. A failed
+                            # page offers no next-link or discovered links
+                            # either (§2d) — other frontier branches, if any,
+                            # still get their turn. If a challenge was
+                            # recognized *behind* the error status, surface it
+                            # too — the failure was a wall, not just an opaque
+                            # error.
+                            result.dead_letter.append(outcome)
+                            if (
+                                result.challenge is None
+                                and outcome.challenge is not None
+                            ):
+                                result.challenge = outcome.challenge
+                            continue
+                        result.pages_fetched += 1
+                        # Change detection (§2d): an unchanged page (304, or a
+                        # body whose content hash matches a prior run) is
+                        # recorded and *not* re-extracted. A 304 carries no
+                        # body, so nothing further is found on it; a
+                        # hash-matched 200 still has a body, so
+                        # pagination/crawl still continues past it.
+                        if detector is not None and detector.is_unchanged(url, outcome):
+                            result.unchanged.append(url)
+                            if next_url := _next_url(outcome.text, url, config):
+                                frontier.append((next_url, depth))
+                            frontier.extend(
+                                _discover_links(outcome.text, url, depth, config)
+                            )
+                            continue
+                        # Remember this page's validators against the *real*
+                        # server response before any hook runs — change
+                        # detection compares against what the origin actually
+                        # sent, not a hook's rewrite.
+                        if detector is not None:
+                            detector.record(url, outcome)
+                        html = outcome.text
+                        if hooks is not None and hooks.on_response is not None:
+                            rewritten = hooks.on_response(url, html)
+                            if rewritten is not None:
+                                html = rewritten
+                        # Recognize an anti-bot challenge in the fetched page
+                        # (§2d): a 2xx challenge would otherwise be scraped as
+                        # if it were data. First page to look like one names
+                        # the run's challenge.
+                        if result.challenge is None:
+                            result.challenge = detect_challenge(html)
+                        result.records.extend(extract_records(html, config, healer))
+                        if next_url := _next_url(html, url, config):
+                            frontier.append((next_url, depth))
+                        frontier.extend(_discover_links(html, url, depth, config))
         finally:
             result.retries = fetcher.retries
             if detector is not None:
@@ -878,7 +928,12 @@ class Tier2Resolver:
             if not gate.can_fetch(url):
                 result.blocked.append(url)
                 continue
-            gate.before_fetch(url)
+            # Paired with `gate.release` in the finally below -- the browser
+            # tier never runs more than one page at a time, so this is purely
+            # about not leaking the per-domain concurrency slot `acquire`
+            # introduced (ROADMAP.md §2d, #174); an unreleased slot would
+            # deadlock this domain's very next page.
+            gate.acquire(url)
             page = context.new_page()
             try:
                 # Attach before navigating so load-time console output and
@@ -951,6 +1006,7 @@ class Tier2Resolver:
                 page_records = self._extract_on_live_page(html, config, healer, page)
             finally:
                 page.close()
+                gate.release(url)
             result.pages_fetched += 1
             result.records.extend(page_records)
             if next_url := _next_url(html, url, config):

@@ -1,4 +1,4 @@
-"""Runtime politeness gate: robots.txt + crawl-delay (ROADMAP.md §2d, §6).
+"""Runtime politeness gate: robots.txt + crawl-delay + concurrency (ROADMAP.md §2d, §6).
 
 The declarative knobs live in `spoor.core.config.PolitenessPolicy`; this module
 is the runtime that enforces them against a live crawl. §6 commits Spoor to
@@ -6,13 +6,16 @@ respecting `robots.txt` and rate-limiting by default, with overriding it an
 explicit opt-out. Per §0 there is nothing site-specific here — robots.txt is
 fetched and parsed the same generic way for every target.
 
-Scope (Phase 1): allow/deny checks and run-level crawl-delay spacing over the
-sequential crawl. Concurrency caps and Retry-After honoring are deferred
-until a request pool / retry mechanism exists (see the ROADMAP §2d note).
+Scope: allow/deny checks, per-domain crawl-delay spacing, and a per-domain
+concurrency bound (ROADMAP.md §2d, #174) over the tier-1 fetch path. This
+class is called from multiple threads once `max_concurrent_per_domain > 1`
+(`Tier1Resolver` dispatches fetches through a thread pool), so every method
+here is safe to call concurrently — see `acquire`/`release`.
 """
 
 from __future__ import annotations
 
+import threading
 import time
 import xml.etree.ElementTree as ET
 from collections import deque
@@ -87,9 +90,20 @@ class Politeness:
     """Enforces a `PolitenessPolicy` across the fetches of one run.
 
     Fetches and caches `robots.txt` per origin (scheme + host) on first need,
-    answers `can_fetch`, and spaces requests via `before_fetch` using an
-    run-level "first fetch happened" flag plus an injectable `sleep` (so tests
-    can assert timing without real waiting).
+    answers `can_fetch`, and gates each fetch through `acquire`/`release`
+    (`before_fetch`/`after_fetch` are the same pair, under their established
+    names), which together bound concurrency and space dispatches, per domain
+    (`netloc` — host and port, matching `urlsplit`). An injectable `sleep` lets
+    tests assert delay timing without real waiting.
+
+    Thread-safety: a single `_registry_lock` guards creation of the per-domain
+    primitives below (the robots.txt cache, each domain's semaphore and
+    dispatch lock) — held only long enough to look up or create an entry,
+    never across a fetch or a sleep, so unrelated domains never wait on each
+    other. Robots.txt itself is fetched outside that lock (it's a network
+    call) using a double-checked read, so two threads racing on the same
+    uncached origin both do a harmless redundant fetch rather than blocking
+    one another.
     """
 
     def __init__(
@@ -102,13 +116,20 @@ class Politeness:
         self._policy = policy
         self._client = client
         self._sleep = sleep
+        self._registry_lock = threading.Lock()
         self._robots: dict[tuple[str, str], RobotFileParser] = {}
-        self._fetched_any = False
+        self._semaphores: dict[str, threading.Semaphore] = {}
+        self._dispatch_locks: dict[str, threading.Lock] = {}
+        self._dispatched: dict[str, bool] = {}
+
+    def _domain(self, url: str) -> str:
+        return urlsplit(url).netloc
 
     def _parser(self, url: str) -> RobotFileParser:
         parts = urlsplit(url)
         origin = (parts.scheme, parts.netloc)
-        cached = self._robots.get(origin)
+        with self._registry_lock:
+            cached = self._robots.get(origin)
         if cached is not None:
             return cached
         parser = RobotFileParser()
@@ -129,8 +150,13 @@ class Politeness:
         else:
             # Absent robots.txt (404) or otherwise unreadable: nothing to obey.
             parser.parse([])
-        self._robots[origin] = parser
-        return parser
+        with self._registry_lock:
+            # Another thread may have raced us to the same origin; keep
+            # whichever landed first so every caller sees one consistent
+            # parser rather than silently swapping underneath a concurrent
+            # reader — the redundant fetch above was the only cost of the race.
+            self._robots.setdefault(origin, parser)
+            return self._robots[origin]
 
     def sitemap_seed_urls(self, target: str) -> list[str]:
         """Every page URL named by the target origin's robots.txt `Sitemap:`
@@ -182,9 +208,58 @@ class Politeness:
         declared = self._parser(url).crawl_delay(USER_AGENT)
         return float(declared) if declared is not None else 0.0
 
-    def before_fetch(self, url: str) -> None:
-        """Sleep before every fetch but the first fetch of the run."""
-        delay = self.crawl_delay(url)
-        if self._fetched_any and delay > 0:
-            self._sleep(delay)
-        self._fetched_any = True
+    def _semaphore(self, domain: str) -> threading.Semaphore:
+        with self._registry_lock:
+            sem = self._semaphores.get(domain)
+            if sem is None:
+                sem = threading.Semaphore(self._policy.max_concurrent_per_domain)
+                self._semaphores[domain] = sem
+            return sem
+
+    def _dispatch_lock(self, domain: str) -> threading.Lock:
+        with self._registry_lock:
+            lock = self._dispatch_locks.get(domain)
+            if lock is None:
+                lock = threading.Lock()
+                self._dispatch_locks[domain] = lock
+            return lock
+
+    def acquire(self, url: str) -> None:
+        """Block until a concurrency slot for `url`'s domain is free and the
+        crawl-delay since the last dispatch to that domain has elapsed.
+
+        The two are independent: the per-domain semaphore bounds how many
+        fetches to that domain may be *in flight* at once
+        (`max_concurrent_per_domain`), while the dispatch lock below only
+        serializes the brief "may I start now" check-and-sleep so concurrent
+        slot-holders for the same domain still start at least `delay` apart —
+        it is released before the caller's actual fetch, so the fetches
+        themselves run concurrently once released to start. A domain's
+        first-ever dispatch never sleeps, matching the old sequential path's
+        "never delay the very first fetch" behavior, now scoped per domain
+        rather than once for the whole run (observable only once a `crawl:`
+        targets more than one domain — a single-domain run, the common case,
+        sees no difference).
+        """
+        domain = self._domain(url)
+        self._semaphore(domain).acquire()
+        with self._dispatch_lock(domain):
+            delay = self.crawl_delay(url)
+            if self._dispatched.get(domain, False) and delay > 0:
+                self._sleep(delay)
+            self._dispatched[domain] = True
+
+    def release(self, url: str) -> None:
+        """Free the concurrency slot `acquire` took for `url`'s domain.
+
+        Always pair with `acquire` via `try`/`finally` — an unreleased slot
+        permanently reduces that domain's effective concurrency for the rest
+        of the run (deadlocking it entirely once every slot leaks).
+        """
+        self._semaphore(self._domain(url)).release()
+
+    # Established call-site names, kept for `Tier1Resolver`/`Tier2Resolver` —
+    # `acquire`/`release` are the same pair, named for what they actually do
+    # now that there's concurrency to bound.
+    before_fetch = acquire
+    after_fetch = release

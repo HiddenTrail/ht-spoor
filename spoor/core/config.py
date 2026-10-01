@@ -109,14 +109,24 @@ class PolitenessPolicy(BaseModel):
     this by default). `delay`, when set, is a minimum spacing in seconds applied
     between fetches and overrides the robots.txt crawl-delay. `respect_robots`
     may be set to false, but only as an explicit, deliberate opt-out — never the
-    default (§6). Retry-After honoring now lives on `RetryPolicy` (§2d Phase 3.5);
-    concurrency caps stay deferred until a request pool exists (§2d note).
+    default (§6). Retry-After honoring lives on `RetryPolicy` (§2d Phase 3.5).
+    `max_concurrent_per_domain` bounds how many tier-1 fetches to the same
+    domain may be in flight at once (ROADMAP.md §2d, #174); the default of 1
+    reproduces the fully-sequential behavior every run had before this existed.
+    Raising it lets fetches to the same domain overlap, still spaced by `delay`
+    (the cap bounds concurrency, the delay bounds request-start rate — the two
+    compose rather than one superseding the other); fetches to *different*
+    domains (e.g. an off-origin `crawl:` link) are never bounded by each
+    other's cap. Scope is the tier-1 fetch path only — the browser tier stays
+    single-threaded (Playwright's sync API isn't safe to drive from more than
+    one thread).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     respect_robots: bool = True
     delay: float | None = None
+    max_concurrent_per_domain: int = Field(default=1, ge=1)
 
 
 class RetryPolicy(BaseModel):
