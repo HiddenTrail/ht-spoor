@@ -25,11 +25,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol
-from urllib.parse import urljoin, urlparse
+from urllib.parse import quote, urljoin, urlparse, urlsplit, urlunsplit
 
 import httpx
 from parsel import Selector
-from playwright.sync_api import BrowserContext, Page, sync_playwright
+from playwright.sync_api import BrowserContext, Page, ProxySettings, sync_playwright
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
@@ -47,6 +47,7 @@ from spoor.core.config import (
     ExtractionConfig,
     FieldSpec,
     PolitenessPolicy,
+    ProxyPolicy,
     RetryPolicy,
 )
 from spoor.core.fingerprint_cache import cache_for_target
@@ -83,6 +84,37 @@ _ITEM_RENDER_TIMEOUT_MS = 5000
 # (ms), for the tier-3 visual signal. Short: a hidden or zero-size candidate must
 # fail fast to "no visual signal" (None) rather than stall the heal on it.
 _SCREENSHOT_TIMEOUT_MS = 2000
+
+
+def _httpx_proxy_url(policy: ProxyPolicy) -> str:
+    """Build an httpx-compatible proxy URL from a `ProxyPolicy` (ROADMAP.md §2d).
+
+    `httpx.Client(proxy=...)` takes a single URL, with credentials embedded as
+    `user:pass@host`; Playwright's `ProxySettings` keeps them as separate
+    fields instead (`_playwright_proxy_settings`), so this is the one place
+    that shape conversion happens.
+    """
+    if policy.username is None and policy.password is None:
+        return policy.server
+    parsed = urlsplit(policy.server)
+    user = quote(policy.username or "", safe="")
+    pwd = quote(policy.password or "", safe="")
+    netloc = f"{user}:{pwd}@{parsed.netloc}"
+    return urlunsplit(
+        (parsed.scheme, netloc, parsed.path, parsed.query, parsed.fragment)
+    )
+
+
+def _playwright_proxy_settings(policy: ProxyPolicy) -> ProxySettings:
+    """Build a Playwright `ProxySettings`-shaped dict from a `ProxyPolicy`."""
+    settings: ProxySettings = {"server": policy.server}
+    if policy.username is not None:
+        settings["username"] = policy.username
+    if policy.password is not None:
+        settings["password"] = policy.password
+    if policy.bypass is not None:
+        settings["bypass"] = policy.bypass
+    return settings
 
 
 @dataclass
@@ -482,7 +514,11 @@ class Tier1Resolver:
             load_session(config.session) if config.session is not None else None
         )
         owns_client = client is None
-        client = client or httpx.Client(follow_redirects=True, timeout=10.0)
+        client = client or httpx.Client(
+            follow_redirects=True,
+            timeout=10.0,
+            proxy=_httpx_proxy_url(config.proxy) if config.proxy is not None else None,
+        )
         gate = Politeness(config.politeness or PolitenessPolicy(), client, sleep=sleep)
         fetcher = RetryingFetcher(client, config.retry or RetryPolicy(), sleep=sleep)
         detector = (
@@ -672,7 +708,11 @@ class Tier2Resolver:
             load_session(config.session) if config.session is not None else None
         )
         owns_client = client is None
-        client = client or httpx.Client(follow_redirects=True, timeout=10.0)
+        client = client or httpx.Client(
+            follow_redirects=True,
+            timeout=10.0,
+            proxy=_httpx_proxy_url(config.proxy) if config.proxy is not None else None,
+        )
         gate = Politeness(config.politeness or PolitenessPolicy(), client, sleep=sleep)
         # Browser-tier navigation retry (§2d, Phase 3.5): a transient navigation
         # failure (a timeout, a dropped connection, a 5xx/429 on the response) is
@@ -705,7 +745,11 @@ class Tier2Resolver:
         recorder = CheckpointRecorder() if want_har else None
         try:
             with sync_playwright() as playwright:
-                browser = playwright.chromium.launch()
+                browser = playwright.chromium.launch(
+                    proxy=_playwright_proxy_settings(config.proxy)
+                    if config.proxy is not None
+                    else None
+                )
                 try:
                     # record_har_path is per-context; recording it on the context
                     # (not per page) captures the whole run in one HAR. A supplied
