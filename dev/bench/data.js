@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790767884039,
+  "lastUpdate": 1790830901887,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -5024,6 +5024,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5379.9,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b012c98b26f93866f0620638be2e447913edecfd",
+          "message": "CLI: don't blame every explore skip on the sandbox gate (#167)\n\nFound while manually inspecting a real crawl's skip reasons (streaming-\nclone, #160-#165): spoor explore's run summary printed \"(destructive\nactions were skipped -- this target is not a declared sandbox)\" whenever\ngraph.skipped was non-empty, regardless of why each action was actually\nskipped. In that crawl, all 36 skips were \"could not be performed: ...\nnot located after replay\" (native <video> control elements, an\nactuation/relocation failure, see #166) -- none were destructive-gate\nskips -- so the summary was telling the operator the wrong reason for\nevery single one.\n\nspoor/exploration/safety.py already names DESTRUCTIVE_SKIP_REASON as the\none exact string a destructive-gate skip carries, specifically so a\ndownstream consumer can tell it apart from any other kind rather than\nmisreporting one as the other -- the CLI just never checked it. Now it\ncounts each kind separately and only claims the sandbox gate for skips\nthat actually came from it, and surfaces the other kind honestly instead\nof hiding it behind a wrong explanation.\n\nVerified: 3 new CLI tests (actuation-only skips report no \"destructive\"\nclaim, destructive-only skips still report correctly, a mix reports\nboth correctly). Fast tier 745 passed (+3), ruff/mypy/check_genericity.py\nclean.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-01T07:56:30+03:00",
+          "tree_id": "4c651cd34a6729de6bf043f3707ab6e8452fb961",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/b012c98b26f93866f0620638be2e447913edecfd"
+        },
+        "date": 1790830899781,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 215.643,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03267,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.8341,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.10681,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.5996,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.07269,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 10.8988,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11298,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 17.003,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.0343,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2472,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.56542,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 31.7403,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.04343,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 11.4119,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.95643,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 125.3118,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.0731,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.4594,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.00903,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.3917,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5307.1,
             "unit": "MB"
           }
         ]
