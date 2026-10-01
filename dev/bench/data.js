@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790830901887,
+  "lastUpdate": 1790839138926,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -5168,6 +5168,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5307.1,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a9dd33acf98ebe0130f2fb37c2f04500baf7881f",
+          "message": "§2e: exclude native <video>/<audio> control children from discovery (#168)\n\nCloses #166. Exploring streaming-clone with a session supplied reached\nevery detail screen correctly but still logged 36 skips every run, all\n\"could not be performed: ... not located after replay\" on the same six\nelements: the native <video controls> play/mute/volume/scrubber/\nfullscreen/overflow-menu buttons.\n\nInvestigated against a real Chromium build rather than guessed at. My\noriginal hypothesis in #166 (controls auto-hide without a mouse hover)\nwas wrong -- these elements resolve and box-model fine over CDP every\ntime, hover or not, first visit or after a full reset-and-replay. The\nactual cause: document.elementFromPoint -- what the live click-\nverification every discovered element passes through (§2e 7a) checks\nthe click lands on -- always retargets a hit anywhere inside a\n<video>/<audio> element's *closed* user-agent shadow DOM back to the\nhost element itself. Confirmed directly: elementFromPoint at a play\nbutton's coordinates returns the <video> tag, every time. A structural\nfact of the browser's shadow-DOM boundary, true on every site with a\nplain HTML5 media element (§0), not a fixture quirk -- so no amount of\nretrying would ever make the existing verification succeed for one.\n\ndiscover_actions now excludes these at the source: _has_media_ancestor\nwalks a candidate node's parentId chain in the same\nAccessibility.getFullAXTree snapshot discovery already has (confirmed\nlive the ancestor chain does carry a role: \"Video\"/\"Audio\" node -- no\nextra CDP round-trip). Cycle-guarded; tolerant of a node missing\nparentId/nodeId (every existing fake driver), which simply never\nmatches -- the same \"include it\" default the rest of discovery already\ntakes for any other missing field.\n\nfeatures/exploration_discovery.feature gained three scenarios: a native\nmedia-control child excluded, an ordinary wrapped element still\ndiscovered (the exclusion doesn't over-fire on non-media ancestors),\nand a cyclic ancestor chain not hanging discovery.\n\nVerified: all existing discovery/exploration tests pass unaffected\n(fast tier 748 passed, +3 new), ruff/mypy/check_genericity.py clean.\nLive re-run of the exact crawl that motivated this: the same streaming-\nclone crawl that logged 36 skips before now logs 0, discovering the\nsame 7 states. docs/ROADMAP.md records the finding and the fix.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-01T10:13:30+03:00",
+          "tree_id": "d671474fadb974baea9de5cc1e2ef0d03482070b",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/a9dd33acf98ebe0130f2fb37c2f04500baf7881f"
+        },
+        "date": 1790839137769,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 239.284,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04762,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.4527,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.13576,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.2816,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0002,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.09563,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 14.5305,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.14306,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 22.9427,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.05417,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.3282,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.60463,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.7391,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.0605,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 15.8983,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.04326,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 127.5328,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09518,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5699,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01215,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.5282,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5294.1,
             "unit": "MB"
           }
         ]
