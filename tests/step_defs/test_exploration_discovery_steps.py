@@ -43,6 +43,14 @@ def _ax_node(fields: dict[str, str]) -> dict[str, object]:
     input_type = fields.get("input_type")
     if input_type:
         node["input_type"] = input_type
+    # Ancestry, for the media-control exclusion (§2e): present only on scenarios
+    # that test it, so every pre-existing table (no such columns) is unaffected.
+    node_id = fields.get("node_id")
+    if node_id:
+        node["nodeId"] = node_id
+    parent_id = fields.get("parent_id")
+    if parent_id:
+        node["parentId"] = parent_id
     return node
 
 

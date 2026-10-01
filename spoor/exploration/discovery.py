@@ -5,15 +5,20 @@ a screen; this answers "what *can* be interacted with here?" without a new
 mechanism, by reusing the §2c accessibility-tree signal. That snapshot (the CDP
 `Accessibility.getFullAXTree` node list, as `AccessibilityCollector` captures it)
 already labels every node with a generic ARIA role, so discovery is: keep the nodes
-whose role is interactive and that aren't ignored, and read each one's role,
-accessible name, backend DOM node id, and — when the driver enriched the node with
-one — its destination hint (a link's target URL path, read from `href`; §2e slice 9b)
-and its DOM `input_type` (an `<input>` element's `type` attribute).
+whose role is interactive and that aren't ignored — except a native `<video>`/
+`<audio>` element's own control children (play/mute/volume/scrubber/fullscreen/...),
+which live inside the browser's closed user-agent shadow DOM and can never pass the
+live click-verification every other element relies on (`_has_media_ancestor`) — and
+read each one's role, accessible name, backend DOM node id, and — when the driver
+enriched the node with one — its destination hint (a link's target URL path, read
+from `href`; §2e slice 9b) and its DOM `input_type` (an `<input>` element's `type`
+attribute).
 
 The accessible name is the label the safety gate (`safety.py`) classifies; the
 backend node id is kept so the (later) explorer loop can locate the element to act
 on it. This slice only discovers — driving actions is the explorer loop. Generic to
-every target (§0): the interactive-role set is the same for all.
+every target (§0): the interactive-role set, and the media-control exclusion, are
+the same for all.
 """
 
 from __future__ import annotations
@@ -125,6 +130,53 @@ def _input_type(node: Mapping[str, object]) -> str | None:
     return raw if isinstance(raw, str) and raw else None
 
 
+# A node whose accessibility-tree ancestor is one of these is inside a native
+# <video>/<audio> element's closed user-agent shadow tree (play/mute/volume/
+# scrubber/fullscreen/the overflow menu) — browser chrome for the media tag, not
+# site-authored content, and never reliably actionable regardless (see
+# `_has_media_ancestor`). Chromium reports these internal roles capitalized,
+# unlike the lowercase ARIA roles every site-authored element carries; matched
+# case-insensitively since that capitalization is an implementation detail, not
+# a contract.
+_MEDIA_ROLES = frozenset({"video", "audio"})
+
+
+def _has_media_ancestor(
+    node: Mapping[str, object], by_node_id: Mapping[object, Mapping[str, object]]
+) -> bool:
+    """Whether `node` descends from a `<video>`/`<audio>` element's AX node (§2e).
+
+    Native media controls live in the browser's own *closed* user-agent shadow
+    DOM. `document.elementFromPoint` always retargets a hit anywhere inside that
+    shadow tree back to the `<video>`/`<audio>` host itself — verified directly
+    against a real Chromium build, not assumed — so the actuation-verification
+    step every other discovered element relies on (§2e 7a: the click lands on the
+    element the same accessibility read resolved, confirmed live before it fires)
+    can never succeed for one. That is a structural fact of the shadow boundary,
+    true on every site with a plain `<video controls>`/`<audio controls>`
+    element (§0), not a timing or visibility issue — so rather than discover
+    something that would always fail its own verification (and cost three
+    wasted replay attempts doing it), these are excluded here, from the same
+    accessibility-tree read discovery already has: no extra CDP round-trip, and
+    no change to how any other element is verified.
+
+    Walks the node's own `parentId` chain (cycle-guarded, since a malformed or
+    fake node list is not this function's contract to enforce); a node missing
+    `parentId`/`nodeId` — any discovery input that predates this check, and every
+    existing fake in the test suite — simply never matches an ancestor, the same
+    "include it" default `discover_actions` already takes for any other missing
+    field.
+    """
+    seen: set[int] = set()
+    current: Mapping[str, object] | None = by_node_id.get(node.get("parentId"))
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if _ax_string(current.get("role")).lower() in _MEDIA_ROLES:
+            return True
+        current = by_node_id.get(current.get("parentId"))
+    return False
+
+
 def discover_actions(
     ax_nodes: Sequence[Mapping[str, object]],
 ) -> list[ActionableElement]:
@@ -132,15 +184,20 @@ def discover_actions(
 
     Keeps document order and every interactive occurrence — the explorer decides
     later what to do with each; deduplication is not this slice's job. Ignored
-    nodes and non-interactive roles are dropped. Tolerant of missing fields: a node
-    with no name yields an empty label, a node with no backend id yields None.
+    nodes, non-interactive roles, and native `<video>`/`<audio>` control children
+    (`_has_media_ancestor` — never actionable regardless, see its docstring) are
+    dropped. Tolerant of missing fields: a node with no name yields an empty
+    label, a node with no backend id yields None.
     """
+    by_node_id = {node.get("nodeId"): node for node in ax_nodes}
     discovered: list[ActionableElement] = []
     for node in ax_nodes:
         if node.get("ignored") is True:
             continue
         role = _ax_string(node.get("role"))
         if role not in ACTIONABLE_ROLES:
+            continue
+        if _has_media_ancestor(node, by_node_id):
             continue
         discovered.append(
             ActionableElement(

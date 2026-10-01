@@ -74,6 +74,53 @@ Feature: Exploration discovers the actionable elements on a page
     Then the first discovered element has input type "password"
     And the second discovered element has no input type
 
+  Scenario: A native video/audio control child is never discovered
+    # Native <video controls>/<audio controls> elements (play, mute, volume, the
+    # scrubber, fullscreen, the overflow menu) live in the browser's own *closed*
+    # shadow DOM -- a real Chromium build confirms elementFromPoint always
+    # retargets a hit inside it back to the <video>/<audio> host, so the live
+    # click-verification every other element passes through (§2e 7a) can never
+    # succeed for one. A structural fact of the browser, true on every site with a
+    # plain media element (§0), not a timing or visibility issue -- so discovery
+    # excludes them, walking only the ancestor chain the same accessibility read
+    # already carries (no extra CDP round-trip).
+    Given an accessibility tree:
+      | node_id | parent_id | role   | name        | ignored |
+      | 1       |           | Video  |             | false   |
+      | 2       | 1         | button | play        | false   |
+      | 3       | 1         | slider | volume      | false   |
+      | 4       |           | button | Add to cart | false   |
+    When I discover the actionable elements
+    Then the discovered elements are:
+      | role   | name        |
+      | button | Add to cart |
+
+  Scenario: An ordinary wrapped element is still discovered
+    # A non-media ancestor (a plain wrapping <div>) must not trip the exclusion --
+    # only an actual <video>/<audio> ancestor does.
+    Given an accessibility tree:
+      | node_id | parent_id | role    | name   | ignored |
+      | 1       |           | generic |        | false   |
+      | 2       | 1         | button  | Submit | false   |
+    When I discover the actionable elements
+    Then the discovered elements are:
+      | role   | name   |
+      | button | Submit |
+
+  Scenario: A malformed cyclic ancestor chain does not hang discovery
+    # A node whose parentId chain cycles back on itself (never true of a real
+    # CDP tree, but not this function's contract to assume) must not hang --
+    # the walk gives up rather than loop, and the element is still discovered.
+    Given an accessibility tree:
+      | node_id | parent_id | role   | name   | ignored |
+      | 1       | 2         | generic|        | false   |
+      | 2       | 1         | generic|        | false   |
+      | 3       | 1         | button | Submit | false   |
+    When I discover the actionable elements
+    Then the discovered elements are:
+      | role   | name   |
+      | button | Submit |
+
   Scenario: A page with no interactive roles yields no actions
     Given an accessibility tree:
       | role      | name    | ignored |
