@@ -22,6 +22,7 @@ are authored when their phase begins, not up front.
 | `interaction.feature` | Interaction execution (native/jittered) | §2 | `spoor/core` | 2 |
 | `request_response_hooks.feature` | Operator-supplied request/response hooks (Python API, `extract.run_report(hooks=...)`); Crawljax-style exploration hooks are a separate, deferred follow-on | §2d | `spoor/operational`, `spoor/core` | 2 |
 | `bounded_concurrency.feature` | Per-domain concurrent fetching (`politeness.max_concurrent_per_domain`, default 1 = sequential), tier-1 only, over a stdlib thread pool — not asyncio | §2d | `spoor/operational`, `spoor/core` | 2 |
+| `resumable_crawl_state.feature` | Resumable, persisted crawl frontier (`resume: true`); continues past where a prior run stopped, both tiers — a different, simpler model than §2e's exploration-mode `--resume-from` | §2d | `spoor/operational`, `spoor/core` | 2 |
 | `api_discovery.feature` | API surface discovery (spec + GraphQL introspection) | §2b | `spoor/api_discovery` | 2.5 |
 | `capture.feature` | Raw network capture (HAR) to local-only cache | §2b/§2c/§2h | `spoor/core`, `spoor/security` | 2.5 |
 | `signals.feature`, `accessibility.feature`, `response_headers.feature`, `storage_state.feature` | Client-side signals catalog (console, a11y tree, response headers, storage state) | §2c | `spoor/signals` | 2.5 |
