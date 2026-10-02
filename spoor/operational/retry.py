@@ -21,6 +21,7 @@ Playwright import. The `Retry-After` honoring here is the item the
 
 from __future__ import annotations
 
+import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -143,6 +144,11 @@ class RetryingFetcher:
     backoff can be asserted in tests without real waiting — the same seam the
     politeness gate uses. `retries` accumulates the retry attempts made across
     every `get` of the run, for the run summary's reliability line.
+
+    One instance is shared across every worker thread `Tier1Resolver`'s bounded
+    concurrency (§2d, #174) dispatches `get` from, so the `retries` counter is
+    incremented under a lock — the only mutable state this class keeps that
+    concurrent calls could otherwise race on.
     """
 
     def __init__(
@@ -155,6 +161,7 @@ class RetryingFetcher:
         self._client = client
         self._policy = policy
         self._sleep = sleep
+        self._retries_lock = threading.Lock()
         self.retries = 0
 
     def get(
@@ -205,7 +212,8 @@ class RetryingFetcher:
                     attempts=attempt,
                     challenge=challenge,
                 )
-            self.retries += 1
+            with self._retries_lock:
+                self.retries += 1
             self._sleep(_wait(self._policy, attempt, retry_after))
 
 
