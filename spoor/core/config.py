@@ -213,6 +213,14 @@ class ExtractionConfig(BaseModel):
     # behavior change a one-shot scrape shouldn't get by surprise; a monitoring run
     # turns it on. Scope is the tier-1 fetch path (browser-tier is a follow-on).
     change_detection: bool = False
+    # Resume a crawl's frontier from where an earlier run against this target
+    # left off (ROADMAP.md §2d, #175). Opt-in and default off: persists the
+    # set of URLs already seen and the remaining frontier to the local-only
+    # cache at the end of a run, and continues from it on the next one instead
+    # of restarting at `target`; never re-checks an already-visited URL for
+    # changes (that's `change_detection`'s job, orthogonal to this). Cleared
+    # once a run's frontier empties on its own, so a later run starts fresh.
+    resume: bool = False
     # Opt-in raw network capture (ROADMAP.md §2b/§2c, §2h); omitted means no
     # capture. Only the browser tier acts on it.
     capture: Capture | None = None

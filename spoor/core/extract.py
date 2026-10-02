@@ -57,6 +57,7 @@ from spoor.core.self_healing import Healer, HealEvent, Screenshotter
 from spoor.core.visual import InvalidImageError, perceptual_hash
 from spoor.operational.challenge import ChallengeSignal, detect_challenge
 from spoor.operational.change_detection import detector_for_target
+from spoor.operational.crawl_state import crawl_state_for_target
 from spoor.operational.hooks import RunHooks
 from spoor.operational.politeness import Politeness
 from spoor.operational.retry import (
@@ -540,16 +541,27 @@ class Tier1Resolver:
             detector_for_target(config.target) if config.change_detection else None
         )
         result = RunResult(tier=self.tier)
-        seen: set[str] = set()
-        # A frontier, not a single chain: (url, depth) pairs, seeded with the
-        # target at depth 0. `pagination.next` (unchanged) always re-queues at
-        # the *same* depth — continuing a listing, not branching — while
-        # `crawl`-discovered links (ROADMAP.md §2d) queue at depth + 1. A plain
-        # config with no `crawl` block behaves exactly as the single-chain
-        # version did: nothing is ever discovered beyond one next-link, so the
-        # frontier never holds more than one item at a time.
-        frontier: deque[tuple[str, int]] = deque([(config.target, 0)])
-        frontier.extend(_sitemap_seeds(gate, config))
+        crawl_state = crawl_state_for_target(config.target) if config.resume else None
+        resumed = crawl_state.load() if crawl_state is not None else None
+        if resumed is not None:
+            # Continuing a prior run's frontier (ROADMAP.md §2d, #175): the
+            # persisted `seen` set is itself the "never re-visit" exclusion —
+            # a resumed run re-checks nothing, it only continues past where
+            # the frontier stopped. No fresh target/sitemap seeding here;
+            # those seeds are already captured in what was persisted.
+            seen, frontier = resumed
+        else:
+            seen = set()
+            # A frontier, not a single chain: (url, depth) pairs, seeded with
+            # the target at depth 0. `pagination.next` (unchanged) always
+            # re-queues at the *same* depth — continuing a listing, not
+            # branching — while `crawl`-discovered links (ROADMAP.md §2d)
+            # queue at depth + 1. A plain config with no `crawl` block behaves
+            # exactly as the single-chain version did: nothing is ever
+            # discovered beyond one next-link, so the frontier never holds
+            # more than one item at a time.
+            frontier = deque([(config.target, 0)])
+            frontier.extend(_sitemap_seeds(gate, config))
 
         def _dispatch(url: str) -> httpx.Response | FetchFailure:
             # Runs in a worker thread (ROADMAP.md §2d, #174): `gate.acquire`
@@ -584,12 +596,20 @@ class Tier1Resolver:
             with ThreadPoolExecutor(max_workers=_MAX_WORKERS) as executor:
                 _Pending = Future[httpx.Response | FetchFailure]
                 in_flight: dict[_Pending, tuple[str, int]] = {}
+                # Bounds pages *examined this invocation*, not `len(seen)` —
+                # on a resumed run (ROADMAP.md §2d, #175) `seen` already
+                # carries every URL prior runs visited, so gating on its size
+                # would let a long-lived crawl's budget shrink run over run
+                # until a resume did nothing at all. Each resume gets its own
+                # fresh `_MAX_PAGES` budget of *new* pages.
+                examined_this_run = 0
                 while frontier or in_flight:
-                    while frontier and len(seen) < _MAX_PAGES:
+                    while frontier and examined_this_run < _MAX_PAGES:
                         url, depth = frontier.popleft()
                         if url in seen:
                             continue
                         seen.add(url)
+                        examined_this_run += 1
                         if not gate.can_fetch(url):
                             result.blocked.append(url)
                             continue
@@ -657,6 +677,18 @@ class Tier1Resolver:
             result.retries = fetcher.retries
             if detector is not None:
                 detector.save()
+            if crawl_state is not None:
+                # Persisted only here, at the end of the run (ROADMAP.md §2d,
+                # #175's accepted tradeoff) — a hard kill mid-run loses that
+                # invocation's progress since its last save, the same risk
+                # profile `detector.save()` above already accepts. An empty
+                # frontier means the crawl finished on its own: clear it so a
+                # later run starts fresh instead of finding nothing to do.
+                if frontier:
+                    crawl_state.record(seen, frontier)
+                else:
+                    crawl_state.clear()
+                crawl_state.save()
             if owns_client:
                 client.close()
         return result
@@ -912,106 +944,132 @@ class Tier2Resolver:
         healer: Healer | None = None,
         hooks: RunHooks | None = None,
     ) -> None:
-        seen: set[str] = set()
-        # A frontier, not a single chain — see Tier1Resolver.run's identical
-        # comment: `pagination.next` re-queues at the same depth,
-        # `crawl`-discovered links (ROADMAP.md §2d) at depth + 1, and a plain
-        # config with no `crawl` block never discovers more than one link at a
-        # time, so this is unchanged from the single-chain version for it.
-        frontier: deque[tuple[str, int]] = deque([(config.target, 0)])
-        frontier.extend(_sitemap_seeds(gate, config))
-        while frontier and len(seen) < _MAX_PAGES:
-            url, depth = frontier.popleft()
-            if url in seen:
-                continue
-            seen.add(url)
-            if not gate.can_fetch(url):
-                result.blocked.append(url)
-                continue
-            # Paired with `gate.release` in the finally below -- the browser
-            # tier never runs more than one page at a time, so this is purely
-            # about not leaking the per-domain concurrency slot `acquire`
-            # introduced (ROADMAP.md §2d, #174); an unreleased slot would
-            # deadlock this domain's very next page.
-            gate.acquire(url)
-            page = context.new_page()
-            try:
-                # Attach before navigating so load-time console output and
-                # errors count.
-                if console is not None:
-                    console.attach(page)
-                # Inside the try so a hook that raises still closes the page
-                # via the finally below, instead of leaking it.
-                if hooks is not None and hooks.on_request is not None:
-                    extra_headers = hooks.on_request(url)
-                    if extra_headers:
-                        page.set_extra_http_headers(extra_headers)
-                # Mark the navigation just before it fires, so layer-5 correlation
-                # can attribute the load's requests to it (§2b). One "load" mark per
-                # page; a paginated crawl records several.
-                if recorder is not None:
-                    recorder.mark("load")
-                # Navigate through the retrying navigator (§2d): a transient
-                # timeout / dropped connection / 5xx-429 is retried; a permanent
-                # or exhausted failure comes back as a FetchFailure to dead-letter.
-                # `partial` binds this iteration's page/url eagerly (no loop-var
-                # closure), and the navigator invokes it once per attempt.
-                response = navigator.navigate(
-                    functools.partial(page.goto, url, wait_until="networkidle"),
-                    url,
-                    transient_exceptions=(PlaywrightTimeoutError, PlaywrightError),
-                )
-                if isinstance(response, FetchFailure):
-                    # Navigation failed unrecoverably: record it and stop this
-                    # crawl — a page that never loaded has no next-link to follow
-                    # (§2d), the same terminal handling as tier 1. page.close()
-                    # still runs via the finally below. When the failure was an
-                    # error *status* (a response arrived — status not None), scan
-                    # the rendered body for an anti-bot wall served behind it: the
-                    # browser holds the DOM, so `page.content()` is the right source
-                    # (the navigator stays body-free). A pure transport failure
-                    # (timeout / dropped connection, status None) has no body worth
-                    # scanning — and this keeps page.content() off the path where a
-                    # never-loaded page could make it raise, so the dead-letter path
-                    # stays crash-proof. Mirrors tier 1, which likewise detects only
-                    # on a response that arrived (§2d).
-                    if result.challenge is None and response.status is not None:
-                        result.challenge = detect_challenge(page.content())
-                    result.dead_letter.append(response)
+        crawl_state = crawl_state_for_target(config.target) if config.resume else None
+        resumed = crawl_state.load() if crawl_state is not None else None
+        if resumed is not None:
+            # Continuing a prior run's frontier (ROADMAP.md §2d, #175) — see
+            # Tier1Resolver.run's identical comment: the persisted `seen` set
+            # is itself the "never re-visit" exclusion, so no fresh
+            # target/sitemap seeding here.
+            seen, frontier = resumed
+        else:
+            seen = set()
+            # A frontier, not a single chain — see Tier1Resolver.run's identical
+            # comment: `pagination.next` re-queues at the same depth,
+            # `crawl`-discovered links (ROADMAP.md §2d) at depth + 1, and a plain
+            # config with no `crawl` block never discovers more than one link at a
+            # time, so this is unchanged from the single-chain version for it.
+            frontier = deque([(config.target, 0)])
+            frontier.extend(_sitemap_seeds(gate, config))
+        # Bounds pages examined *this invocation* — see Tier1Resolver.run's
+        # identical comment on why this isn't `len(seen)` once resume exists.
+        examined_this_run = 0
+        try:
+            while frontier and examined_this_run < _MAX_PAGES:
+                url, depth = frontier.popleft()
+                if url in seen:
                     continue
-                # Record the main document's response headers (§2c), if any.
-                if headers is not None and response is not None:
-                    headers.capture(response.headers)
-                self._await_items(page, config)
-                if _requires_browser(config):
-                    _exhaust_infinite_scroll(page, recorder)
-                html = page.content()
-                # Snapshot the a11y tree after the page has fully rendered — the
-                # *actual* rendered DOM, before any on_response hook's rewrite.
-                if a11y is not None:
-                    a11y.capture(page)
-                if hooks is not None and hooks.on_response is not None:
-                    rewritten = hooks.on_response(url, html)
-                    if rewritten is not None:
-                        html = rewritten
-                # Extract while the page is still open, so tier 3 can screenshot
-                # elements for the perceptual-hash visual signal (§2 tier table).
-                # The screenshotter is bound to this live page and cleared after,
-                # so it never outlives the page it captures from.
-                # Recognize an anti-bot challenge in the rendered page (§2d),
-                # same tier-agnostic scan as tier 1 — a browser can render a
-                # challenge just as a static fetch can land on one.
-                if result.challenge is None:
-                    result.challenge = detect_challenge(html)
-                page_records = self._extract_on_live_page(html, config, healer, page)
-            finally:
-                page.close()
-                gate.release(url)
-            result.pages_fetched += 1
-            result.records.extend(page_records)
-            if next_url := _next_url(html, url, config):
-                frontier.append((next_url, depth))
-            frontier.extend(_discover_links(html, url, depth, config))
+                seen.add(url)
+                examined_this_run += 1
+                if not gate.can_fetch(url):
+                    result.blocked.append(url)
+                    continue
+                # Paired with `gate.release` in the finally below -- the browser
+                # tier never runs more than one page at a time, so this is purely
+                # about not leaking the per-domain concurrency slot `acquire`
+                # introduced (ROADMAP.md §2d, #174); an unreleased slot would
+                # deadlock this domain's very next page.
+                gate.acquire(url)
+                page = context.new_page()
+                try:
+                    # Attach before navigating so load-time console output and
+                    # errors count.
+                    if console is not None:
+                        console.attach(page)
+                    # Inside the try so a hook that raises still closes the page
+                    # via the finally below, instead of leaking it.
+                    if hooks is not None and hooks.on_request is not None:
+                        extra_headers = hooks.on_request(url)
+                        if extra_headers:
+                            page.set_extra_http_headers(extra_headers)
+                    # Mark the navigation just before it fires, so layer-5 correlation
+                    # can attribute the load's requests to it (§2b). One "load" mark per
+                    # page; a paginated crawl records several.
+                    if recorder is not None:
+                        recorder.mark("load")
+                    # Navigate through the retrying navigator (§2d): a transient
+                    # timeout / dropped connection / 5xx-429 is retried; a permanent
+                    # or exhausted failure comes back as a FetchFailure to dead-letter.
+                    # `partial` binds this iteration's page/url eagerly (no loop-var
+                    # closure), and the navigator invokes it once per attempt.
+                    response = navigator.navigate(
+                        functools.partial(page.goto, url, wait_until="networkidle"),
+                        url,
+                        transient_exceptions=(PlaywrightTimeoutError, PlaywrightError),
+                    )
+                    if isinstance(response, FetchFailure):
+                        # Navigation failed unrecoverably: record it and stop this
+                        # crawl — a page that never loaded has no next-link to follow
+                        # (§2d), the same terminal handling as tier 1. page.close()
+                        # still runs via the finally below. When the failure was an
+                        # error *status* (a response arrived — status not None), scan
+                        # the rendered body for an anti-bot wall served behind it: the
+                        # browser holds the DOM, so `page.content()` is the right source
+                        # (the navigator stays body-free). A pure transport failure
+                        # (timeout / dropped connection, status None) has no body worth
+                        # scanning — and this keeps page.content() off the path where a
+                        # never-loaded page could make it raise, so the dead-letter path
+                        # stays crash-proof. Mirrors tier 1, which likewise detects only
+                        # on a response that arrived (§2d).
+                        if result.challenge is None and response.status is not None:
+                            result.challenge = detect_challenge(page.content())
+                        result.dead_letter.append(response)
+                        continue
+                    # Record the main document's response headers (§2c), if any.
+                    if headers is not None and response is not None:
+                        headers.capture(response.headers)
+                    self._await_items(page, config)
+                    if _requires_browser(config):
+                        _exhaust_infinite_scroll(page, recorder)
+                    html = page.content()
+                    # Snapshot the a11y tree after the page has fully rendered — the
+                    # *actual* rendered DOM, before any on_response hook's rewrite.
+                    if a11y is not None:
+                        a11y.capture(page)
+                    if hooks is not None and hooks.on_response is not None:
+                        rewritten = hooks.on_response(url, html)
+                        if rewritten is not None:
+                            html = rewritten
+                    # Extract while the page is still open, so tier 3 can screenshot
+                    # elements for the perceptual-hash visual signal (§2 tier table).
+                    # The screenshotter is bound to this live page and cleared after,
+                    # so it never outlives the page it captures from.
+                    # Recognize an anti-bot challenge in the rendered page (§2d),
+                    # same tier-agnostic scan as tier 1 — a browser can render a
+                    # challenge just as a static fetch can land on one.
+                    if result.challenge is None:
+                        result.challenge = detect_challenge(html)
+                    page_records = self._extract_on_live_page(
+                        html, config, healer, page
+                    )
+                finally:
+                    page.close()
+                    gate.release(url)
+                result.pages_fetched += 1
+                result.records.extend(page_records)
+                if next_url := _next_url(html, url, config):
+                    frontier.append((next_url, depth))
+                frontier.extend(_discover_links(html, url, depth, config))
+        finally:
+            if crawl_state is not None:
+                # Persisted only here, at the end of the crawl (ROADMAP.md
+                # §2d, #175's accepted tradeoff) — see Tier1Resolver.run's
+                # identical note.
+                if frontier:
+                    crawl_state.record(seen, frontier)
+                else:
+                    crawl_state.clear()
+                crawl_state.save()
 
     def _extract_on_live_page(
         self,
