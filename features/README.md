@@ -232,8 +232,10 @@ agent can consult "what happens when I click X" as data, not just read the stati
 foundation**, built before anything that can fire an action exists. Two pure-logic
 pieces plus the gate that combines them: a **sandbox registry**
 (`spoor/security/sandbox.py`) that recognizes a target as a sandbox only when its
-host is loopback (`localhost` / `127.*` / `::1`) or the operator explicitly declared
-it one; and a **destructive-action classifier** (`spoor/exploration/safety.py`) that
+host is loopback (`localhost` / `127.*` / `::1`), or the operator declared it one
+*and* its host is at least a private-range IP — a declaration alone is never
+enough, closing #102's technical-backstop gap; and a **destructive-action
+classifier** (`spoor/exploration/safety.py`) that
 matches the §2e keyword list (delete, remove, buy, purchase, pay, confirm, send,
 submit-payment, log out) as whole words in an action's label. The gate
 (`evaluate_action`) permits a non-destructive action anywhere, permits a destructive

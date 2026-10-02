@@ -125,7 +125,8 @@ a config flag or a "just this once":
   and fails the build if a hostname or site-specific branch leaks in.
 - **Destructive actions are sandbox-only.** During exploration, an action flagged
   destructive/irreversible is fired *only* against a recognized sandbox (`localhost`,
-  `127.0.0.1`, or an explicitly declared sandbox). Against anything else it is always
+  `127.0.0.1`, or a declared sandbox whose host also checks out as loopback/private —
+  a declaration alone is never enough). Against anything else it is always
   skipped and logged. No flag relaxes this.
 - **The serving layer is read-only, always.** (Above.)
 - **Secret redaction on shared output is on by default.** Bearer tokens, session-cookie
