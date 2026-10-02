@@ -65,6 +65,11 @@ from spoor.exploration.control import RunController
 from spoor.exploration.dedup import UndecodableImage, decode, find_subimage
 from spoor.exploration.discovery import ActionableElement, discover_actions
 from spoor.exploration.graph import ExplorationGraph, path_steps_from_root
+from spoor.exploration.hooks import (
+    ExplorationHooks,
+    build_explored_state,
+    build_explored_transition,
+)
 from spoor.exploration.safety import evaluate_action
 from spoor.exploration.screenshot_store import ImageRef, ScreenshotStore
 from spoor.exploration.state import state_id
@@ -533,6 +538,7 @@ def explore(
     resume_from: ExplorationGraph | None = None,
     resume_anchor: str | None = None,
     progress: Callable[[], None] | None = None,
+    hooks: ExplorationHooks | None = None,
 ) -> ExplorationGraph:
     """Explore `target` through `driver`, returning the state-action graph (§2e).
 
@@ -610,6 +616,16 @@ def explore(
     one the caller already holds, so nothing new needs passing through. Left None
     (the default), nothing changes — the same "opt-in, no cost unless asked for"
     posture as the screenshot sinks.
+
+    `hooks` (ROADMAP.md §2e, #187) are operator-supplied observers, fired *after*
+    their state/transition is already committed to the graph and (for a
+    transition) after the destructive-action gate has already been fully
+    consumed for that action — neither hook's return value is read, so nothing
+    a hook does can select, skip, or drive a new interaction. Each receives a
+    freshly built, redaction-safe view (`ExploredState`/`ExploredTransition` —
+    never the raw `StateSignals`/`TransitionSignals` the graph itself holds):
+    counts and `redact()`-passed text only, never a raw console line, storage
+    value, or network URL. Left None (the default), nothing changes.
     """
     if (
         screenshots is not None or element_screenshots is not None
@@ -728,6 +744,10 @@ def explore(
         controller.record_state()
         if progress is not None:
             progress()
+        if hooks is not None and hooks.on_state_discovered is not None:
+            hooks.on_state_discovered(
+                build_explored_state(sid, actions, graph.node(sid).signals)
+            )
         return sid, True
 
     def next_layer_action(
@@ -975,13 +995,24 @@ def explore(
                 edge = (state, action.role, action.name, to_state)
                 if edge not in recorded:
                     recorded.add(edge)
+                    transition_signals = diff_signals(before, after)
                     graph.add_transition(
                         state,
                         action,
                         to_state,
-                        diff_signals(before, after),
+                        transition_signals,
                         recovered_via=outcome.recovered_via,
                     )
+                    if hooks is not None and hooks.on_transition_taken is not None:
+                        hooks.on_transition_taken(
+                            build_explored_transition(
+                                state,
+                                action,
+                                to_state,
+                                outcome.recovered_via,
+                                transition_signals,
+                            )
+                        )
                 # Enqueue a landing the frontier hasn't expanded under this URL path.
                 # Keyed on `(state, url_path)`, not first-seen: a known DOM reached at a
                 # new path is still walked (the fork), while a repeat of an
