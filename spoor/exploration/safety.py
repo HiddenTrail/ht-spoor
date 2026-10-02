@@ -5,8 +5,9 @@ action exists. It answers one question for every candidate action: may explorati
 perform it against this target? Two inputs combine into that answer:
 
 - the destructive-action classifier here — does the action's label/role read as
-  delete/remove/buy/purchase/pay/confirm/send/submit-payment/log-out (the §2e
-  list)? A maintainable, PR-extendable keyword set, never a fixed one;
+  delete/remove/buy/purchase/pay/confirm/send/submit-payment/log-out/
+  place-cancel-return-order (the §2e list)? A maintainable, PR-extendable
+  keyword set, never a fixed one;
 - the sandbox registry (`spoor/security/sandbox.py`) — is the target one the
   operator controls?
 
@@ -29,6 +30,11 @@ from spoor.security.sandbox import is_sandbox
 # case-insensitively on whole words in the action's label (and role). Maintained
 # by PR (§2e) — extend this set, never a runtime config, to teach the gate a new
 # risky verb. "log out" / "sign out" are matched as their joined forms too.
+# Order actions are matched as multi-word phrases ("place order", not bare
+# "order"), the same reason "submit payment" isn't bare "submit": a plain noun
+# like "order" also appears in ordinary navigation ("My Orders", "Order
+# history", "Order state") that isn't destructive at all — matching only the
+# checkout/cancellation phrase avoids flagging those as false positives.
 DESTRUCTIVE_KEYWORDS = frozenset(
     {
         "delete",
@@ -43,6 +49,9 @@ DESTRUCTIVE_KEYWORDS = frozenset(
         "logout",
         "sign out",
         "signout",
+        "place order",
+        "cancel order",
+        "return order",
     }
 )
 

@@ -353,11 +353,11 @@ spoor apply-scaffold https://example.com ./interactive-round/interactive.yaml --
 ```
 
 **The safety rule — read this before pointing it at anything real.** Some actions
-are destructive: deleting a record, buying, paying, logging out, submitting a form.
-On any normal site Spoor **always skips** those and tells you it skipped them — it
-will never click "Delete" or "Buy" on a live site. The **only** way it will exercise
-a destructive action is if you explicitly declare the target a sandbox you own with
-`--sandbox`:
+are destructive: deleting a record, buying, paying, placing or cancelling an order,
+logging out, submitting a form. On any normal site Spoor **always skips** those and
+tells you it skipped them — it will never click "Delete" or "Buy" on a live site.
+The **only** way it will exercise a destructive action is if you explicitly declare
+the target a sandbox you own with `--sandbox`:
 
 ```bash
 # ONLY for a local or throwaway test system you control:

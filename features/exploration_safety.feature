@@ -64,10 +64,23 @@ Feature: Exploration performs destructive actions only inside a sandbox
       | Confirm order    | destructive    |
       | Send message     | destructive    |
       | Log out          | destructive    |
+      | Place order      | destructive    |
+      | Cancel order     | destructive    |
+      | Return order     | destructive    |
       | View details     | safe           |
       | Next page        | safe           |
       | Open menu        | safe           |
       | Order history    | safe           |
+      # The whole point of matching phrases, not the bare noun "order": these
+      # all contain "order" but none is a checkout/cancellation action, so
+      # adding "place order"/"cancel order"/"return order" above must never
+      # make any of these destructive.
+      | My Orders          | safe           |
+      | Order state        | safe           |
+      | Order status       | safe           |
+      | Track order        | safe           |
+      | Order confirmation | safe           |
+      | Go to my orders    | safe           |
 
   Scenario Outline: Inside a sandbox, destructive actions are performed
     Given an exploration target "<url>"
