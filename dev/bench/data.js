@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790888653543,
+  "lastUpdate": 1790921495981,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -6320,6 +6320,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5340.5,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f1b2fb0a6f08e8cf379a286dff837519dbd12042",
+          "message": "Add bounded concurrent fetching, in-house (closes #174) (#189)\n\nPolitenessPolicy gains max_concurrent_per_domain (default 1,\nreproducing the fully-sequential behavior every run had before this\nexisted). Tier1Resolver dispatches fetches through a stdlib\nThreadPoolExecutor (not asyncio -- Spoor's core is synchronous\nthroughout, and D1 already weighed that exact cost against Crawlee's\nAutoscaledPool); each completed fetch's processing (change detection,\nhooks, extraction, frontier growth) stays on the calling thread, so\nnone of that existing logic needed its own locking.\n\nPoliteness.acquire/release (before_fetch/after_fetch under their\nestablished names) bound per-domain concurrency via a semaphore and\nspace dispatches via a per-domain lock+sleep, independent of each\nother: the cap bounds how many fetches may be in flight, the delay\nstill bounds how often a new one may start. RetryingFetcher.retries\nand Politeness's robots.txt cache are now thread-safe, since a shared\ninstance is called from multiple worker threads for the first time.\n\nScope is tier 1 only -- the browser tier stays single-threaded\n(Playwright's sync API isn't safe to drive from more than one thread);\nTier2Resolver now pairs acquire/release purely to avoid deadlocking\nthe per-domain semaphore, not to gain concurrency.\n\nSelf-review (full diff, per the updated CLAUDE.md rule) caught two\nissues before this was pushed: a test step silently ignored its own\n{count:d} parameter (and the browser-tier scenario's wording had\nactually drifted from what the fixture serves, caught only once the\nparameter was wired up to assert instead of ignored), and a semaphore\ntest that only proved the cap was never exceeded, not that it was\never actually reached -- both fixed.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-02T09:06:45+03:00",
+          "tree_id": "abfdf23de5d62bf637a0dd070714a3825bf27983",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/f1b2fb0a6f08e8cf379a286dff837519dbd12042"
+        },
+        "date": 1790921495520,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 223.93,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.0369,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.9457,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12199,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.8833,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06806,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 10.9772,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.10774,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 18.189,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.05992,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2952,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.57361,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.0387,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05133,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.0443,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.01794,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.524,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09023,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5809,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01039,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4514,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5346.5,
             "unit": "MB"
           }
         ]
