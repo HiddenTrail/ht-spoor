@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1790922766545,
+  "lastUpdate": 1790926583877,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -6608,6 +6608,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 3559.9,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fbc286b5114cfef4cc37ef0fdc6416626a0c31a4",
+          "message": "Add resumable, persisted crawl state (closes #175) (#191)\n\nA crawl: run (or a plain pagination.next chain) now continues past\nwhere an earlier run against the same target left off, instead of\nalways restarting from scratch. Opt-in via resume: true.\n\nDesign question the issue named up front, answered: this deliberately\ndoes not reuse the exploration-mode --resume-from machinery (a\nstate-graph model needing anchor resolution and a live browser replay\nto re-establish position) -- a flat URL frontier has no states or\nactions, so none of that applies. The right precedent is\nChangeDetector/FingerprintCache: a small per-domain JSON store under\n.spoor-cache/crawl_state/, loaded once at the start of a run and saved\nonce at the end, keyed by target URL within the domain file.\n\nA resumed run never re-checks an already-visited URL for changes --\nthat's change_detection's job, orthogonal to this. _MAX_PAGES bounds\nnew pages examined this invocation, not a lifetime count, so a\nlong-running crawl's per-run budget never shrinks across resumes. A\nrun's frontier clearing naturally (the crawl finished) clears the\npersisted entry, so the next run starts fresh. Scope is both tiers.\n\nSelf-review (full diff) found and recorded, rather than silently\nfixed, one accepted sharp edge this interacts with from #174's\nconcurrency: a URL is marked seen at dispatch time, not completion\ntime, so an exception mid-run can persist a URL as seen before it was\never fully processed -- the alternative (marking seen only on\ncompletion) would let the same URL be submitted to two workers at\nonce, a worse bug than the one this accepts.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-02T10:31:08+03:00",
+          "tree_id": "308984cd202fc7e32b37e4f943ecb97a70694049",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/fbc286b5114cfef4cc37ef0fdc6416626a0c31a4"
+        },
+        "date": 1790926582840,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 211.049,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03035,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.747,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.1052,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.5381,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.07067,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 10.1299,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.10558,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 16.4126,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04473,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2473,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.56338,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 31.7817,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.03898,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 10.5473,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.92212,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 124.768,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.07053,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.4298,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.00889,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.3912,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5336.5,
             "unit": "MB"
           }
         ]
