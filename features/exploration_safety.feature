@@ -7,12 +7,18 @@
 # read as delete/buy/pay/confirm/log-out?).
 #
 # NON-NEGOTIABLE (§2e/CLAUDE.md): destructive/irreversible actions are sandbox-only
-# and NON-CONFIGURABLE. Against a sandbox (localhost / 127.0.0.1, or a target
-# explicitly declared `sandbox: true`) the gate may perform them; against anything
-# else — any real external site — they are ALWAYS skipped and logged as skipped,
-# and there is deliberately no flag or option that relaxes this. Non-destructive
-# actions are performed anywhere. The worst case for exploring a real, unvetted
-# site is "missed a state", never "placed a real order" or "deleted real data".
+# and NON-CONFIGURABLE. Against a sandbox (localhost / 127.0.0.1 / a private-range
+# IP, whether auto-detected or declared `sandbox: true`) the gate may perform them;
+# against anything else — any real external site — they are ALWAYS skipped and
+# logged as skipped, and there is deliberately no flag or option that relaxes this.
+# Non-destructive actions are performed anywhere. The worst case for exploring a
+# real, unvetted site is "missed a state", never "placed a real order" or "deleted
+# real data".
+#
+# `sandbox: true` is an operator assertion, not an unchecked bypass (closes #102):
+# it only grants sandbox status when the host itself also checks out as loopback or
+# a private-range IP. A declared sandbox pointed at a real, publicly-routable host
+# is refused — there is no way to talk the gate into treating a real site as safe.
 
 Feature: Exploration performs destructive actions only inside a sandbox
   As someone pointing autonomous exploration at a target
@@ -32,9 +38,9 @@ Feature: Exploration performs destructive actions only inside a sandbox
       | http://127.10.0.9/      |
       | http://[::1]:3000/      |
 
-  Scenario Outline: Real external targets are not sandboxes
-    # Only localhost/127.0.0.1 or an explicit declaration count today; a private-
-    # range IP does not (tightening the registry to IP ranges is future work, §9).
+  Scenario Outline: Real external targets are not sandboxes, undeclared
+    # Without a declaration, only loopback auto-qualifies; a private-range IP does
+    # not (it still needs `sandbox: true` — see the declared scenarios below).
     Given an exploration target "<url>"
     Then the target is not recognized as a sandbox
 
@@ -46,9 +52,30 @@ Feature: Exploration performs destructive actions only inside a sandbox
       | http://127.evil.com/   |
       | http://localhost.evil.com/ |
 
-  Scenario: A target explicitly declared a sandbox is recognized as one
-    Given an exploration target "https://staging.example/" declared as a sandbox
+  Scenario Outline: A declared sandbox still needs a host that checks out (closes #102)
+    # The technical backstop: `sandbox: true` is an assertion, not a bypass. It only
+    # grants sandbox status when the host is also loopback or a private-range IP —
+    # a real, publicly-routable host is refused no matter what the operator claims.
+    Given an exploration target "<url>" declared as a sandbox
+    Then the target is not recognized as a sandbox
+
+    Examples:
+      | url                        |
+      | https://staging.example/   |
+      | https://shop.example/      |
+      | http://127.evil.com/       |
+      | http://localhost.evil.com/ |
+
+  Scenario Outline: A declared sandbox with a private-range host is recognized as one
+    Given an exploration target "<url>" declared as a sandbox
     Then the target is recognized as a sandbox
+
+    Examples:
+      | url                     |
+      | http://10.0.0.5/        |
+      | http://172.16.0.9/      |
+      | http://192.168.1.50/    |
+      | http://localhost:3000/  |
 
   Scenario Outline: Actions are classified by whether they are destructive
     # A maintainable, PR-extendable keyword/role list, not a fixed set (§2e).
@@ -112,10 +139,15 @@ Feature: Exploration performs destructive actions only inside a sandbox
       | https://shop.example/   | View details |
       | http://localhost:3000/  | Next page    |
 
-  Scenario: A declared sandbox permits destructive actions
-    Given an exploration target "https://staging.example/" declared as a sandbox
+  Scenario: A declared sandbox with a private-range host permits destructive actions
+    Given an exploration target "http://10.0.0.5/" declared as a sandbox
     When the interaction gate considers an action labeled "Delete account"
     Then the action is allowed
+
+  Scenario: A declared sandbox with a real, public host still skips destructive actions
+    Given an exploration target "https://staging.example/" declared as a sandbox
+    When the interaction gate considers an action labeled "Delete account"
+    Then the action is skipped as unsafe outside a sandbox
 
   Scenario: Nothing relaxes the non-sandbox skip — the §2e non-negotiable
     # Structural pin: the gate's public decision is a pure function of the target

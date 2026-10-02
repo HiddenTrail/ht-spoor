@@ -368,7 +368,10 @@ spoor explore http://localhost:3000 --sandbox
 Never pass `--sandbox` for a site you don't own or can't safely reset. This is a
 hard rule, not a preference: there is no flag or config that makes Spoor perform a
 destructive action on a target it doesn't recognize as a sandbox (a local address,
-or one you declared with `--sandbox`).
+or one you declared with `--sandbox`). `--sandbox` isn't a magic word, either —
+it only takes effect when the address itself also looks local or private (a
+`localhost`/private-network address); pointing `--sandbox` at a real public
+website is refused the same as if you hadn't passed the flag at all.
 
 ### Extending an exploration run from Python (state/transition hooks)
 
