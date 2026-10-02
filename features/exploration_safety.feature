@@ -109,6 +109,30 @@ Feature: Exploration performs destructive actions only inside a sandbox
       | Order confirmation | safe           |
       | Go to my orders    | safe           |
 
+  Scenario Outline: Actions are classified the same way in other languages (closes #101)
+    # The guard isn't English-only: it matches every covered language's keywords
+    # unconditionally, with no locale to declare or detect — a target whose UI
+    # happens to be in Spanish, German, French, Portuguese, Italian, or Dutch
+    # gets the same destructive-vs-safe read as an English-labeled one.
+    Then an action labeled "<label>" is <classification>
+
+    Examples:
+      | label                | classification |
+      | Eliminar cuenta       | destructive    |
+      | Confirmar pedido      | destructive    |
+      | Ver detalles          | safe           |
+      | Konto löschen         | destructive    |
+      | Jetzt kaufen          | destructive    |
+      | Details anzeigen      | safe           |
+      | Supprimer le compte   | destructive    |
+      | Voir les détails      | safe           |
+      | Excluir conta         | destructive    |
+      | Ver detalhes          | safe           |
+      | Elimina account       | destructive    |
+      | Mostra dettagli       | safe           |
+      | Account verwijderen   | destructive    |
+      | Details bekijken      | safe           |
+
   Scenario Outline: Inside a sandbox, destructive actions are performed
     Given an exploration target "<url>"
     When the interaction gate considers an action labeled "<label>"

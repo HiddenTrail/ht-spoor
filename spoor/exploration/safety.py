@@ -6,8 +6,9 @@ perform it against this target? Two inputs combine into that answer:
 
 - the destructive-action classifier here — does the action's label/role read as
   delete/remove/buy/purchase/pay/confirm/send/submit-payment/log-out/
-  place-cancel-return-order (the §2e list)? A maintainable, PR-extendable
-  keyword set, never a fixed one;
+  place-cancel-return-order (the §2e list), in English or one of the other
+  languages `destructive_keywords_i18n.py` covers (closes #101)? A maintainable,
+  PR-extendable keyword set, never a fixed one;
 - the sandbox registry (`spoor/security/sandbox.py`) — is the target one the
   operator controls?
 
@@ -24,6 +25,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from spoor.exploration.destructive_keywords_i18n import ALL_I18N_KEYWORDS
 from spoor.security.sandbox import is_sandbox
 
 # Substrings that mark an action as destructive/irreversible, matched
@@ -35,6 +37,10 @@ from spoor.security.sandbox import is_sandbox
 # like "order" also appears in ordinary navigation ("My Orders", "Order
 # history", "Order state") that isn't destructive at all — matching only the
 # checkout/cancellation phrase avoids flagging those as false positives.
+#
+# English only — see `destructive_keywords_i18n.py` for every other language
+# covered; `_DESTRUCTIVE_RE` below always matches against this set *and* that
+# module's, unconditionally (no locale to declare or detect, closes #101).
 DESTRUCTIVE_KEYWORDS = frozenset(
     {
         "delete",
@@ -55,23 +61,27 @@ DESTRUCTIVE_KEYWORDS = frozenset(
     }
 )
 
-# Word-boundary alternation over the keywords, longest first so multi-word phrases
-# ("submit payment") win over their parts. Built once at import.
-_KEYWORDS_BY_LEN = sorted(DESTRUCTIVE_KEYWORDS, key=len, reverse=True)
+# Word-boundary alternation over every keyword (English + every covered
+# language), longest first so multi-word phrases ("submit payment") win over
+# their parts. Built once at import.
+_KEYWORDS_BY_LEN = sorted(
+    DESTRUCTIVE_KEYWORDS | ALL_I18N_KEYWORDS, key=len, reverse=True
+)
 _DESTRUCTIVE_RE = re.compile(
     r"\b(?:" + "|".join(re.escape(k) for k in _KEYWORDS_BY_LEN) + r")\b",
-    re.IGNORECASE,
+    re.IGNORECASE | re.UNICODE,
 )
 
 
 def is_destructive(label: str, role: str | None = None) -> bool:
     """Whether an action reads as destructive/irreversible (§2e).
 
-    Matches a destructive keyword as a whole word in the action's visible label
-    (and its accessibility role, if given). Conservative by design: an unmatched
-    label is treated as safe, but the gate still only performs it — a false
-    negative on a real site is bounded by the sandbox rule, which skips *all*
-    matched-destructive actions there regardless.
+    Matches a destructive keyword — English or one of the other languages
+    `destructive_keywords_i18n.py` covers — as a whole word in the action's
+    visible label (and its accessibility role, if given). Conservative by
+    design: an unmatched label is treated as safe, but the gate still only
+    performs it — a false negative on a real site is bounded by the sandbox
+    rule, which skips *all* matched-destructive actions there regardless.
     """
     haystack = label if role is None else f"{label} {role}"
     return _DESTRUCTIVE_RE.search(haystack) is not None

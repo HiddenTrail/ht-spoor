@@ -237,7 +237,10 @@ host is loopback (`localhost` / `127.*` / `::1`), or the operator declared it on
 enough, closing #102's technical-backstop gap; and a **destructive-action
 classifier** (`spoor/exploration/safety.py`) that
 matches the §2e keyword list (delete, remove, buy, purchase, pay, confirm, send,
-submit-payment, log out) as whole words in an action's label. The gate
+submit-payment, log out) as whole words in an action's label — in English and,
+unconditionally, in every language `spoor/exploration/destructive_keywords_i18n.py`
+covers (Spanish, German, French, Portuguese, Italian, Dutch), closing #101's
+English-only gap. The gate
 (`evaluate_action`) permits a non-destructive action anywhere, permits a destructive
 one only inside a sandbox, and otherwise skips it with a log-ready reason. The §2e
 non-negotiable — destructive actions are sandbox-only and **non-configurable** — is
