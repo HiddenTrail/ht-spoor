@@ -370,6 +370,30 @@ hard rule, not a preference: there is no flag or config that makes Spoor perform
 destructive action on a target it doesn't recognize as a sandbox (a local address,
 or one you declared with `--sandbox`).
 
+### Extending an exploration run from Python (state/transition hooks)
+
+`spoor explore` has no CLI flag for your own code, but running it as a library
+lets you observe the map as it's built — a newly discovered screen, a fired
+action — without writing anything site-specific into Spoor itself:
+
+```python
+from spoor.exploration.explorer import explore
+from spoor.exploration.hooks import ExplorationHooks
+
+hooks = ExplorationHooks(
+    on_state_discovered=lambda state: print(f"found {state.state_id}"),
+    on_transition_taken=lambda t: print(f"{t.from_state} --{t.action_name}--> {t.to_state}"),
+)
+
+graph = explore(driver, target=url, controller=controller, hooks=hooks)
+```
+
+Both hooks fire only *after* Spoor has already decided and recorded what
+happened — a hook can never trigger a click `spoor explore` wouldn't
+otherwise have made, and it never sees a raw captured value (a console line,
+a storage key, a network request): only counts and the same redacted text
+the wiki itself shows. Leave `hooks` out entirely and nothing changes.
+
 ## Current capabilities
 
 ### Available now
@@ -382,6 +406,7 @@ or one you declared with `--sandbox`).
 - Authenticated targets: supply a captured browser session (cookies + `localStorage`) via `session:` to scrape login-gated pages — "bring-your-own-session"; Spoor performs no login itself
 - Proxy routing: supply a proxy via `proxy:` to route a run's traffic through it (including the plain fetch, `robots.txt`/sitemap lookups, and the browser tier) — "bring-your-own-proxy"; Spoor never sources a proxy itself
 - Request/response hooks (Python API): pass `hooks=RunHooks(on_request=..., on_response=...)` to `extract.run_report` to add request headers or adjust a fetched page before extraction, without writing site-specific code into Spoor itself — see "Extending a run from Python" above
+- Exploration hooks (Python API): pass `hooks=ExplorationHooks(on_state_discovered=..., on_transition_taken=...)` to `explore()` to observe a newly discovered screen or a fired action as the map is built — both fire only after Spoor has already decided and recorded what happened, and both only ever see counts and already-redacted text, never a raw captured value — see "Extending an exploration run from Python" above
 - Exploration mode: point Spoor at a URL with no config and it maps the site in a real browser — `spoor explore <url>` discovers the interactive elements it can reach on each screen, waits for the page to settle before reading it, and records where each action leads as a graph of states and transitions (see "Exploring a site" below for the safety rule). A live terminal shows a progress bar or spinner with states/requests/elapsed time while it runs. When a welcome dialog or cookie-consent overlay sits over the page and intercepts clicks, Spoor interacts past it (dismissing the overlay the same way a visitor would) and maps the site behind it, instead of stopping at the overlay — while still refusing any interaction the safety rule forbids. If a page never fully settles before the safety timeout, the state is flagged as unsettled and the run continues on the last snapshot rather than hanging. Add `--wiki <dir>` to render the result as a browsable wiki — an overview diagram plus a page per state and transition, secrets redacted. Map a large site incrementally with `--resume-from <selector>`: continue an earlier exploration of the same URL from a screen it already reached (named by id), with `--max-depth` counted from that screen, merging what it finds into the saved map. Add `--gen-tests <dir>` to export the map as a runnable pytest suite — one Playwright-driven regression test per mapped transition that replays to the screen, fires the action, and asserts what it changed — so re-running it later catches behavioural drift (captured secrets redacted before they reach a test). Each exploration is also remembered in the local map, so the serving layer below can hand the graph back later without re-exploring
 - Interactive-round scaffolding: add `--scaffold <dir>` to a `spoor explore` run to also write `interactive.yaml` naming every discovered field, login point, and destructive action a future interactive round could touch — a starting point for a human to fill in, not something anything reads yet. Once filled in, `spoor apply-scaffold <url> <file> --sandbox` types each pinned value into its field, live, on a sandbox target only — never presses Enter, never submits, never clicks anything else. If typing a value changes the page, that's observed the same read-only way as everything else Spoor maps and merged into the saved map/wiki as a real, clearly-flagged state and transition, never overwriting what the original crawl found
 - Read-only map serving: each run remembers what it mapped for the target URL — extracted records, a safe summary of any API surface it observed (published spec/GraphQL endpoint, plus endpoint/request counts), and, for a URL that was explored, the exploration graph itself (the states discovered and, for each button or link, what clicking it changed). Two ways to consult it without re-crawling: `spoor serve` exposes a small read-only HTTP API, and `spoor serve-mcp` exposes the same data to agents as read-only MCP tools (list mapped domains; fetch a URL's records, observed API surface, and exploration graph with how long ago it was captured — so an agent can ask "what happens when I click X" instead of re-exploring). By default both only read the stored map. Neither ever changes a site: the strongest thing either can do is re-observe one — opt in with `--recheck` and they also accept a request to re-check a mapped URL, which re-runs that URL's extraction (a fresh read of the site) and refreshes the map. Secrets are redacted from everything they return. Install with `pip install 'ht-spoor[serve]'`

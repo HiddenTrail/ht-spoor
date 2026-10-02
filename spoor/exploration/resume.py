@@ -29,6 +29,7 @@ from spoor.exploration.explorer import (
     explore,
 )
 from spoor.exploration.graph import ExplorationGraph
+from spoor.exploration.hooks import ExplorationHooks
 from spoor.exploration.persisted_map import load_exploration_map
 from spoor.exploration.screenshot_store import ImageRef
 from spoor.exploration.selector import (
@@ -89,6 +90,7 @@ def resume_exploration(
     element_screenshots: MutableMapping[str, list[ElementShot]] | None = None,
     screenshot_dir: Path | None = None,
     progress: Callable[[], None] | None = None,
+    hooks: ExplorationHooks | None = None,
 ) -> ExplorationGraph:
     """Resume exploration of `target` from the anchor `selector` names in `saved_map`.
 
@@ -97,8 +99,8 @@ def resume_exploration(
     returning the loaded graph with the newly discovered states and transitions merged
     in. The depth budget on `controller` counts clicks from the anchor. The explorer
     refuses a stale map (a changed start page or an unreachable anchor) with a
-    `ValueError` that propagates unchanged. The screenshot sinks and `progress` behave
-    exactly as in `explore`.
+    `ValueError` that propagates unchanged. The screenshot sinks, `progress`, and
+    `hooks` behave exactly as in `explore`.
     """
     loaded = load_exploration_map(saved_map)
     anchor = resolve_resume_anchor(saved_map, selector)
@@ -113,4 +115,5 @@ def resume_exploration(
         resume_from=loaded,
         resume_anchor=anchor,
         progress=progress,
+        hooks=hooks,
     )
