@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791008897215,
+  "lastUpdate": 1791012035644,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -7328,6 +7328,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5372.3,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "63549b01cc542a629fb945749214b5f949d02e72",
+          "message": "Fix BDD readability/quality issues found in a full-suite review (#196)\n\nNo behavior changes to production code — all edits are to .feature files\nand their step definitions, following a full audit of all 64 feature\nfiles for test coverage and Gherkin clarity.\n\n- resumable_crawl_state.feature: a scenario titled \"clears its persisted\n  state\" now actually asserts that, instead of only inferring it indirectly.\n- exploration_safety.feature: two Scenario Outlines were a bare Then with\n  no Given/When; added a narrative When step for both. Moved \"(closes\n  #NNN)\" out of two scenario titles into their comments.\n- exploration_session.feature: \"it reports 1 states discovered\" ->\n  \"1 state discovered\" (the shared step pattern now accepts singular/\n  plural via parsers.re instead of parsers.parse).\n- interactive_scaffold.feature / interactive_scaffold_apply.feature:\n  same issue-number-in-title fix as exploration_safety.feature.\n- serving.feature: replaced a real-shaped bearer-token fixture value\n  with an obviously-fake placeholder.\n- exploration_wiki.feature: added the As-a/I-want/So-that framing every\n  sibling feature file has; this one had none.\n- exploration_signals.feature: renamed the Background table's \"ax_nodes\"\n  column to \"a11y nodes\" and added a comment explaining the \"; \"-joined\n  multi-value cells.\n- exploration_actuation.feature: renamed an Examples-table value from\n  \"nothing -- no matching node\" to a plain \"no element\" enum value.\n- api_discovery.feature: added a short \"why\" framing comment to each of\n  layers 2/4/5, which previously shared only layer 1's Feature-level\n  As-a/I-want/So-that.\n- resolution.feature: reworded a Then from an implementation detail\n  (\"the dispatcher registers tier 1 and tier 2 in order\") to the\n  user-visible behavior it guarantees (\"tier 1 is always tried before\n  the browser tier\").\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-03T10:15:32+03:00",
+          "tree_id": "fb40bd445e184ae4e2a46f13cdad8a46de6ce199",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/63549b01cc542a629fb945749214b5f949d02e72"
+        },
+        "date": 1791012034719,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 221.804,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04008,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.9649,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12312,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.9306,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06449,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 10.9407,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.10858,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 18.1307,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04151,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2866,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.57345,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.1873,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.04978,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 12.912,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.97985,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.135,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.08787,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5714,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01023,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4426,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5342.4,
             "unit": "MB"
           }
         ]
