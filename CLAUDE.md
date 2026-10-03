@@ -80,6 +80,10 @@ The `browser` marker is applied per *scenario* via a Gherkin `@browser` tag on t
 
 Treat a doc that no longer matches the code as a gate failure to fix before the PR, exactly like a failing test — and say in the PR description what docs you checked and reconciled. "Docs unaffected" is a valid outcome only after actually looking.
 
+## Always state where a run's output landed
+
+Any command that writes output to disk — `spoor explore --wiki`/`--scaffold`/`--gen-tests`, a `pytest` run with its own report/cache directory, a demo or manual verification run, anything else that produces a file or directory as its result — must be followed by explicitly telling the user the exact path (directory or file) where the result landed. Don't make them infer it from a flag or scroll back through command output to find it; state it plainly in your response, every time, not only the first time or when asked.
+
 ### Audience matters: user-facing text vs internal text
 
 Not every reader is a contributor. When you edit docs, help text, summaries, errors, or labels, decide first whether the audience is:
