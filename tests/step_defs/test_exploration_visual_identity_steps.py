@@ -174,3 +174,15 @@ def lead_to_same_state(context: dict[str, Any]) -> None:
 @then(parsers.parse("exactly {n:d} signal captures were taken"))
 def exact_capture_count(context: dict[str, Any], n: int) -> None:
     assert context["driver"].capture_calls == n
+
+
+@then("no state id is a string-prefix of another state id")
+def no_state_id_is_a_prefix_of_another(context: dict[str, Any]) -> None:
+    # The exact bug class a composite "dom_id:hash"-style id would reintroduce:
+    # apply.py's _resolve_state (and --resume-from's selector resolution) match a
+    # saved id by str.startswith(prefix), so a composite id sharing its base
+    # dom_id as a literal prefix would make that lookup wrongly ambiguous.
+    states = list(context["graph"].states)
+    for i, a in enumerate(states):
+        for b in states[i + 1 :]:
+            assert not a.startswith(b) and not b.startswith(a), (a, b)

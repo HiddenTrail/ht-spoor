@@ -13,6 +13,14 @@
 # requiring a locale/flag to declare visual identity on: it is opportunistic,
 # based only on whatever screenshot hash the driver happens to produce.
 #
+# Matched by Hamming distance, not exact equality (found and fixed during
+# self-review, after exact-match comparison produced spurious splits on a real
+# page — a text field gaining a focus ring when clicked was enough to move its
+# dHash and wrongly mint a second state for the exact same screen). Two hashes
+# within `_VISUAL_SPLIT_BITS` (3 of 64, the same threshold and reasoning
+# `ScreenshotStore` already uses for this same dHash) count as the same
+# picture; only a genuinely larger difference splits.
+#
 # The cost model is deliberate, not incidental (confirmed with the maintainer):
 # every state but the root is reached by firing an action, which already
 # captures a before/after signal bundle for the transition diff — that bundle is
@@ -34,22 +42,37 @@ Feature: Visually distinct screens that share a DOM hash become distinct states
   I want a screenshot hash to split apart two screens whose DOM looks identical
   So that a modal, overlay, or color-only change isn't silently folded into one state
 
-  Scenario: Two DOM-identical visits with different screenshots become two states
+  Scenario: Two DOM-identical visits with clearly different screenshots become two states
+    # "0" and "15" differ in 4 bits — past the 3-bit near-duplicate threshold.
     Given an app whose actions are:
       | from | label  | role | to    |
       | home | Go A   | link | lobby |
       | home | Go B   | link | lobby |
-    And "lobby" is screenshotted as "hashA" then "hashB"
+    And "lobby" is screenshotted as "0" then "15"
     When I explore from "home"
     Then the graph has 3 states
     And "Go A" and "Go B" lead to different states
+    And no state id is a string-prefix of another state id
 
   Scenario: Two DOM-identical visits with the same screenshot stay one state
     Given an app whose actions are:
       | from | label  | role | to    |
       | home | Go A   | link | lobby |
       | home | Go B   | link | lobby |
-    And "lobby" is screenshotted as "hashA" then "hashA"
+    And "lobby" is screenshotted as "0" then "0"
+    When I explore from "home"
+    Then the graph has 2 states
+    And "Go A" and "Go B" lead to the same state
+
+  Scenario: A near-duplicate screenshot (re-render noise) stays one state, not a split
+    # "0" and "2" differ in 1 bit — well inside the 3-bit near-duplicate threshold,
+    # the exact shape of real re-render noise (anti-aliasing, a focus ring, a
+    # blinking cursor): the same screen, not a new one.
+    Given an app whose actions are:
+      | from | label  | role | to    |
+      | home | Go A   | link | lobby |
+      | home | Go B   | link | lobby |
+    And "lobby" is screenshotted as "0" then "2"
     When I explore from "home"
     Then the graph has 2 states
     And "Go A" and "Go B" lead to the same state
@@ -84,6 +107,6 @@ Feature: Visually distinct screens that share a DOM hash become distinct states
       | from | label  | role | to    |
       | home | Go A   | link | lobby |
       | home | Go B   | link | lobby |
-    And "lobby" is screenshotted as "hashA" then "hashB"
+    And "lobby" is screenshotted as "0" then "15"
     When I explore from "home"
     Then exactly 5 signal captures were taken
