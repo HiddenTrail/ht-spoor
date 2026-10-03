@@ -23,7 +23,7 @@ Feature: Exploring a live, login-gated site with a supplied session
   Scenario: Without a session, the crawl never gets past the gate
     Given an auth-gated fixture server whose deeper pages need a cookie then a token
     When I run spoor explore against it with no session
-    Then it reports 1 states discovered
+    Then it reports 1 state discovered
     And it reports 0 transitions
 
   Scenario: A cookie-only session reaches the second page but not the third

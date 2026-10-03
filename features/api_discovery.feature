@@ -118,6 +118,10 @@ Feature: A run discovers an official API spec when the target serves one
     Then the run reports no discovered API spec
 
   # --- Layer 2: GraphQL introspection --------------------------------------
+  # Same story as layer 1 above, for a GraphQL API instead of a REST one: when a
+  # target exposes a GraphQL endpoint with introspection left on, that's an
+  # authoritative, machine-readable description of the schema — read it instead
+  # of guessing at queries from observed traffic.
 
   Scenario: A GraphQL endpoint with introspection enabled is discovered
     Given a target with a GraphQL endpoint at "/graphql" answering introspection
@@ -137,6 +141,11 @@ Feature: A run discovers an official API spec when the target serves one
     Then the run reports no discovered GraphQL schema
 
   # --- Layer 4: spec synthesis from a captured HAR -------------------------
+  # When a target has no official spec to find (layers 1-2 came up empty), the
+  # next best thing is inferring one from the API traffic a run already observed:
+  # cluster the requests it captured into endpoints and write out a best-effort
+  # OpenAPI document — an educated guess from real traffic, not an authoritative
+  # source, and the output says so.
 
   Scenario: Repeated ID paths in a captured HAR synthesize one templated endpoint
     Given a captured HAR with GET JSON requests to "/api/users/1", "/api/users/2", "/api/users/3"
@@ -171,6 +180,12 @@ Feature: A run discovers an official API spec when the target serves one
     Then no API spec is synthesized
 
   # --- Layer 5: action-to-endpoint correlation -----------------------------
+  # Layer 4's synthesized endpoint list is flat — it doesn't say which action on
+  # the page actually triggered which request. This layer adds that: attribute
+  # each captured request to the most recent exploration action before it, so
+  # the output reads "clicking this likely triggered these endpoints" instead of
+  # just "these endpoints exist somewhere." An approximation (same time window
+  # ≠ proven cause), reported honestly as one.
 
   Scenario: Each request is credited to the action whose window it fell in
     Given a checkpoint "load" at second 0

@@ -39,6 +39,7 @@ Feature: A crawl resumes its frontier from where an earlier run left off
   Scenario: A run that completes on its own clears its persisted state
     Given resume is enabled
     And a first run already completed the whole crawl
+    Then no resumable frontier file exists for the target
     When I run the crawl again
     Then every page is fetched again, not skipped as already done
 

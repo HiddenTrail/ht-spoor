@@ -127,7 +127,7 @@ def app_states(context: dict[str, Any], datatable: list[list[str]]) -> None:
         app.add_state(
             f["state"],
             StateSignals(
-                ax_node_count=int(f["ax_nodes"]),
+                ax_node_count=int(f["a11y nodes"]),
                 console_messages=_semis(f["console"]),
                 storage_keys=_semis(f["storage"]),
                 network_requests=_semis(f["network"]),

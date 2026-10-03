@@ -77,7 +77,8 @@ Feature: Type a filled-in interactive-round scaffold's values into their fields
     Then no field was applied
     And no field failed
 
-  Scenario: A blank value with generate: true gets a generated value instead (closes #103)
+  # closes #103
+  Scenario: A blank value with generate: true gets a generated value instead
     Given the scaffold asks to generate "Email" on "home" with kind "email"
     When I apply the scaffold
     Then "Email" on "home" was applied as a generated value
