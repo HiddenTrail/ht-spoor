@@ -13,35 +13,73 @@ diffing (§5.4).
 Each capability maps to a `spoor/` subpackage and a ROADMAP phase (§4). Files
 are authored when their phase begins, not up front.
 
+64 feature files, grouped below by what they cover rather than listed as one
+flat table — the grouping is purely navigational (every row's text is
+unchanged from before); the prose section further down keeps its own
+chronological, slice-by-slice narrative order.
+
+### Core extraction & tier dispatch
+
 | Feature file | Capability | ROADMAP | Package | Phase |
 |---|---|---|---|---|
 | `extraction.feature` | Declarative extraction configs | §2a | `spoor/core`, CLI | 1 |
 | `extraction_robustness.feature` | Graceful degradation on empty / non-HTML / malformed / deep / non-ASCII pages — extract what's there, never crash | §2a | `spoor/core` | 1 |
+| `interaction.feature` | Interaction execution (native/jittered) | §2 | `spoor/core` | 2 |
+| `resolution.feature` | Tier dispatcher / escalation, then tier-3 self-healing | §2 | `spoor/core` | 1 / 3 |
+
+### Operational essentials — politeness, output, retry, reliability
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
 | `operational.feature` | Politeness & rate limiting | §2d | `spoor/operational` | 1 |
 | `output.feature` | Output pipeline (pluggable sinks) | §2d | `spoor/operational` | 1 / 3.5 |
-| `interaction.feature` | Interaction execution (native/jittered) | §2 | `spoor/core` | 2 |
+| `observability.feature` | Run summary / observability | §2d | `spoor/operational` | 1 |
 | `request_response_hooks.feature` | Operator-supplied request/response hooks (Python API, `extract.run_report(hooks=...)`); Crawljax-style exploration hooks are a separate, deferred follow-on | §2d | `spoor/operational`, `spoor/core` | 2 |
 | `bounded_concurrency.feature` | Per-domain concurrent fetching (`politeness.max_concurrent_per_domain`, default 1 = sequential), tier-1 only, over a stdlib thread pool — not asyncio | §2d | `spoor/operational`, `spoor/core` | 2 |
 | `resumable_crawl_state.feature` | Resumable, persisted crawl frontier (`resume: true`); continues past where a prior run stopped, both tiers — a different, simpler model than §2e's exploration-mode `--resume-from` | §2d | `spoor/operational`, `spoor/core` | 2 |
-| `api_discovery.feature` | API surface discovery (spec + GraphQL introspection) | §2b | `spoor/api_discovery` | 2.5 |
-| `capture.feature` | Raw network capture (HAR) to local-only cache | §2b/§2c/§2h | `spoor/core`, `spoor/security` | 2.5 |
-| `signals.feature`, `accessibility.feature`, `response_headers.feature`, `storage_state.feature` | Client-side signals catalog (console, a11y tree, response headers, storage state) | §2c | `spoor/signals` | 2.5 |
-| `redaction.feature` | Data handling: secret redaction before shared output (sandbox registry later) | §2h | `spoor/security` | 2.5 |
-| `session.feature` | Bring-your-own-session: authenticate a run with a supplied browser storage state (cookies + localStorage); Spoor runs no login flow itself | §2h | `spoor/security`, `spoor/core` | 2.5 |
-| `observability.feature` | Run summary / observability | §2d | `spoor/operational` | 1 |
 | `retry.feature` | Retry transient fetch failures with backoff (Retry-After honored), dead-letter the unrecoverable | §2d | `spoor/operational` | 3.5 |
 | `browser_retry.feature` | Retry transient browser navigations (same classification/backoff) so a failed `page.goto` is dead-lettered, not a crash | §2d | `spoor/operational`, `spoor/core` | 3.5 |
 | `anti_bot.feature` | Detect anti-bot/CAPTCHA challenges (reCAPTCHA/hCaptcha/Cloudflare) and fail loudly — detection, never bypass | §2d | `spoor/operational` | 3.5 |
 | `change_detection.feature` | Skip re-extracting pages unchanged since the last run (conditional `ETag`/`Last-Modified` request, content-hash fallback), opt-in | §2d | `spoor/operational` | 3.5 |
-| `resolution.feature` | Tier dispatcher / escalation, then tier-3 self-healing | §2 | `spoor/core` | 1 / 3 |
+| `proxy.feature` | Bring-your-own-proxy: route a run's traffic (static tier, browser tier's own httpx client, and the Chromium process) through a supplied proxy via the config's `proxy:` block; Spoor never discovers or provides a proxy itself | §2d | `spoor/core` | 2.5 |
+
+### API discovery & client-side signals
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
+| `api_discovery.feature` | API surface discovery (spec + GraphQL introspection) | §2b | `spoor/api_discovery` | 2.5 |
+| `capture.feature` | Raw network capture (HAR) to local-only cache | §2b/§2c/§2h | `spoor/core`, `spoor/security` | 2.5 |
+| `signals.feature`, `accessibility.feature`, `response_headers.feature`, `storage_state.feature` | Client-side signals catalog (console, a11y tree, response headers, storage state) | §2c | `spoor/signals` | 2.5 |
+
+### Security & data handling
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
+| `redaction.feature` | Data handling: secret redaction before shared output (sandbox registry later) | §2h | `spoor/security` | 2.5 |
+| `session.feature` | Bring-your-own-session: authenticate a run with a supplied browser storage state (cookies + localStorage); Spoor runs no login flow itself | §2h | `spoor/security`, `spoor/core` | 2.5 |
+
+### Tier-3 self-healing
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
 | `self_healing.feature` | Tier-3 self-healing: scored element matching, no model call | §2 / §5.3 | `spoor/core` | 3 |
 | `self_healing_runs.feature` | Tier-3 wired into a live run: persist fingerprints, heal across runs, surface counts | §2 / §2d | `spoor/core` | 3 |
 | `self_healing_items.feature` | Tier-3 in a listing: heal a field selector that breaks *within* rows, per row | §2 / §2d | `spoor/core` | 3 |
 | `self_healing_reanchor.feature` | Tier-3 cross-run re-anchoring: a confident heal becomes the new anchor | §2 / §2d | `spoor/core` | 3 |
 | `self_healing_container.feature` | Tier-3 heals a broken row *container* (`item` selector), with a repeating-group gate + ambiguity refusal | §2 / §2d | `spoor/core` | 3 |
 | `self_healing_visual.feature` | Tier-3 perceptual-hash visual signal: a cropped-screenshot difference hash heals a low-text element whose markup churns | §2 / §2d | `spoor/core` | 3 |
+
+### Read-only map serving
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
 | `serving.feature` | Read-only serving of a captured map over a REST API (records + observed API surface + exploration graph, with freshness) | §2f | `spoor/serving` | 4 / 5 |
 | `serving_mcp.feature` | Read-only serving of the same map over an MCP server (agent-facing tools; records, API surface, and exploration graph) | §2f | `spoor/serving` | 4 / 5 |
+
+### Exploration — safety, state identity & the core loop
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
 | `exploration_safety.feature` | Exploration safety gate: destructive actions are sandbox-only, non-configurable | §2e | `spoor/exploration`, `spoor/security` | 5 |
 | `exploration_state.feature` | Exploration state abstraction: normalize + hash the DOM so equivalent screens share one state id | §2e | `spoor/exploration` | 5 |
 | `exploration_visual_identity.feature` | Visual state identity: a screenshot hash splits an apparent revisit into a distinct state when its DOM/text hash matches but its screenshot's Hamming distance from every variant already seen is too large (not exact equality — a near-duplicate re-render, e.g. a focus ring, stays merged), so a modal or color-only change isn't silently folded into the screen it covers — `state_id()` itself stays DOM/text-only; the split happens in the explorer's capture step, at zero extra signal-capture cost in the normal walk (closes #104) | §9 | `spoor/exploration` | 5 |
@@ -50,14 +88,30 @@ are authored when their phase begins, not up front.
 | `exploration_loop.feature` | Exploration explorer loop: the state-action graph orchestrator tying together discovery, safety, state abstraction, and run controls; an opt-in, no-argument `progress` callback fires synchronously alongside `record_state`/`record_request` so a caller (the CLI's live spinner/bar) can redraw without any of its own hooks into the loop | §2e | `spoor/exploration` | 5 |
 | `exploration_hooks.feature` | Operator-supplied exploration hooks (Python API, `explore(hooks=...)`): observe a newly discovered state or a fired transition, fired only after each is already committed to the graph and the destructive-action gate already consumed, carrying only a redaction-safe view — closes #187, part 2 of #150 | §2e | `spoor/exploration` | 2 |
 | `exploration_browser.feature` | Exploration in a real browser: the `spoor explore` command drives the whole stack against a live site via a headless-Chromium driver, renders a wiki, and persists the graph for serving | §2e / §2f | `spoor/exploration`, `spoor/serving`, CLI | 5 |
+| `exploration_session.feature` | Bring-your-own-session for `spoor explore`: a supplied cookie/localStorage session survives every reset-and-replay (cookies re-added after each clear, localStorage restored via an init script), so a login-gated site's real content is mapped past the login screen; Spoor never logs in itself | §2e, §2h | `spoor/exploration`, `spoor/security` | 5 |
+
+### Exploration — per-transition signal capture & the wiki
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
 | `exploration_signals.feature` | Exploration per-transition signal capture: a free-signal bundle per state and a before/after diff (a11y, console, storage, network, screenshot) per transition | §2e | `spoor/exploration` | 5 |
 | `exploration_signals_live.feature` | Live per-transition signal capture: the real driver reads console, storage, network, a11y, and a screenshot hash from an actual Chromium page; a reset scopes the console/network buffers to the current visit (6d) | §2e | `spoor/exploration` | 5 |
 | `exploration_wiki.feature` | Exploration wiki generation: render the state-action graph into a browsable static HTML site (index + Mermaid overview, one page per state/transition), with captured values redacted before rendering; state pages labelled by page title and repeated console/network lines collapsed with a count (6c), network requests grouped by kind (6d), and each state page leading with an Actions table of its elements (Label / Type / Screen capture / Destination) before the signals (6e), plus a help/glossary page linked from every page defining the terms used (6f), and a per-state full-page screenshot embedded as an image when opted in — pixel-free by default (8a) | §2e | `spoor/exploration` | 5 |
+
+### Exploration — screenshots & dedup
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
 | `exploration_screenshots.feature` | Opt-in full-page screenshot capture and writing: the explorer stores a full-page image per discovered state into a caller-provided sink, and the wiki writer places each image under a `screenshots/` subfolder and embeds it; a default run captures no pixels and the wiki stays pixel-free, because pixels cannot be secret-redacted the way text is (§2h) — capture and embedding turn on only via the `spoor explore --screenshots` flag, which requires `--wiki` (8b) | §2e | `spoor/exploration`, CLI | 5 |
 | `exploration_element_screenshots.feature` | Opt-in per-element screenshot capture and writing: the explorer clips one image per discovered actionable element (the "Next" button, the "Currency" dropdown) into a caller-provided sink, aligned by discovery position, and the wiki writer places each clip under the `screenshots/` subfolder and embeds it in that element's Actions-table row; a default run clips nothing and the wiki stays pixel-free, for the same §2h reason (pixels cannot be secret-redacted) (8d) | §2e | `spoor/exploration` | 5 |
 | `exploration_opened_screenshots.feature` | Opt-in opened-contents screenshot capture: for a gate-permitted disclosure element (a dropdown/list — combobox/listbox), the explorer opens it, screenshots what it reveals, and restores, storing it as the `ElementShot`'s `opened` image; the wiki writer embeds it in a new "Opened contents" Actions-table column beside the closed clip. Opening runs only after the clean-page state/signals/clips are recorded and only for a role the safety gate permits, so it never corrupts the graph or fires a destructive action outside a sandbox; a default run and a clip-only driver produce none (8e) | §2e | `spoor/exploration` | 5 |
 | `exploration_opened_screenshots_live.feature` | Live opened-contents capture: the real PlaywrightDriver opens an ARIA "Currency" combobox on a loopback fixture in a headless Chromium, captures the revealed in-DOM option list, and Escape-restores; the capture is a real PNG that differs from the closed page and the page is left closed — proving the live half of slice 8e the in-process scenarios can't (8e) | §2e | `spoor/exploration` | 5 |
 | `exploration_screenshot_dedup.feature` | Screenshot deduplication and sub-image containment: two states that render the same picture (byte-exact, or near-identical within a tight perceptual distance) share one file rather than each writing a copy — but stay separate states, and a flat/blank screen is matched byte-exactly only; an element clip that is a region of its page's full-page shot is stored as a crop reference into that picture (located by the driver's element geometry first, by pixel search when geometry is missing), and only a clip in no bigger picture gets its own file; a re-run writes the identical file set (8g) | §2e | `spoor/exploration` | 5 |
+
+### Exploration — robustness (actuation, settling, recovery, replay)
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
 | `exploration_actuation.feature` | Robust actuation, pure verdict: classify a discovered element's click point as ACTUATE / COVERED / NOT LOCATED (sub-slice 7a) | §2e | `spoor/exploration` | 5 |
 | `exploration_actuation_live.feature` | Robust actuation, live driver: relocate via the CDP tree and click by a verified coordinate; detect a covered element without mis-clicking (sub-slice 7a) | §2e | `spoor/exploration` | 5 |
 | `exploration_settling.feature` | State settling, pure quiescence policy: settle when DOM mutations go quiet for a window, report unsettled at a bounded timeout — under a fake clock (sub-slice 7b) | §2e | `spoor/exploration` | 5 |
@@ -66,14 +120,29 @@ are authored when their phase begins, not up front.
 | `exploration_replay.feature` | Replay resilience: verify each reset-and-replay against the state ids it first reached and retry a transient bad render, flagging a persistently unreachable or divergent step honestly (sub-slice 7d) | §2e | `spoor/exploration` | 5 |
 | `exploration_settling_network.feature` | Settling also waits for the network: treat the page as busy while a request is in flight so a late response can't render a different page after a read, bounded so a never-ending request is flagged unsettled not hung (sub-slice 7e) | §2e | `spoor/exploration` | 5 |
 | `exploration_settling_announcements.feature` | Settling also waits out an urgent live-region announcement: treat an on-screen `aria-live="assertive"`/`role="alert"` toast as page activity so a transient notification that auto-dismisses can't leave two captures of one screen on different state ids, bounded so a never-clearing announcement is flagged unsettled not hung; durable `polite`/`status` regions are ignored (sub-slice 7f) | §2e | `spoor/exploration` | 5 |
+
+### Exploration — traversal & resume
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
 | `exploration_traversal.feature` | Breadth-first, depth-bounded, URL-forked traversal: the walk peels the site layer by layer (shallow, high-value pages before deep tendrils), a `--max-depth` reach bound maps only the first N layers, and — when the driver reports URLs — the frontier forks on the URL path so a distinct page rendering an already-seen DOM is still explored; graph identity stays the DOM state id (slice 9) | §2e | `spoor/exploration`, CLI | 5 |
 | `exploration_traversal_live.feature` | Live URL reporting for the frontier fork: the real driver's `current_url` reports the URL of the page actually loaded and tracks a real navigation from one page to the next (slice 9); also the live half of the destination hint (slice 9b) and the `input_type` enrichment (interactive-round scaffold slice 1, issue #131) | §2e | `spoor/exploration` | 5 |
 | `exploration_state_selector.feature` | Anchor selection for a resume run: a state-selector (`id:` prefix, `title:` exact, `url:` exact, or a role+name action `path`, combinable AND) resolves an in-memory candidate set to exactly one state, deterministically and never guessing — zero matches reported unmatched, several reported ambiguous with the candidates listed; the pure resolution core of the anchored, depth-relative resume capability (§2e v2), no browser or disk | §2e | `spoor/exploration` | 5 |
 | `exploration_graph_candidates.feature` | Building anchor candidates from an exploration graph: each mapped state becomes a resolvable `AnchorCandidate` (id, redacted page title, root-relative action path) so a resume selector resolves against a real run; `url:` is unpopulated by design (a state records no route) and reported unmatched, not guessed; the graph→candidate adapter of the resume capability (§2e v2), pure logic | §2e | `spoor/exploration`, `spoor/security` | 5 |
 | `exploration_persisted_map.feature` | Loading a persisted exploration map back into a graph: the inverse of the §2h-shareable map projection rebuilds an `ExplorationGraph` (states in order, action inventories, transition topology) so a later run can anchor a resume by `id:`/`path` against a crawl no longer in memory; signals/titles aren't stored so `title:` finds nothing (its own slice), validated by a project→load round-trip; the cross-run half of the resume capability (§2e v2), pure logic | §2e | `spoor/exploration` | 5 |
 | `exploration_resume_traversal.feature` | Resuming exploration from a mapped anchor: `resume_exploration` loads a saved map, resolves a selector to one anchor state, and continues the breadth-first walk *outward from it* — depth re-origined at the anchor (`--max-depth` counts clicks from the anchor, not the site root) and new states/transitions merged additively into the loaded map; refuses to guess (no/many matches, or a start page that no longer matches the saved map); the traversal slice that ties the three pure resume slices to the crawl and the CLI (`--resume-from`). Fast-tier scenarios drive the real load→resolve→resume chain against a fake site; a `@browser` scenario proves it end to end in real Chromium | §2e | `spoor/exploration`, CLI | 5 |
+
+### Interactive-round scaffold
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
 | `interactive_scaffold.feature` | Interactive-round config scaffold generation: from a completed exploration graph, write a human-editable YAML file (`interactive.yaml`, a fixed filename inside the directory `--scaffold` is given — the same directory shape as `--wiki`/`--gen-tests`) naming discovered fields (each with a best-guess `kind`, a blank value to fill in, and — for a generatable `kind` — an opt-in `generate: false` toggle backed by Faker, closes #103), discovered login points (a flag pointing at the existing `session:` mechanism, never a fillable credential — Spoor does not automate logins), and discovered actions the safety gate skipped for being destructive (informational only, matched against the gate's own recorded skip reason); scaffold *generation* only, consuming a filled-in scaffold to run an interactive round is separate, later work (issue #131) | §2e | `spoor/scaffold`, `spoor/exploration`, CLI | 5 |
 | `interactive_scaffold_apply.feature` | Typing-only consumption of a filled-in scaffold: `spoor apply-scaffold <url> <file> --sandbox` types each field's value — pinned, or generated by the Faker-backed seam when `generate: true` is set on a blank-valued field (closes #103; a pinned value always wins) — into its field on the root state via `driver.fill`, sharing `perform`'s exact relocate-and-verify path — never presses Enter, never clicks a submit control, never applies a value, a maintainer-approved exception to the read-only-mode-exit gate ahead of keyword-list localization (#101, now delivered). Sandbox-gated before the driver is ever touched; fields sharing a state share one page visit so an earlier field's value survives; a reset failure fails only that state's fields; a non-string YAML value and a field reachable only by clicking through navigation are both reported failed, never attempted; `fill` verifies a field's live value actually changed before reporting success, so a read-only field can't be claimed applied. When a fill changes the page, the result is observed the same read-only way exploration observes any click (issue #137) and recorded as a real, replayable graph edge — a new state and a typed transition, clearly flagged in the wiki and persisted map as reached via config rather than a click; a fill with no observable effect adds nothing new. One field's failure is recorded and the rest still run, never an abort | §2e | `spoor/scaffold`, `spoor/exploration`, `spoor/testgen`, `spoor/serving`, CLI | 5 |
+
+### Test-automation generation
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
 | `testgen.feature` | Test-automation run generation: the pure generator turns a §2e exploration graph into a pytest suite (one Playwright-driven regression test per mapped transition) — replay the path, fire the action, assert the recorded signals, with every captured value and the live observations redacted like-for-like (sub-slice 2g-i) | §2g | `spoor/testgen`, `spoor/security` | 6 |
 | `testgen_writer.feature` | Writing the generated suite to disk and running it: `render_suite` writes the pure generator's `filename → source` under a directory (created if absent, contents byte-for-byte the generator's), wired to `spoor explore --gen-tests <dir>`; a `@browser` scenario crawls a fixture, writes its suite, runs pytest on it against the same live fixture in a subprocess, and asserts it passes green — the end-to-end proof of sub-slice 2g-ii | §2g | `spoor/testgen`, CLI | 6 |
 
