@@ -2,12 +2,19 @@
 
 Issue #131 shipped scaffold *generation* only (`spoor/scaffold/interactive_config.py`).
 This module is the first, deliberately narrow slice of *consuming* one: given a
-scaffold a human has filled in, type its pinned values into fields on the root state
-the crawl started from. Never presses Enter, never clicks a submit control, never
-applies the value in any way — this stays entirely inside the "types a scaffold's
-pinned values into their fields" exception `docs/ROADMAP.md` §2e records ahead of
-keyword-list localization (issue #101). Applying a value is still fully gated on #101
-and the separate "how a filled field's value gets applied" open question.
+scaffold a human has filled in, type its pinned — or, since #103, generated — values
+into fields on the root state the crawl started from. Never presses Enter, never
+clicks a submit control, never applies the value in any way — this stays entirely
+inside the "types a scaffold's values into their fields" exception `docs/ROADMAP.md`
+§2e records ahead of keyword-list localization (issue #101, now delivered).
+
+A field's value comes from one of two places, in order: a non-blank `value:` the
+operator typed in directly (always wins, never second-guessed), or — opt-in, only
+when `generate: true` is also set on a blank-valued field — a freshly generated,
+realistic-looking value from the Faker-backed generator seam
+(`interactive_config.generate_value`, closes #103). Neither path is new scope beyond
+what this module already did: a generated value is typed in exactly the same way,
+through the same sandbox/safety gates, as a pinned one.
 
 Restricted to the root state and to declared-sandbox targets only (§2e non-negotiable:
 destructive-or-not, any interaction beyond passive observation is sandbox-only). A
@@ -44,6 +51,7 @@ from spoor.exploration.explorer import ActionError
 from spoor.exploration.graph import ExplorationGraph, paths_from_root
 from spoor.exploration.safety import evaluate_action
 from spoor.exploration.state import state_id as compute_state_id
+from spoor.scaffold import interactive_config
 from spoor.scaffold.interactive_config import FIELD_ROLES
 from spoor.security.sandbox import is_sandbox
 
@@ -82,11 +90,12 @@ class ApplyDriver(Protocol):
 
 @dataclass(frozen=True)
 class FieldToApply:
-    """One scaffold `fields:` entry with a non-blank value, ready to type in."""
+    """One scaffold `fields:` entry ready to type in — pinned or generated."""
 
     state: str
     name: str
     value: str
+    generated: bool = False
 
 
 @dataclass(frozen=True)
@@ -95,6 +104,7 @@ class AppliedField:
 
     state: str
     name: str
+    generated: bool = False
 
 
 @dataclass(frozen=True)
@@ -121,12 +131,24 @@ def load_scaffold(path: Path) -> dict[str, Any]:
 def applicable_fields(
     scaffold: dict[str, Any],
 ) -> tuple[list[FieldToApply], list[FailedField]]:
-    """Every `fields:` entry with a non-blank value, plus any entry that is invalid.
+    """Every `fields:` entry ready to apply — pinned or generated — plus any invalid.
 
-    A blank or missing `value:` means the user chose not to fill this one in; skipped
-    silently, not an error. A malformed entry (missing `state`/`name`, or either not a
-    string) is skipped the same way — this stays a best-effort reader of a hand-edited
-    file, never a strict parser that crashes on one bad row.
+    A non-blank `value:` always wins and is used as-is, exactly as before #103: a
+    pinned literal is an explicit operator decision, never second-guessed by the
+    generator seam even when `generate: true` is also set on the same entry.
+
+    A blank `value:` with `generate: true` (closes #103, opt-in — unset or `false`
+    behaves exactly as before #103) asks the generator seam for a fresh value keyed
+    by the entry's `kind:`. A `kind` the seam can't generate for (e.g. `choice`,
+    `unknown`, or a `kind` missing/malformed) is reported as a `FailedField`, not
+    silently skipped — `generate: true` was an explicit ask, so failing to honor it
+    is not the same "user chose not to fill this in" outcome a plain blank value is.
+
+    A blank `value:` with no `generate: true` means the user chose not to fill this
+    one in; skipped silently, not an error — unchanged from before #103. A malformed
+    entry (missing `state`/`name`, or either not a string) is skipped the same way —
+    this stays a best-effort reader of a hand-edited file, never a strict parser
+    that crashes on one bad row.
 
     A `value:` that parsed as something other than a string — e.g. an unquoted `42`,
     which YAML reads as an integer — is different: it *was* an attempt to fill the
@@ -144,14 +166,30 @@ def applicable_fields(
         state, name, value = entry.get("state"), entry.get("name"), entry.get("value")
         if not isinstance(state, str) or not isinstance(name, str):
             continue
-        if value is None or value == "":
+        if value is not None and value != "":
+            if not isinstance(value, str):
+                invalid.append(
+                    FailedField(state, name, "value must be a quoted YAML string")
+                )
+                continue
+            ready.append(FieldToApply(state=state, name=name, value=value))
             continue
-        if not isinstance(value, str):
+        if entry.get("generate") is not True:
+            continue
+        kind = entry.get("kind")
+        generated = (
+            interactive_config.generate_value(kind) if isinstance(kind, str) else None
+        )
+        if generated is None:
             invalid.append(
-                FailedField(state, name, "value must be a quoted YAML string")
+                FailedField(
+                    state, name, f"no generator available for kind {kind!r}"
+                )
             )
             continue
-        ready.append(FieldToApply(state=state, name=name, value=value))
+        ready.append(
+            FieldToApply(state=state, name=name, value=generated, generated=True)
+        )
     return ready, invalid
 
 
@@ -330,7 +368,9 @@ def apply_scaffold(
             except ActionError as exc:
                 failed.append(FailedField(current_state, field.name, str(exc)))
                 continue
-            applied.append(AppliedField(current_state, field.name))
+            applied.append(
+                AppliedField(current_state, field.name, generated=field.generated)
+            )
             filled_action = ActionableElement(
                 role=target_action.role,
                 name=target_action.name,

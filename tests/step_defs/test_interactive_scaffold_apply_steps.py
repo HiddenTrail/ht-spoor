@@ -102,6 +102,36 @@ def empty_scaffold(context: dict[str, Any]) -> None:
     context["scaffold"] = {"fields": []}
 
 
+@given(
+    parsers.parse(
+        'the scaffold asks to generate "{name}" on "{state}" with kind "{kind}"'
+    )
+)
+def scaffold_generate(
+    context: dict[str, Any], name: str, state: str, kind: str
+) -> None:
+    context["scaffold"]["fields"].append(
+        {"state": state, "name": name, "value": "", "kind": kind, "generate": True}
+    )
+
+
+@given("that same field also asks to generate with kind \"email\"")
+def also_generate(context: dict[str, Any]) -> None:
+    context["scaffold"]["fields"][-1]["kind"] = "email"
+    context["scaffold"]["fields"][-1]["generate"] = True
+
+
+@given(
+    parsers.parse(
+        'the scaffold has "{name}" on "{state}" with a blank value and generate: false'
+    )
+)
+def scaffold_generate_false(context: dict[str, Any], name: str, state: str) -> None:
+    context["scaffold"]["fields"].append(
+        {"state": state, "name": name, "value": "", "kind": "email", "generate": False}
+    )
+
+
 # --- When --------------------------------------------------------------------
 
 
@@ -154,6 +184,18 @@ def was_applied(context: dict[str, Any], name: str, state: str) -> None:
 @then(parsers.parse('the driver typed "{value}" into "{name}"'))
 def driver_typed(context: dict[str, Any], value: str, name: str) -> None:
     assert context["driver"].filled.get(name) == value
+
+
+@then(parsers.parse('"{name}" on "{state}" was applied as a generated value'))
+def was_applied_generated(context: dict[str, Any], name: str, state: str) -> None:
+    field = _find_applied(context, name, state)
+    assert field.generated is True
+
+
+@then(parsers.parse('the driver typed an email-shaped value into "{name}"'))
+def driver_typed_email_shaped(context: dict[str, Any], name: str) -> None:
+    value = context["driver"].filled.get(name)
+    assert value is not None and "@" in value
 
 
 @then(parsers.parse('the driver replayed the path to "{state}" before typing'))

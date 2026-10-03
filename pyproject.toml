@@ -41,6 +41,12 @@ dependencies = [
     # templates — chosen over reusing a full site generator (MkDocs/Docusaurus);
     # see the §2e slice-6a decision note.
     "jinja2>=3.1",
+    # §2e/§2g interactive-round scaffold generator seam (closes #103): produces a
+    # realistic-looking fill value per field kind (email/phone/url/number/date/
+    # text) when a scaffold field opts in with `generate: true`, instead of
+    # requiring every field to be hand-pinned. See the generator-seam decision
+    # note.
+    "faker>=24.0",
 ]
 
 [project.optional-dependencies]

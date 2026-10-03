@@ -77,6 +77,30 @@ Feature: Type a filled-in interactive-round scaffold's values into their fields
     Then no field was applied
     And no field failed
 
+  Scenario: A blank value with generate: true gets a generated value instead (closes #103)
+    Given the scaffold asks to generate "Email" on "home" with kind "email"
+    When I apply the scaffold
+    Then "Email" on "home" was applied as a generated value
+    And the driver typed an email-shaped value into "Email"
+
+  Scenario: A pinned value always wins over generate: true on the same field
+    Given the scaffold pins "Email" on "home" to "jane@example.com"
+    And that same field also asks to generate with kind "email"
+    When I apply the scaffold
+    Then "Email" on "home" was applied
+    And the driver typed "jane@example.com" into "Email"
+
+  Scenario: generate: true on a non-generatable kind is a reported failure, not a silent skip
+    Given the scaffold asks to generate "Promo code" on "home" with kind "unknown"
+    When I apply the scaffold
+    Then "Promo code" on "home" failed with reason "no generator available for kind 'unknown'"
+
+  Scenario: generate: false behaves exactly like today — blank and skipped
+    Given the scaffold has "Email" on "home" with a blank value and generate: false
+    When I apply the scaffold
+    Then no field was applied
+    And no field failed
+
   Scenario: An unresolved state prefix is reported, never guessed
     Given the scaffold pins "Email" on "nonexistent" to "jane@example.com"
     When I apply the scaffold
