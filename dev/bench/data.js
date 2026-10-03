@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791063539746,
+  "lastUpdate": 1791070532435,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -7760,6 +7760,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5296,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "98faa7c9ed32a6b0a00f0c94314abc511a3b7778",
+          "message": "Polish the exploration wiki's visual design (slice 6h follow-up) (#199)\n\nDeepens the dark theme slice 6h first shipped, purely presentational:\nthree stat tiles replace the index's bare bullet-list summary; index/help\nlists get breathing room and hover affordance instead of a wall of\nunderlined links; a table cell's <em> (a type name, or a \"none\"\nplaceholder) reads as a quiet pill; settle-warning and scaffold-reached\nnotices are left-accented alert banners, not plain paragraphs; a full-page\nstate screenshot gets a shadow and hover lift while a table-row thumbnail\nis height-capped; a wide table scrolls horizontally in its own bordered\ncontainer instead of squeezing columns or overflowing the page; and\nMermaid is driven by themeVariables pulled from the same color tokens\ninstead of its own generic dark preset, so the overview diagram reads as\nthe same surface as the page around it.\n\nRespects slice 6h's existing \"no non-system font\" decision rather than\nsilently reversing it. Every existing class name, non-style attribute, and\npiece of rendered content is unchanged; the only structural additions are\na <main> wrapper, a .stats/.stat grid, and a .table-wrap div around each\nexisting <table> -- verified by diffing the set of HTML-structure\nassertions in the wiki test suite against the actual rendered output\nbefore and after.\n\nSelf-review caught and removed an unused --accent-dim CSS token and a\nstray dl border-bottom rule left over from an earlier draft, redundant\nwith the section divider h2's own border-bottom already provides.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-04T02:30:44+03:00",
+          "tree_id": "e9dc6f20442c18e4f81bf74d85e2bd4ff54e71e6",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/98faa7c9ed32a6b0a00f0c94314abc511a3b7778"
+        },
+        "date": 1791070531119,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 202.291,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.02778,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.4643,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.09793,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.3708,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.05012,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 8.3829,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.09032,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 13.9737,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04103,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2137,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.56126,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 31.2392,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.03821,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 10.0127,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.94098,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 125.1715,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.07486,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.4597,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.00831,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.3671,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5400,
             "unit": "MB"
           }
         ]
