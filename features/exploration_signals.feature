@@ -21,11 +21,13 @@ Feature: The explorer records a signal diff for every transition
   So that the map answers "what happens, on every signal level, when I press this"
 
   Background:
+    # console/storage/network cells hold zero or more values separated by "; ",
+    # e.g. "ready; open" below is two console messages on the "menu" state, not one.
     Given a sandbox app whose states are:
-      | state | ax_nodes | console      | storage      | network         | screenshot |
-      | home  | 3        | ready        | guest        |                 | hashA      |
-      | menu  | 5        | ready; open  | guest; token | /api/menu       | hashB      |
-      | home2 | 3        | ready        | guest        |                 | hashA      |
+      | state | a11y nodes | console      | storage      | network         | screenshot |
+      | home  | 3          | ready        | guest        |                 | hashA      |
+      | menu  | 5          | ready; open  | guest; token | /api/menu       | hashB      |
+      | home2 | 3          | ready        | guest        |                 | hashA      |
 
   Scenario: A transition records what its action changed across every signal
     Given an action "Open menu" (button) from "home" to "menu"

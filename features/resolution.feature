@@ -55,6 +55,6 @@ Feature: The dispatcher resolves a config through the right tier
     Then tier 1 on its own extracts nothing
     And the dispatcher escalates to tier 2 and returns the rendered records
 
-  Scenario: Both tiers are registered in order, tier 1 then the browser tier
-    Then the dispatcher registers tier 1 and tier 2 in order
+  Scenario: Tier 1 is always tried before the browser tier is ever reached
+    Then tier 1 is always tried before the browser tier
     And both tiers are implemented, tier 2 rendering in a real browser

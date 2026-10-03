@@ -37,7 +37,9 @@ Feature: The explorer classifies whether a discovered element can be actuated
       | button | Save    | the target itself           | actuate     |
       | button | Save    | a descendant of the target  | actuate     |
       | button | Save    | a different element on top  | covered     |
-      | button | Missing | nothing — no matching node  | not located |
+      # "no element" — the accessibility tree has no node for this element at all
+      # (e.g. it was removed from the page), so there is nothing to click.
+      | button | Missing | no element                  | not located |
 
   Scenario: A covered verdict names the layer's role and text, for recovery to use
     # The covered signal is not just "blocked": it carries what is on top (its role and

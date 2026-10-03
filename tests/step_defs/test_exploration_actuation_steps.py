@@ -36,7 +36,7 @@ def click_point_is(context: dict[str, Any], observed: str) -> None:
     # Translate the plain-language observation into the three facts `classify` decides
     # over. A "different element on top" is covered by an unnamed layer here; the
     # covered-with-details scenario below supplies a described one.
-    if observed == "nothing — no matching node":
+    if observed == "no element":
         context["verdict"] = classify(
             located=False, point_hits_target=False, covering=None
         )

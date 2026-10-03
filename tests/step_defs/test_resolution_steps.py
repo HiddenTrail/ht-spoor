@@ -126,7 +126,7 @@ def dispatcher_returns_rendered_records(context: dict[str, Any]) -> None:
     assert all(record["title"] for record in records)
 
 
-@then("the dispatcher registers tier 1 and tier 2 in order")
+@then("tier 1 is always tried before the browser tier")
 def tiers_registered_in_order(context: dict[str, Any]) -> None:
     assert [resolver.tier for resolver in extract.DEFAULT_TIERS] == [1, 2]
 

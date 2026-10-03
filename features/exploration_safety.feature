@@ -52,10 +52,11 @@ Feature: Exploration performs destructive actions only inside a sandbox
       | http://127.evil.com/   |
       | http://localhost.evil.com/ |
 
-  Scenario Outline: A declared sandbox still needs a host that checks out (closes #102)
-    # The technical backstop: `sandbox: true` is an assertion, not a bypass. It only
-    # grants sandbox status when the host is also loopback or a private-range IP —
-    # a real, publicly-routable host is refused no matter what the operator claims.
+  Scenario Outline: A declared sandbox still needs a host that checks out
+    # The technical backstop (closes #102): `sandbox: true` is an assertion, not a
+    # bypass. It only grants sandbox status when the host is also loopback or a
+    # private-range IP — a real, publicly-routable host is refused no matter what
+    # the operator claims.
     Given an exploration target "<url>" declared as a sandbox
     Then the target is not recognized as a sandbox
 
@@ -79,6 +80,7 @@ Feature: Exploration performs destructive actions only inside a sandbox
 
   Scenario Outline: Actions are classified by whether they are destructive
     # A maintainable, PR-extendable keyword/role list, not a fixed set (§2e).
+    When the classifier examines an action labeled "<label>"
     Then an action labeled "<label>" is <classification>
 
     Examples:
@@ -109,11 +111,13 @@ Feature: Exploration performs destructive actions only inside a sandbox
       | Order confirmation | safe           |
       | Go to my orders    | safe           |
 
-  Scenario Outline: Actions are classified the same way in other languages (closes #101)
-    # The guard isn't English-only: it matches every covered language's keywords
-    # unconditionally, with no locale to declare or detect — a target whose UI
-    # happens to be in Spanish, German, French, Portuguese, Italian, or Dutch
-    # gets the same destructive-vs-safe read as an English-labeled one.
+  Scenario Outline: Actions are classified the same way in other languages
+    # The guard isn't English-only (closes #101): it matches every covered
+    # language's keywords unconditionally, with no locale to declare or detect —
+    # a target whose UI happens to be in Spanish, German, French, Portuguese,
+    # Italian, or Dutch gets the same destructive-vs-safe read as an
+    # English-labeled one.
+    When the classifier examines an action labeled "<label>"
     Then an action labeled "<label>" is <classification>
 
     Examples:

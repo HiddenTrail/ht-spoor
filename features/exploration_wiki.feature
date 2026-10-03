@@ -1,4 +1,8 @@
 Feature: Exploration wiki generation — the browsable map (ROADMAP.md §2e, slice 6a)
+  As someone who just ran spoor explore against a site
+  I want the resulting state-action graph rendered as a browsable set of pages
+  So that I can see what each screen looked like and what each action changed, without reading raw captured data myself
+
   The explored state-action graph is §2e's real product only once it is browsable.
   This slice is the pure renderer: an ExplorationGraph becomes a set of static HTML
   pages — an index with a graph overview and run counts, one page per state showing

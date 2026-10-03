@@ -179,13 +179,13 @@ def run_explore_anonymous(context: dict[str, Any]) -> None:
     context["output"] = result.output
 
 
-@then(parsers.parse("it reports {n:d} states discovered"))
-def reports_states(context: dict[str, Any], n: int) -> None:
+@then(parsers.re(r"it reports (?P<n>\d+) states? discovered"))
+def reports_states(context: dict[str, Any], n: str) -> None:
     assert f"states discovered: {n}" in context["output"], context["output"]
 
 
-@then(parsers.parse("it reports {n:d} transitions"))
-def reports_transitions(context: dict[str, Any], n: int) -> None:
+@then(parsers.re(r"it reports (?P<n>\d+) transitions?"))
+def reports_transitions(context: dict[str, Any], n: str) -> None:
     assert f"transitions:       {n}" in context["output"], context["output"]
 
 

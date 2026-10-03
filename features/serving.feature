@@ -33,7 +33,7 @@ Feature: A read-only API serves a captured map with freshness
       | https://shop.example/p/1    | Widget                   | 2020-01-01T00:00:00Z |
       | https://shop.example/p/2    | Gadget                   | 2020-01-01T00:00:00Z |
       | https://other.example/about | About Us                 | 2020-01-01T00:00:00Z |
-      | https://shop.example/leak   | Bearer abcdef1234567890x | 2020-01-01T00:00:00Z |
+      | https://shop.example/leak   | Bearer FAKE00000000TOKEN | 2020-01-01T00:00:00Z |
 
   Scenario: A mapped URL returns its records with a freshness age
     When I GET "/map?url=https://shop.example/p/1"

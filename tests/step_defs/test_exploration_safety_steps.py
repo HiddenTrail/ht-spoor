@@ -51,6 +51,15 @@ def gate_considers(context: dict[str, Any], label: str) -> None:
     )
 
 
+@when(parsers.parse('the classifier examines an action labeled "{label}"'))
+def classifier_examines(context: dict[str, Any], label: str) -> None:
+    # Purely narrative: `is_destructive` is a pure function, so there is nothing
+    # to set up ahead of the Then that checks its verdict — this step exists only
+    # to give the scenario a When, so it reads as a story rather than a bare
+    # assertion with no stated trigger.
+    context["label"] = label
+
+
 # --- Then ----------------------------------------------------------------
 
 
