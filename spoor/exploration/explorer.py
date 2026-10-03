@@ -647,6 +647,14 @@ def explore(
     # A resume continues an earlier map in place (additive merge); a fresh run starts
     # from an empty graph (§2e resume).
     graph = resume_from if resume_from is not None else ExplorationGraph()
+    # Visual state identity (ROADMAP.md §9, closes #104): two screens can share one
+    # DOM/text hash (a modal overlay, a color-only status change) yet be genuinely
+    # different states. `state_id()` itself stays DOM/text-only (unchanged, no
+    # screenshot input) — this closure-local map, dom id -> {screenshot hash: the
+    # final state id that hash resolved to}, is where the split actually happens,
+    # scoped to this run's walk only (not persisted; a resume's replay verification
+    # stays DOM-only, deliberately out of scope here — see the decision note).
+    _visual_variants: dict[str, dict[str, str]] = {}
 
     def capture(signals: StateSignals | None = None) -> tuple[str, bool]:
         """Record the driver's current state; return its id and whether it's new.
@@ -654,16 +662,44 @@ def explore(
         A caller that already captured the current signal bundle (a transition's
         after-snapshot) passes it in so the driver isn't snapshotted twice for the
         same state; otherwise the bundle is captured here.
+
+        An apparent revisit (the DOM/text hash matches a state already in the
+        graph) is confirmed, not assumed (closes #104): a screenshot hash that
+        doesn't match any variant already seen under this DOM id splits off a
+        new, visually-distinct state instead of silently deduping into the wrong
+        one. Every caller but the root already passes `signals` (a transition's
+        after-snapshot), so confirming a revisit costs no driver call beyond what
+        the transition's own before/after diff already took. The one exception
+        is the root: on a fresh run `graph` starts empty, so the root is never
+        an apparent revisit of itself; on a *resumed* run the root already lives
+        in the loaded map, so this costs exactly one extra `capture_signals()`
+        call, once per resume — `_visual_variants` starts empty every run (not
+        persisted across a resume), so that call can never find a baseline to
+        compare against and always falls through to the plain DOM-only dedup
+        below, unchanged from before #104; the extra call only confirms what was
+        already true. No screenshot, or a hash that was never recorded for this
+        DOM id at all (nothing to compare against), falls back to the original
+        DOM-only dedup the same way.
         """
-        sid = state_id(driver.state_html())
-        if graph.has_state(sid):
-            return sid, False
+        dom_id = state_id(driver.state_html())
+        sid = dom_id
+        if graph.has_state(dom_id):
+            probe = signals if signals is not None else driver.capture_signals()
+            screenshot_hash = probe.screenshot_hash
+            variants = _visual_variants.get(dom_id)
+            if screenshot_hash is None or variants is None:
+                return dom_id, False
+            existing = variants.get(screenshot_hash)
+            if existing is not None:
+                return existing, False
+            sid = f"{dom_id}:{screenshot_hash}"
+            signals = probe
         actions = discover_actions(driver.ax_nodes())
-        graph.add_state(
-            sid,
-            actions,
-            signals if signals is not None else driver.capture_signals(),
-        )
+        resolved_signals = signals if signals is not None else driver.capture_signals()
+        graph.add_state(sid, actions, resolved_signals)
+        screenshot_hash = resolved_signals.screenshot_hash
+        if screenshot_hash is not None:
+            _visual_variants.setdefault(dom_id, {})[screenshot_hash] = sid
         # This new state's position in the graph, which is the render-time enumeration
         # order, so the filenames written here match the `state-{index}.*` names the
         # wiki embeds and the `state-{index}.html` page each image sits beside.
