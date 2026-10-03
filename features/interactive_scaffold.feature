@@ -37,6 +37,16 @@ Feature: Scaffold an interactive-round config from an exploration graph
     When I scaffold a config for "https://shop.example"
     Then the scaffold has a field named "Promo code" with kind "unknown"
 
+  Scenario: A generatable field offers an opt-in generate toggle, defaulted off (closes #103)
+    When I scaffold a config for "https://shop.example"
+    Then the scaffold has a field named "Email" with kind "email"
+    And that field's generate toggle is false
+
+  Scenario: An unrecognized field offers no generate toggle at all, nothing to turn on
+    When I scaffold a config for "https://shop.example"
+    Then the scaffold has a field named "Promo code" with kind "unknown"
+    And that field has no generate toggle
+
   Scenario: A password field becomes a login point, never a generatable field
     When I scaffold a config for "https://shop.example"
     Then the scaffold has a login point named "Password"

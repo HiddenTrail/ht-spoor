@@ -17,8 +17,12 @@ Three sections, each generic (§0) — no site-specific logic anywhere in this m
 - **fields** — every discovered text-entry-like element (textbox/searchbox/combobox/
   listbox) that is *not* a login field, each with a best-guess `kind` inferred from
   its DOM `input_type` (§2e scaffold slice 1's `ActionableElement.input_type`
-  enrichment) and a blank `value:` for the user to pin. An element whose input type
-  isn't recognized gets an honest `kind: unknown` rather than a guessed default.
+  enrichment), a blank `value:` for the user to pin, and — for a `kind` the
+  generator seam covers — a `generate: false` toggle (closes #103) the user can flip
+  to have Spoor fill the field with a realistic generated value instead of a pinned
+  one. An element whose input type isn't recognized gets an honest `kind: unknown`
+  rather than a guessed default, and no `generate:` toggle at all (there is nothing
+  to generate).
 - **login_points** — every discovered `input_type == "password"` field. These are
   never generatable: Spoor does not automate logins (`docs/ROADMAP.md` §2h,
   bring-your-own-session, decided). An entry is a flag plus a blank `session:` key
@@ -35,6 +39,8 @@ Three sections, each generic (§0) — no site-specific logic anywhere in this m
 from __future__ import annotations
 
 from pathlib import Path
+
+from faker import Faker
 
 from spoor.exploration.discovery import ActionableElement
 from spoor.exploration.graph import ExplorationGraph, paths_from_root
@@ -61,6 +67,42 @@ _GENERATOR_TABLE: dict[str, tuple[str, str, str]] = {
     "search": ("text", "a search box", "example search term"),
     "text": ("text", "free text", "example text"),
 }
+
+# Every `kind` the generator seam (closes #103) can actually produce a value for —
+# exactly the kinds `_GENERATOR_TABLE` maps an `input_type` onto. `"choice"` (a
+# fixed-options field whose options this slice doesn't enumerate) and `"unknown"`
+# are deliberately excluded: generating a plausible value for either would mean
+# guessing, which this module's own contract (never silently wrong) rules out.
+GENERATABLE_KINDS = frozenset(
+    kind for kind, _note, _example in _GENERATOR_TABLE.values()
+)
+
+_faker = Faker()
+
+
+def generate_value(kind: str) -> str | None:
+    """A freshly generated, realistic-looking value for `kind`, or None if it can't.
+
+    Faker-backed (§9's "generator seam" sketch, closes #103) — not a fixed example
+    string like `_GENERATOR_TABLE`'s `example:` column, which only ever illustrates
+    the scaffold, never gets typed anywhere. Every call returns a fresh value (no
+    caching, no seeding): a field filled twice across two runs gets two different
+    generated values, same as a real signup form would see from two different
+    visitors. `kind` outside `GENERATABLE_KINDS` returns None, never a guess.
+    """
+    if kind == "email":
+        return _faker.email()
+    if kind == "phone":
+        return _faker.phone_number()
+    if kind == "url":
+        return _faker.url()
+    if kind == "number":
+        return str(_faker.random_int(min=1, max=1000))
+    if kind == "date":
+        return _faker.date()
+    if kind == "text":
+        return _faker.sentence(nb_words=4).rstrip(".")
+    return None
 
 
 def _yaml_str(value: str) -> str:
@@ -129,12 +171,20 @@ def build_scaffold(graph: ExplorationGraph, *, target: str) -> str:
             example_line = (
                 f"    example: {_yaml_str(example)}\n" if example is not None else ""
             )
+            generate_line = (
+                f"    generate: false  # set true to fill with a generated"
+                f" {kind} value instead of pinning one below\n"
+                if kind in GENERATABLE_KINDS
+                else ""
+            )
             field_lines.append(
                 f"  - state: {short}\n"
                 f"    name: {_yaml_str(name)}\n"
                 f"    kind: {kind}  # {note}\n"
                 f"{example_line}"
-                f"    value:  # fill in to pin this field's value\n"
+                f"{generate_line}"
+                f"    value:  # fill in to pin this field's value"
+                f" (wins over generate: true)\n"
             )
 
     destructive_lines: list[str] = []

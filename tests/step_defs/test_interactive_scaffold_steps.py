@@ -108,6 +108,16 @@ def field_value_blank(context: dict[str, Any]) -> None:
     assert context["last_field"]["value"] is None
 
 
+@then("that field's generate toggle is false")
+def generate_toggle_false(context: dict[str, Any]) -> None:
+    assert context["last_field"]["generate"] is False
+
+
+@then("that field has no generate toggle")
+def no_generate_toggle(context: dict[str, Any]) -> None:
+    assert "generate" not in context["last_field"]
+
+
 @then(parsers.parse('the scaffold has a login point named "{name}"'))
 def has_login_point(context: dict[str, Any], name: str) -> None:
     login = _find(context["scaffold"]["login_points"], name)
