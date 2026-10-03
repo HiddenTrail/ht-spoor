@@ -80,11 +80,29 @@ custom properties for background/surface/border/text/accent colours) in place of
 original bare sans-serif-on-white rules, so the generated pages read as one considered
 surface instead of a default-browser-styles page. The tokens and layout language are
 generic to Spoor's own output, not any scraped target (§0) — no target branding, no
-non-system font that would fail to load for a reader without it installed. Mermaid is
-told to render in its own dark theme (`mermaid.initialize({..., theme: "dark"})`) so the
-overview diagram matches the page around it. Purely presentational: the class names
-(`.count`, `.screenshot`, `.screenshot-crop`) and every non-style attribute are
-unchanged, so existing content, links, and redaction behaviour are untouched.
+non-system font that would fail to load for a reader without it installed. Purely
+presentational: the class names (`.count`, `.screenshot`, `.screenshot-crop`) and every
+non-style attribute are unchanged, so existing content, links, and redaction behaviour
+are untouched.
+
+Slice 6i deepens that pass with the detail 6h's first cut left flat: three stat tiles
+(states/transitions/skipped) replace the index's bare bullet list; the index's and
+help page's `<ul>`/`<dl>` rows get breathing room and a hover affordance instead of a
+dense wall of underlined links; a table-cell `<em>` (an action's type, or a "none"
+placeholder) reads as a quiet pill rather than plain italics; the settle-warning and
+scaffold-notice paragraphs on a state/transition page are left-accented alert banners,
+not ordinary prose; a full-page state screenshot gets a drop shadow and a hover lift,
+while a table-row thumbnail is height-capped so one oversized picture can't blow out a
+row; a wide `Actions`/`Skipped actions` table scrolls horizontally inside its own
+bordered container instead of squeezing columns or breaking the page's layout; and
+Mermaid is driven by `theme: "base"` with `themeVariables` pulled from the same colour
+tokens (rather than its own built-in `"dark"` theme) so the overview diagram's palette
+is visually the same surface as the page around it, not merely dark. Still purely
+presentational and still generic to Spoor's own output (§0): every existing class name,
+non-style attribute, and piece of rendered content is unchanged — the only structural
+additions are a `<main>` wrapper, a `.stats`/`.stat` grid around the index's three
+counts, and a `.table-wrap` div around each existing `<table>`, none of which alter
+what any page says.
 
 (The console/network buffers are also now *scoped per visit*: the driver clears them on
 each reset, so a state reached late in the run reflects only the walk that reached it,
@@ -641,6 +659,7 @@ _LAYOUT = """<!DOCTYPE html>
         --bg: #1f1c1b;
         --surface: #2a2724;
         --surface-2: #322e2b;
+        --surface-3: #3a3531;
         --border: #3d3835;
         --border-hover: #5a5550;
         --text: #f0ece8;
@@ -649,80 +668,205 @@ _LAYOUT = """<!DOCTYPE html>
         --teal: #208e98;
         --yellow: #d8fd1b;
         --radius: 8px;
+        --radius-sm: 5px;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
+          monospace;
       }
       * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
       body {
         background: var(--bg);
         color: var(--text);
-        font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
-        line-height: 1.55;
-        margin: 2rem auto;
-        max-width: 60rem;
-        padding: 0 1.5rem 3rem;
+        font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        line-height: 1.6;
+        margin: 0 auto;
+        max-width: 64rem;
+        padding: 0 1.5rem 4rem;
       }
-      h1, h2 { font-weight: 700; letter-spacing: 0; line-height: 1.2; }
-      h1 { color: var(--accent); font-size: 1.9rem; margin-bottom: 0.75rem; }
-      h2 { color: var(--teal); font-size: 1.3rem; margin: 2rem 0 0.75rem; }
-      a { color: var(--accent); }
-      a:hover { text-decoration: underline; }
+      h1, h2, h3 { font-weight: 700; letter-spacing: 0; line-height: 1.25; }
+      h1 {
+        color: var(--accent);
+        font-size: 2rem;
+        margin: 0 0 0.6rem;
+        word-break: break-word;
+      }
+      h2 {
+        border-bottom: 1px solid var(--border);
+        color: var(--teal);
+        font-size: 1.2rem;
+        margin: 2.5rem 0 1rem;
+        padding-bottom: 0.4rem;
+      }
+      h3 { color: var(--text); font-size: 0.95rem; margin: 1.25rem 0 0.5rem; }
+      p { margin: 0 0 1rem; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { color: var(--yellow); text-decoration: underline; }
+      ul, dl { margin: 0; padding-left: 0; }
+      ul { list-style: none; }
+
+      /* Sticky top nav: a quiet, always-reachable way back to the overview or
+         help page, never competing with a page's own content for attention. */
       nav {
         align-items: center;
+        background: linear-gradient(var(--bg) 85%, transparent);
         border-bottom: 1px solid var(--border);
         display: flex;
         flex-wrap: wrap;
-        gap: 0.4rem 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 1rem;
+        font-size: 0.9rem;
+        gap: 0.4rem 1.25rem;
+        margin: 0 -1.5rem 2rem;
+        padding: 1.1rem 1.5rem 1rem;
+        position: sticky;
+        top: 0;
+        z-index: 10;
       }
-      nav a { color: var(--text-muted); }
-      nav a:hover { color: var(--text); }
-      table {
+      nav a { color: var(--text-muted); font-weight: 600; }
+      nav a:hover { color: var(--accent); text-decoration: none; }
+      nav span { color: var(--text-muted); }
+      main { display: block; }
+
+      /* Index-page summary: three counts as scannable tiles instead of a bare
+         bullet list, the first thing a reader's eye should land on. */
+      .stats {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+        margin: 0 0 1.5rem;
+      }
+      .stat {
         background: var(--surface);
         border: 1px solid var(--border);
-        border-collapse: collapse;
         border-radius: var(--radius);
-        overflow: hidden;
+        padding: 0.9rem 1.1rem;
+      }
+      .stat strong {
+        color: var(--accent);
+        display: block;
+        font-size: 1.6rem;
+        line-height: 1.2;
+      }
+
+      /* Plain index lists read as a quiet rail of rows, not a wall of
+         underlined links — each row gets room and a hover affordance. */
+      .index-list li {
+        border-bottom: 1px solid var(--border);
+        padding: 0.6rem 0.1rem;
+      }
+      .index-list li:last-child { border-bottom: none; }
+      .index-list a { color: var(--text); font-weight: 600; }
+      .index-list a:hover { color: var(--accent); }
+
+      .table-wrap {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin: 0 0 1rem;
+        overflow-x: auto;
+      }
+      table {
+        background: var(--surface);
+        border-collapse: collapse;
         width: 100%;
       }
       th, td {
-        border: 1px solid var(--border);
-        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid var(--border);
+        padding: 0.6rem 0.85rem;
         text-align: left;
+        vertical-align: middle;
       }
+      tr:last-child td { border-bottom: none; }
+      tbody tr:hover td { background: var(--surface-2); }
       th {
         background: var(--surface-2);
         color: var(--text-muted);
-        font-size: 0.78em;
-        letter-spacing: 0.06em;
+        font-size: 0.74em;
+        letter-spacing: 0.07em;
         text-transform: uppercase;
+        white-space: nowrap;
+      }
+      /* A table cell's <em> reads as a quiet status pill (a type name, or a
+         "none" placeholder) rather than plain italics — scoped to table cells
+         only, so prose emphasis elsewhere is untouched. */
+      td em {
+        background: var(--surface-3);
+        border-radius: 999px;
+        color: var(--text-muted);
+        font-size: 0.8em;
+        font-style: normal;
+        padding: 0.15rem 0.6rem;
+        white-space: nowrap;
       }
       code {
         background: var(--surface-2);
         border-radius: 4px;
         color: var(--yellow);
-        padding: 0.1rem 0.35rem;
+        font-family: var(--mono);
+        font-size: 0.9em;
+        padding: 0.1rem 0.4rem;
       }
       pre.mermaid {
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--radius);
-        padding: 1rem;
+        overflow-x: auto;
+        padding: 1.25rem;
       }
       .count { color: var(--text-muted); font-size: 0.85em; }
       .screenshot {
-        max-width: 100%;
-        height: auto;
         border: 1px solid var(--border);
-        border-radius: var(--radius);
+        border-radius: var(--radius-sm);
+        height: auto;
+        max-width: 100%;
+        transition: border-color 0.15s ease, transform 0.15s ease;
       }
+      .screenshot:hover { border-color: var(--border-hover); }
       .screenshot-crop { max-width: none; }
+      /* A full-size state screenshot (outside a table) gets room to breathe and
+         a lift on hover; a thumbnail inside a table row stays row-sized. */
+      td .screenshot { max-height: 7rem; width: auto; }
+      h2 + .screenshot, h2 + p + .screenshot {
+        box-shadow: 0 4px 24px rgb(0 0 0 / 0.35);
+        display: block;
+        max-width: 42rem;
+      }
+      h2 + .screenshot:hover, h2 + p + .screenshot:hover {
+        transform: translateY(-2px);
+      }
+
+      /* Settle warnings and interactive-round notices read as alert banners,
+         not plain paragraphs, so they're not mistaken for ordinary prose. */
+      .notice {
+        background: var(--surface);
+        border-left: 3px solid var(--yellow);
+        border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        padding: 0.75rem 1rem;
+      }
+      .notice.notice-info { border-left-color: var(--teal); }
+
+      /* Help-page glossary: each term/definition pair as a small card, instead
+         of a long run of <dt>/<dd> pairs with no visual separation. */
+      dl { display: flex; flex-direction: column; }
+      dl + h2 { margin-top: 2.5rem; }
+      dt {
+        color: var(--accent);
+        font-weight: 700;
+        padding: 0.9rem 0 0.1rem;
+      }
+      dd { color: var(--text-muted); margin: 0 0 0.9rem; }
+
+      @media (max-width: 30rem) {
+        body { padding: 0 1rem 3rem; }
+        nav { margin: 0 -1rem 1.5rem; padding: 1rem 1rem 0.85rem; }
+        h1 { font-size: 1.6rem; }
+      }
     </style>
   </head>
   <body>
     <nav><a href="{{ root }}index.html">&larr; Overview</a> &middot;
       <a href="{{ root }}help.html">Help / glossary</a> &middot;
       <span>Explored target: <code>{{ target }}</code></span></nav>
+    <main>
     {% block body %}{% endblock %}
+    </main>
   </body>
 </html>
 """
@@ -732,11 +876,11 @@ _INDEX = """{% extends "layout.html" %}
 {% block body %}
 <h1>Exploration wiki</h1>
 <p>Explored target: <code>{{ target }}</code></p>
-<ul>
-  <li><strong>{{ states | length }}</strong> states discovered</li>
-  <li><strong>{{ transitions | length }}</strong> transitions</li>
-  <li><strong>{{ skipped | length }}</strong> actions skipped</li>
-</ul>
+<div class="stats">
+  <div class="stat"><strong>{{ states | length }}</strong> states discovered</div>
+  <div class="stat"><strong>{{ transitions | length }}</strong> transitions</div>
+  <div class="stat"><strong>{{ skipped | length }}</strong> actions skipped</div>
+</div>
 
 <h2>Overview</h2>
 <pre class="mermaid">
@@ -744,18 +888,29 @@ _INDEX = """{% extends "layout.html" %}
 </pre>
 <script type="module">
   import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-  mermaid.initialize({ startOnLoad: true, theme: "dark" });
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "base",
+    themeVariables: {
+      background: "#1f1c1b",
+      primaryColor: "#2a2724",
+      primaryBorderColor: "#5a5550",
+      primaryTextColor: "#f0ece8",
+      lineColor: "#aaa39d",
+      fontFamily: "-apple-system, \\"Segoe UI\\", Roboto, Helvetica, Arial, sans-serif",
+    },
+  });
 </script>
 
 <h2>States</h2>
-<ul>
+<ul class="index-list">
   {% for state in states %}
   <li><a href="{{ state.filename }}">{{ state.label }}</a></li>
   {% endfor %}
 </ul>
 
 <h2>Transitions</h2>
-<ul>
+<ul class="index-list">
   {% for transition in transitions %}
   <li><a href="{{ transition.filename }}">{{ transition.from_label }}
     &mdash;{{ transition.action_name }}&rarr; {{ transition.to_label }}</a></li>
@@ -764,6 +919,7 @@ _INDEX = """{% extends "layout.html" %}
 
 {% if skipped %}
 <h2>Skipped actions</h2>
+<div class="table-wrap">
 <table>
   <tr><th>From</th><th>Action</th><th>Role</th><th>Reason</th></tr>
   {% for skip in skipped %}
@@ -771,6 +927,7 @@ _INDEX = """{% extends "layout.html" %}
     <td>{{ skip.action_role }}</td><td>{{ skip.reason }}</td></tr>
   {% endfor %}
 </table>
+</div>
 {% endif %}
 {% endblock %}
 """
@@ -799,13 +956,13 @@ _STATE = """{% extends "layout.html" %}
 <h1>{{ state.label }}</h1>
 <p>State id: <code>{{ state.id }}</code></p>
 {% if not state.settled %}
-<p><strong>⚠ Did not settle:</strong> the page kept changing until the settle timeout,
-so this snapshot is best-effort and may be incomplete.</p>
+<p class="notice"><strong>⚠ Did not settle:</strong> the page kept changing until the
+settle timeout, so this snapshot is best-effort and may be incomplete.</p>
 {% endif %}
 {% if state.filled_via_scaffold %}
-<p><strong>&#128427; Reached via an interactive-round config:</strong> this state was
-revealed by typing a filled-in scaffold's value into a field, not by a click — see the
-transition below for what was typed.</p>
+<p class="notice notice-info"><strong>&#128427; Reached via an interactive-round
+config:</strong> this state was revealed by typing a filled-in scaffold's value into a
+field, not by a click — see the transition below for what was typed.</p>
 {% endif %}
 {% if state.screenshot_image %}
 <h2>Screenshot</h2>
@@ -814,6 +971,7 @@ transition below for what was typed.</p>
 
 <h2>Actions</h2>
 {% if state.elements %}
+<div class="table-wrap">
 <table>
   <tr><th>Label</th><th>Type</th><th>Screen capture</th><th>Opened contents</th>
     <th>Destination / target state</th></tr>
@@ -834,6 +992,7 @@ transition below for what was typed.</p>
   </tr>
   {% endfor %}
 </table>
+</div>
 {% else %}<p><em>none</em></p>{% endif %}
 
 {% if state.has_signals %}
