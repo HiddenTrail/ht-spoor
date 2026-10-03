@@ -49,6 +49,7 @@ not retried: there is nothing transient to wait out.
 
 from __future__ import annotations
 
+import hashlib
 from collections import deque
 from collections.abc import Callable, Mapping, MutableMapping, Sequence
 from dataclasses import dataclass
@@ -59,6 +60,7 @@ from urllib.parse import urlparse
 
 import numpy as np
 
+from spoor.core.visual import hamming_distance
 from spoor.exploration.actuation import ActuationVerdict, CoveringElement, Verdict
 from spoor.exploration.capture import StateSignals, diff_signals
 from spoor.exploration.control import RunController
@@ -86,6 +88,24 @@ _MAX_RECOVERY_STEPS = 50
 # so a small bound regains the coverage all-or-nothing replay lost without letting a
 # genuinely nondeterministic path spin: after this many attempts the failure is flagged.
 _MAX_REPLAY_ATTEMPTS = 3
+
+
+def _parse_dhash(screenshot_hash: str | None) -> int | None:
+    """`screenshot_hash` as an int for Hamming comparison, or None if unusable.
+
+    The real driver only ever produces `str(perceptual_hash(png))` or `None`
+    (`PlaywrightDriver._screenshot_hash` already catches its own failures) — this
+    can never raise there. A malformed value (only reachable via a test fake or a
+    future driver bug) degrades to "no usable hash" rather than crashing the
+    whole run, the same conservative posture every other optional signal in this
+    module already takes.
+    """
+    if screenshot_hash is None:
+        return None
+    try:
+        return int(screenshot_hash)
+    except ValueError:
+        return None
 
 
 class ActionError(Exception):
@@ -647,6 +667,24 @@ def explore(
     # A resume continues an earlier map in place (additive merge); a fresh run starts
     # from an empty graph (§2e resume).
     graph = resume_from if resume_from is not None else ExplorationGraph()
+    # Visual state identity (ROADMAP.md §9, closes #104): two screens can share one
+    # DOM/text hash (a modal overlay, a color-only status change) yet be genuinely
+    # different states. `state_id()` itself stays DOM/text-only (unchanged, no
+    # screenshot input) — this closure-local map, dom id -> [(dHash, the final state
+    # id that hash resolved to), ...], is where the split actually happens, scoped to
+    # this run's walk only (not persisted; a resume's replay verification stays
+    # DOM-only, deliberately out of scope here — see the decision note).
+    #
+    # Matched by Hamming distance, not exact equality — a dHash is a *perceptual*
+    # hash, and comparing two by `==` would split on anti-aliasing/cursor noise (a
+    # text field gaining a focus ring when the explorer clicks it, say) as readily as
+    # on a genuine visual change. `_VISUAL_SPLIT_BITS` reuses the exact threshold and
+    # reasoning `ScreenshotStore._NEAR_DUPLICATE_BITS` already established for this
+    # same dHash: 3 of 64 bits is tight enough to still catch a real difference,
+    # loose enough to absorb re-render noise — found and fixed during self-review
+    # after exact-match comparison produced spurious splits on a live page.
+    _visual_variants: dict[str, list[tuple[int, str]]] = {}
+    _VISUAL_SPLIT_BITS = 3
 
     def capture(signals: StateSignals | None = None) -> tuple[str, bool]:
         """Record the driver's current state; return its id and whether it's new.
@@ -654,16 +692,48 @@ def explore(
         A caller that already captured the current signal bundle (a transition's
         after-snapshot) passes it in so the driver isn't snapshotted twice for the
         same state; otherwise the bundle is captured here.
+
+        An apparent revisit (the DOM/text hash matches a state already in the
+        graph) is confirmed, not assumed (closes #104): a screenshot hash whose
+        Hamming distance to every variant already seen under this DOM id exceeds
+        `_VISUAL_SPLIT_BITS` splits off a new, visually-distinct state instead of
+        silently deduping into the wrong one — its id is a fresh digest of the DOM
+        id and the screenshot hash together, not a `dom_id`-prefixed string, so it
+        can never collide with a prefix lookup (`apply.py`'s `_resolve_state`,
+        `--resume-from`'s selector resolution) the way a literal `f"{dom_id}:..."`
+        would. Every caller but the root already passes `signals` (a transition's
+        after-snapshot), so confirming a revisit costs no driver call beyond what
+        the transition's own before/after diff already took. The one exception
+        is the root: on a fresh run `graph` starts empty, so the root is never
+        an apparent revisit of itself; on a *resumed* run the root already lives
+        in the loaded map, so this costs exactly one extra `capture_signals()`
+        call, once per resume — `_visual_variants` starts empty every run (not
+        persisted across a resume), so that call can never find a baseline to
+        compare against and always falls through to the plain DOM-only dedup
+        below, unchanged from before #104; the extra call only confirms what was
+        already true. No screenshot, or no baseline ever recorded for this DOM id
+        at all (nothing to compare against), falls back to the original DOM-only
+        dedup the same way.
         """
-        sid = state_id(driver.state_html())
-        if graph.has_state(sid):
-            return sid, False
+        dom_id = state_id(driver.state_html())
+        sid = dom_id
+        if graph.has_state(dom_id):
+            probe = signals if signals is not None else driver.capture_signals()
+            new_hash = _parse_dhash(probe.screenshot_hash)
+            variants = _visual_variants.get(dom_id)
+            if new_hash is None or not variants:
+                return dom_id, False
+            for existing_hash, existing_sid in variants:
+                if hamming_distance(new_hash, existing_hash) <= _VISUAL_SPLIT_BITS:
+                    return existing_sid, False
+            sid = hashlib.sha256(f"{dom_id}:{new_hash}".encode()).hexdigest()
+            signals = probe
         actions = discover_actions(driver.ax_nodes())
-        graph.add_state(
-            sid,
-            actions,
-            signals if signals is not None else driver.capture_signals(),
-        )
+        resolved_signals = signals if signals is not None else driver.capture_signals()
+        graph.add_state(sid, actions, resolved_signals)
+        new_hash = _parse_dhash(resolved_signals.screenshot_hash)
+        if new_hash is not None:
+            _visual_variants.setdefault(dom_id, []).append((new_hash, sid))
         # This new state's position in the graph, which is the render-time enumeration
         # order, so the filenames written here match the `state-{index}.*` names the
         # wiki embeds and the `state-{index}.html` page each image sits beside.
