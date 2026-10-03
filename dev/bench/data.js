@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791012035644,
+  "lastUpdate": 1791016459804,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -7472,6 +7472,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5342.4,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8969c82ad32e2678b3554ba7523f0fe3233b1224",
+          "message": "Fold the screenshot perceptual hash into state identity (closes #104) (#197)\n\n* Fold the screenshot perceptual hash into state identity (closes #104)\n\nstate_id(html) stays DOM/text-only, unchanged. A new closure-local map in\nexplorer.py's capture() (dom id -> {screenshot hash: final state id}, one\nrun's walk only) splits an apparent revisit into a distinct state when its\nscreenshot hash doesn't match any variant already seen under that DOM\nhash, instead of silently deduping a modal/overlay/color-only-change into\nthe screen it covers. No screenshot available, or no baseline hash\nrecorded for that DOM id, falls back to the original DOM-only dedup,\nbyte-for-byte.\n\nTwo scope decisions confirmed with the maintainer before implementing:\nvisual splitting is opportunistic (no flag, no locale-style config) and\nresume/replay verification stays DOM-only for now, tracked as a narrower\nfirst cut. The cost model lands better than scoped for a fresh run: every\nnon-root state already carries a captured before/after signal bundle from\nits transition's diff, reused as the revisit probe at zero extra driver\ncost — confirmed by a dedicated call-count scenario. One real exception\nfound and documented rather than glossed over: a resumed run's root\n(already in the loaded map) pays one extra, harmless capture per resume.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n* Fix exact-hash-equality and id-collision bugs in visual state identity\n\nCI caught a real regression on PR #197: comparing screenshot perceptual\nhashes by exact string equality is wrong, since a dHash is meant to be\ncompared by Hamming distance. On a real page, clicking into a text field\nduring exploration (ACTIONABLE_ROLES already includes textbox) adds a\nfocus ring to the screenshot -- a trivial pixel difference that still\nchanged the hash string and wrongly split the identical screen into a\nsecond state.\n\nThat spurious split's id (f\"{dom_id}:{hash}\") also shared a literal\nstring-prefix with the plain dom_id, which broke apply.py's\n_resolve_state (str.startswith-based prefix matching): the live\napply-scaffold browser scenario's state prefix resolved ambiguously, so\nno field was ever applied and the test timed out waiting for a field the\nrun never reached.\n\nFixed both: screenshot hashes now compare via hamming_distance against\nthe same 3-bit threshold ScreenshotStore already established for this\nexact noise-vs-real-change distinction, and a split state's id is now a\nsha256 digest of (dom_id, hash) instead of a literal prefixed string.\nAlso hardened the hash parse to degrade to \"no usable hash\" on a\nValueError instead of raising, since the real driver can never produce a\nmalformed value but a crash on bad test data would otherwise abort the\nwhole run.\n\nAdded two regression-pinning scenarios: a near-duplicate screenshot (the\nexact shape of real re-render noise) stays merged, not split; no state id\nis ever a string-prefix of another. Full fast-tier suite, mutation\ncorpus, genericity check, and the complete unfiltered browser tier (50\nscenarios, not the exploration-only subset that let this slip through\noriginally) all green.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-03T11:29:23+03:00",
+          "tree_id": "4b77b4eb0e8402b6c9991656f11bb837652c2a8a",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/8969c82ad32e2678b3554ba7523f0fe3233b1224"
+        },
+        "date": 1791016458495,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 225.756,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04315,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.0866,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.1276,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.0543,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.07468,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 11.6254,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11676,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 19.4724,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04459,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2891,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.58001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.551,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05018,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.2615,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.01823,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.9614,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09011,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5493,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01067,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4786,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5326.2,
             "unit": "MB"
           }
         ]
