@@ -46,6 +46,21 @@ Feature: Opt-in full-page screenshots in the wiki (ROADMAP.md §2e, slice 8b)
     Then the wiki directory contains no screenshot images
     And no wiki page embeds a screenshot image
 
+  Scenario: A wiki that embeds any screenshot shows a visible reminder on its index page
+    # closes #106: text redaction can't scrub a secret baked into pixels, so the
+    # opt-in itself is the "deliberate, explicit" gate — this notice makes that
+    # tradeoff visible to whoever opens the wiki, right where they'd decide whether
+    # to share the directory, rather than relying on them recalling the --screenshots
+    # flag's own help text.
+    Given I explored it with screenshot capture on
+    When I render the wiki to disk
+    Then the index page shows a reminder that screenshots are not text-redacted
+
+  Scenario: A pixel-free wiki shows no such reminder
+    Given I explored it with screenshot capture off
+    When I render the wiki to disk
+    Then the index page shows no reminder about screenshots
+
   Scenario: Screenshot images are grouped in their own subfolder, not flat beside the pages
     # The images live under a "screenshots/" subfolder rather than sitting flat next to
     # the HTML pages, so the wiki directory stays readable; pages embed them by that

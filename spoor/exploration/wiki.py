@@ -546,6 +546,25 @@ def build_pages(
 
     env = _environment()
     safe_target = redact(target)
+    # Whether this wiki embeds a picture anywhere at all — a full-page shot, an
+    # element clip, or an opened-contents capture (§2e slices 8a/8d/8e). Surfaced
+    # on the index page as a visible reminder that pixels, unlike every text value
+    # on these pages, were never passed through §2h redaction (closes #106): the
+    # `--screenshots` opt-in is the deliberate action the design calls for, but the
+    # operator deciding whether to *share* the resulting directory still needs to
+    # see that tradeoff stated plainly, not just recall it from the CLI's own help
+    # text when they first ran the command.
+    #
+    # A caller can supply a non-empty `element_screenshots`/`element_opened` sink
+    # whose individual entries are still `None` (that element's capture failed or
+    # couldn't be located) — checking only that the outer mapping is non-empty
+    # would claim pixels exist when none actually do, so each is checked for at
+    # least one real reference inside.
+    has_screenshots = (
+        bool(shot_files)
+        or any(ref is not None for refs in element_clips.values() for ref in refs)
+        or any(ref is not None for refs in element_opens.values() for ref in refs)
+    )
     # `root` is the path from a page back to the wiki root, prepended to every link and
     # image `src` (slice 6g). Root pages ("") sit at the top; state/transition pages
     # live one level down, so they climb out with `_ROOT_UP`.
@@ -556,6 +575,7 @@ def build_pages(
             transitions=transition_views,
             skipped=skip_views,
             mermaid=_mermaid(graph, state_index, labels),
+            has_screenshots=has_screenshots,
             root="",
         ),
         # A fixed, target-independent glossary of every term the pages use (6f).
@@ -876,6 +896,12 @@ _INDEX = """{% extends "layout.html" %}
 {% block body %}
 <h1>Exploration wiki</h1>
 <p>Explored target: <code>{{ target }}</code></p>
+{% if has_screenshots %}
+<p class="notice"><strong>&#128247; This wiki includes screenshots.</strong> Unlike
+every other captured value on these pages, pixels cannot be checked for secrets the
+way text can — review the images yourself before sharing this directory with anyone
+else.</p>
+{% endif %}
 <div class="stats">
   <div class="stat"><strong>{{ states | length }}</strong> states discovered</div>
   <div class="stat"><strong>{{ transitions | length }}</strong> transitions</div>

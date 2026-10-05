@@ -268,3 +268,20 @@ def image_in_subfolder(context: dict[str, Any], name: str, sub: str) -> None:
 def no_flat_image(context: dict[str, Any]) -> None:
     flat = list(context["out_dir"].glob("*.png"))
     assert flat == [], f"images should live in the subfolder, found flat: {flat}"
+
+
+# --- Then: the shared-output redaction reminder (closes #106) ------------
+
+
+def _index_page(context: dict[str, Any]) -> str:
+    return (context["out_dir"] / "index.html").read_text(encoding="utf-8")
+
+
+@then("the index page shows a reminder that screenshots are not text-redacted")
+def index_shows_reminder(context: dict[str, Any]) -> None:
+    assert 'class="notice' in _index_page(context)
+
+
+@then("the index page shows no reminder about screenshots")
+def index_shows_no_reminder(context: dict[str, Any]) -> None:
+    assert 'class="notice' not in _index_page(context)
