@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791193288317,
+  "lastUpdate": 1791197767864,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -8192,6 +8192,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5426.2,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e48d31cbef510ada64f5ae738af913f2a963c330",
+          "message": "Resolve screenshot-embedding redaction design (closes #106) (#202)\n\nResearched before deciding: a screenshot never automatically leaves the\nmachine today -- spoor/serving/api.py and mcp_server.py have no route or\ntool that serves a static file or image, MapStore/map_view never carry a\nscreenshot path or bytes (only a screenshot_changed boolean), and the\nwiki directory is never read back by spoor serve/serve-mcp. So the\nnon-negotiable (pixels reach a shared surface only via an explicit\nopt-in) is already structurally satisfied by the existing --screenshots\nflag.\n\nConfirmed with the maintainer: formalize that the opt-in is the\ndeliberate gate, and add one concrete piece of transparency rather than\nnew infrastructure (an export command, automated image PII detection --\nboth considered and explicitly rejected, the latter out of step with\nthis codebase's never-guess posture for a cheap addition). A wiki's index\npage now shows a visible notice when it embeds any screenshot (full-page,\nelement clip, or opened-contents), reminding the operator to review\nbefore sharing the directory.\n\nSelf-review caught and fixed a false-positive edge case before\ncommitting: a caller-supplied element_screenshots/element_opened sink can\nbe non-empty while every individual capture is None (location/capture\nfailed), which would have shown the notice with zero real images\nembedded -- fixed to check for at least one actual ImageRef, verified\nwith a throwaway script.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-05T13:51:01+03:00",
+          "tree_id": "a014287c979e5fd202fb53139ee0e6caf4c8685e",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/e48d31cbef510ada64f5ae738af913f2a963c330"
+        },
+        "date": 1791197766430,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 224.587,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04069,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.9018,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12483,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.0652,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06883,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 11.4245,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11129,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 18.8144,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04628,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2691,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.577,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.1758,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.04972,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.3913,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.97223,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.0917,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.08481,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5247,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01055,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4621,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5365.1,
             "unit": "MB"
           }
         ]
