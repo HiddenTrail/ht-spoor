@@ -108,7 +108,7 @@ are on the horizon as an **optional** tier, never the default run loop.
 
 | Feature | Approach | Why | Phase | Notes |
 |---|---|---|---|---|
-| Healing report: old locator, new locator, confidence, suggested fix | Adapt | Spoor already records heal events (§2); surfacing them as suggested config/test fixes makes tier 3 visible | 2 | |
+| Healing report: old locator, new locator, confidence, suggested fix | **Adapted, closes #154** — `spoor run --healing-report`, `spoor/operational/healing_report.py` | Spoor already records heal events (§2); surfacing them as a suggested config fix makes tier 3 visible — see the Phase-3 tier-3 healing-report decision note in ROADMAP.md | 2 | |
 
 ## 5. Deliberate non-goals
 

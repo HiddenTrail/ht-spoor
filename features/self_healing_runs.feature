@@ -49,3 +49,13 @@ Feature: A run heals a field whose selector broke since it was last seen
     When I run the config
     Then the "name" field is null
     And the run summary reports no heals
+
+  Scenario: A confident heal records the old selector and a suggested new one
+    # Proves the end-to-end wiring (closes #154): a real run's heal event
+    # carries what the healing report needs, not just a count.
+    Given a config extracting a "name" field with selector "h2.title"
+    And a first run has recorded that field's fingerprint
+    When the page markup changes so "h2.title" matches nothing
+    And I run the config again
+    Then the heal event for "name" records the old selector "h2.title"
+    And the heal event for "name" suggests the new selector "h2.heading"

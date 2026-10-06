@@ -149,3 +149,19 @@ def summary_no_heals(context: dict[str, Any]) -> None:
     summary = context["summary"]
     assert summary.heal_confident == 0
     assert summary.heal_uncertain == 0
+
+
+@then(
+    parsers.parse('the heal event for "{name}" records the old selector "{selector}"')
+)
+def heal_event_old_selector(context: dict[str, Any], name: str, selector: str) -> None:
+    event = next(e for e in context["result"].heal_events if e.field == name)
+    assert event.old_selector == selector
+
+
+@then(
+    parsers.parse('the heal event for "{name}" suggests the new selector "{selector}"')
+)
+def heal_event_new_selector(context: dict[str, Any], name: str, selector: str) -> None:
+    event = next(e for e in context["result"].heal_events if e.field == name)
+    assert event.new_locator == selector

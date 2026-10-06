@@ -101,9 +101,21 @@ def test_an_uncertain_heal_returns_none_but_records_a_flagged_event(
 def test_a_heal_event_carries_no_matched_text(tmp_path: Path) -> None:
     healer = _healer_having_remembered_original(tmp_path)
     healer.attempt("name", Selector(text=_CLASS_RENAMED))
-    # §2h: only field name + confidence are exposed; the event has no text field.
-    assert not hasattr(healer.events[0], "text")
-    assert vars(healer.events[0]).keys() == {"field", "confidence", "used"}
+    event = healer.events[0]
+    # §2h: field name, confidence, and the two *structural* locator strings are
+    # exposed (closes #154); there is no field carrying the matched page text,
+    # and neither locator string — a CSS-selector-shaped tag/id/class
+    # description — happens to equal or embed the matched text itself.
+    assert not hasattr(event, "text")
+    assert vars(event).keys() == {
+        "field",
+        "confidence",
+        "used",
+        "old_selector",
+        "new_locator",
+    }
+    assert event.old_selector is None or "Beta Gadget" not in event.old_selector
+    assert event.new_locator is None or "Beta Gadget" not in event.new_locator
 
 
 def test_attempt_with_no_candidate_elements_returns_none(tmp_path: Path) -> None:

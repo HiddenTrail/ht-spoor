@@ -72,6 +72,21 @@ def run(
             ),
         ),
     ] = None,
+    healing_report: Annotated[
+        Path | None,
+        typer.Option(
+            "--healing-report",
+            help=(
+                "Also write a markdown report of this run's tier-3 self-healing "
+                "activity to this file: for each field whose configured selector "
+                "stopped matching, the old selector, the locator tier 3 "
+                "re-resolved it to, its confidence, and a suggested config fix. "
+                "Confident heals and uncertain matches (flagged for review, never "
+                "applied automatically) are reported separately. Nothing is "
+                "written when nothing healed this run."
+            ),
+        ),
+    ] = None,
 ) -> None:
     """Run a config against its target and write the extracted records."""
     cfg = load_config(config.read_text(encoding="utf-8"))
@@ -102,6 +117,15 @@ def run(
     )
     typer.echo(f"Wrote {len(result.records)} record(s) to {output} ({fmt})")
     typer.echo(RunSummary.from_result(result).render())
+    if healing_report is not None:
+        from spoor.operational.healing_report import render_healing_report
+
+        report = render_healing_report(result.heal_events)
+        if report is None:
+            typer.echo("  healing report:  nothing healed this run, none written")
+        else:
+            healing_report.write_text(report, encoding="utf-8")
+            typer.echo(f"  healing report:  {healing_report}")
 
 
 def _check_explore_output_paths(
