@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791278716914,
+  "lastUpdate": 1791281857593,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -8480,6 +8480,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5328.6,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bdf7a413414bdd4156efdc0a5ff1daf0a7e3d8be",
+          "message": "Add user-configurable clickable-element rules for exploration (closes #152) (#204)\n\n* Add user-configurable clickable-element rules for exploration (closes #152)\n\ndocs/COMPETITIVE_PLAN.md flagged Crawljax's clickable-element rules\n(incl. exclusions) as worth adapting: an explicit, operator-set\nallow/exclude list for which actionable elements exploration attempts,\nrather than an inferred heuristic (§1 \"not an agent\").\n\nspoor/exploration/element_rules.py adds ElementRules(include, exclude):\ncase-sensitive glob patterns matched against an element's visible\naccessible label, exclude winning over include (same composition rule\nscoped-crawl's include/exclude fields use). Wired into explorer.py's\nmain firing loop only, via a new optional element_rules parameter on\nexplore()/resume_exploration(), checked independently of and before\nthe existing destructive-action safety gate -- never instead of it.\nDeliberately scoped out of the opt-in disclosure-screenshot capture and\nlayer-recovery's candidate search, so excluding an element from the\nmapped graph doesn't also stop it from clearing a layer blocking some\nother, included action.\n\nNew CLI flags: --include-element / --exclude-element (repeatable).\nUnset, behavior is unchanged -- every discovered element stays a\ncandidate.\n\nNon-negotiable preserved: an --include-element match on a destructive\nlabel grants no sandbox permission; both checks must independently\nallow an action before it fires, pinned by its own scenario.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n* Let --include-element/--exclude-element read patterns from a file (#152 follow-up)\n\nA real site's rule set can run to dozens of patterns, which repeated\nCLI flags handle poorly. Rather than adding a full exploration config\nfile (exploration's whole pitch is \"point it at a URL with no\nconfig\"), a value starting with '@' on either flag is now read as a\nfile of patterns, one per line (blank lines and '#' comments skipped),\ninstead of being a literal pattern -- mixing freely with literal\nvalues across repeated uses of the same flag.\n\nA missing file, or one that resolves to zero patterns, is refused up\nfront with a clear error before any browser is launched, the same\nposture every other explore input validation already takes.\n\nCLI-layer plumbing only -- ElementRules itself is unchanged, so this\nis covered by plain CliRunner tests in tests/test_cli.py rather than a\nnew .feature file, matching how --session's file-threading and\nmissing-file-rejection tests are already done there.\n\nCo-Authored-By: Claude Sonnet 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-06T13:13:16+03:00",
+          "tree_id": "415c0f36b7accc122e68beb13312cab9830bb66b",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/bdf7a413414bdd4156efdc0a5ff1daf0a7e3d8be"
+        },
+        "date": 1791281856782,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 193.975,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.02171,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.1913,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.07939,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 1.9578,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.05165,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 7.4233,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.07125,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 12.7348,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.02649,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.1384,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.54035,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 30.4335,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.02561,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 7.2641,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.87684,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 123.4763,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.05941,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.3641,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.00628,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.2683,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5400.5,
             "unit": "MB"
           }
         ]
