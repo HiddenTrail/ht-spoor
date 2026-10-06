@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791311620061,
+  "lastUpdate": 1791316842805,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -9056,6 +9056,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5311.7,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d77d53a3ef0a96ab056f4211e631bf8ff408ce18",
+          "message": "Fix --assert-no-new-signals: guaranteed TypeError, dropped signals, page-load false positives (#208)\n\nA full-epic adversarial review (PRs #203-#207) found the --gen-tests\n--assert-no-new-signals reverse assertion (#128, merged in #205)\nshipped broken in ways its own scenarios never caught, because every\ntestgen scenario inspects generated source text, never executes it.\n\n1. Guaranteed runtime crash. The generated closed-world assertion was\n   `assert set(console) <= ['a', 'b'], \"...\"` -- set <= list raises\n   TypeError unconditionally in Python. Every generated test that\n   reached a console- or storage-touching transition under the flag\n   crashed instead of asserting anything. Fixed by wrapping the\n   literal in set(...) at render time.\n\n2. Silent data loss + O(T*(S+T)) cost. _closed_world_signals rebuilt\n   a {edge: Transition} dict and re-ran a full BFS on every call,\n   inside the per-transition loop -- repeated work for no reason.\n   Worse: the single-value dict silently kept only the last\n   transition for a given edge, dropping an earlier transition's\n   recorded signals when two shared an edge signature (plausible\n   after a --resume-from merge) -- a legitimately-seen value excluded\n   from the closed set, a false-positive failure with no diagnostic.\n   Fixed by hoisting the shared structures out of the loop and\n   replacing the dict with a {edge: list[Transition]} grouping that\n   unions every transition sharing an edge.\n\n3. The documented page-load-noise caveat was narrower than the real\n   gap. It correctly named the untouched-kind case but missed that a\n   *touched* kind has the identical problem: the landing page's own\n   console/network/storage activity from the bare page.goto() at the\n   start of every replay was never in the closed set either, so the\n   very first generated test for a touched kind on any real\n   page-load-noisy site false-positived. Fixed by seeding the root\n   state's own full captured snapshot into every closed-world set\n   unconditionally.\n\nNew tests/test_pytest_gen.py closes the detection gap directly: it\nexec()s the generated assertion lines against stand-in values,\nproving they run, not just parse.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-06T22:56:09+03:00",
+          "tree_id": "31c8d5ca014b5b56f7390002699d625219013436",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/d77d53a3ef0a96ab056f4211e631bf8ff408ce18"
+        },
+        "date": 1791316841166,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 202.495,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.02835,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.6261,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.08767,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.0898,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06614,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 9.3437,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.10293,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 15.0917,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.03917,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2046,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.55341,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 31.6506,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.03205,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 8.6838,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.88665,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 124.0227,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.06035,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.3618,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.00682,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.308,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5400.4,
             "unit": "MB"
           }
         ]
