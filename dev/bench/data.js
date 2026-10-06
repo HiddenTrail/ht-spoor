@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791295570569,
+  "lastUpdate": 1791311620061,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -8912,6 +8912,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5315.2,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5a5095de74f340f81dafb0d80f8785224ed309ed",
+          "message": "Add tier-3 healing report, spoor run --healing-report (closes #154) (#207)\n\ndocs/COMPETITIVE_PLAN.md flags Healenium/Testim's healing reports (old\nlocator, new locator, confidence, suggested fix) as worth adapting.\nTier 3 already recorded a HealEvent per heal attempt and RunSummary\nalready counted them, but neither named what broke or what tier 3\nfound instead -- a heal was a silent runtime recovery, visible only as\na number.\n\nHealEvent gains old_selector and new_locator (both default None,\nevery existing construction unaffected). old_selector is the\nconfigured selector that matched nothing, threaded in from the one\nplace that already knows it. new_locator is a CSS-selector-shaped\ndescription of the winning element (#id, else tag.class1.class2, else\nthe bare tag) -- a suggestion to review, never a claim it uniquely\nresolves to just that element. Set whenever heal() found any best\ncandidate, confident or not, since an uncertain match's best guess is\nstill worth showing for review; None only when a container heal's\nambiguous or empty refusal leaves no single element to point at.\n\nspoor/operational/healing_report.py:render_healing_report renders the\nevents as markdown: confident heals with a suggested config fix, then\nuncertain matches in a separate section explicitly flagged for manual\nreview, never suggested as something to adopt. Every value is\nredacted before it reaches the report, the same defensive posture the\ngenerated-test writer already takes.\n\nWired to spoor run --healing-report <file>. Scoped to spoor run only:\ntier-3 field healing is an extraction-config mechanism; exploration\nhas no CSS selectors to heal, so a generated-test fix (the issue's\nother named shape) doesn't apply to anything that exists today.\n\nStrengthened (not just widened) the existing §2h no-raw-text pinned\ntest to also assert neither new field happens to contain the matched\ntext, not only that there's no field literally named \"text\".\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-06T21:28:46+03:00",
+          "tree_id": "78101a42ee4f80eae88ad6f4315dc794a68b1fab",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/5a5095de74f340f81dafb0d80f8785224ed309ed"
+        },
+        "date": 1791311618509,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 220.535,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03685,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.8834,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12241,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.89,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06437,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 10.7925,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.10748,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 17.8085,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.03965,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2521,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.57249,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.0064,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.04905,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 12.4663,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.99114,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.3591,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.08514,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5371,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01027,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4435,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5311.7,
             "unit": "MB"
           }
         ]
