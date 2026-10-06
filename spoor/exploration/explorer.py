@@ -66,6 +66,7 @@ from spoor.exploration.capture import StateSignals, diff_signals
 from spoor.exploration.control import RunController
 from spoor.exploration.dedup import UndecodableImage, decode, find_subimage
 from spoor.exploration.discovery import ActionableElement, discover_actions
+from spoor.exploration.element_rules import ElementRules
 from spoor.exploration.graph import ExplorationGraph, path_steps_from_root
 from spoor.exploration.hooks import (
     ExplorationHooks,
@@ -552,6 +553,7 @@ def explore(
     target: str,
     controller: RunController,
     declared_sandbox: bool = False,
+    element_rules: ElementRules | None = None,
     screenshots: MutableMapping[str, ImageRef] | None = None,
     element_screenshots: MutableMapping[str, list[ElementShot]] | None = None,
     screenshot_dir: Path | None = None,
@@ -566,6 +568,17 @@ def explore(
     controller stops it (budget reached or kill switch thrown). Destructive actions
     are fired only inside a sandbox; on any other target they are recorded as skips
     and their state is never reached (§2e non-negotiable).
+
+    `element_rules` (§2e, closes #152) is an optional operator-set allow/exclude list
+    (`ElementRules`) narrowing which discovered actions are attempted at all, matched
+    by visible label. Left None (the default), every discovered action is a candidate
+    exactly as before. It is independent of, and can never relax, the destructive-
+    action safety gate above: an action must clear *both* checks to fire, and an
+    `include` pattern matching a destructive label does not grant it sandbox
+    permission. Applied only at the main firing loop — not to the opt-in "what a
+    dropdown reveals" screenshot capture or to a layer-recovery candidate search,
+    since excluding an element from the graph should not also stop it from being used
+    to clear a layer blocking some other, included action.
 
     `screenshots` is an opt-in sink for full-page screenshots (§2e slice 8b): when a
     mapping is passed and the driver can take one, each discovered state's image is
@@ -1015,6 +1028,11 @@ def explore(
             for action in _prioritized(graph.node(state).actions):
                 if controller.check().should_stop:
                     return
+                if element_rules is not None:
+                    rule_decision = element_rules.evaluate(action)
+                    if not rule_decision.allowed:
+                        graph.record_skip(state, action, rule_decision.reason)
+                        continue
                 decision = evaluate_action(
                     target, action.name, action.role, declared_sandbox
                 )

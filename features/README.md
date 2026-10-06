@@ -89,6 +89,7 @@ chronological, slice-by-slice narrative order.
 | `exploration_hooks.feature` | Operator-supplied exploration hooks (Python API, `explore(hooks=...)`): observe a newly discovered state or a fired transition, fired only after each is already committed to the graph and the destructive-action gate already consumed, carrying only a redaction-safe view — closes #187, part 2 of #150 | §2e | `spoor/exploration` | 2 |
 | `exploration_browser.feature` | Exploration in a real browser: the `spoor explore` command drives the whole stack against a live site via a headless-Chromium driver, renders a wiki, and persists the graph for serving | §2e / §2f | `spoor/exploration`, `spoor/serving`, CLI | 5 |
 | `exploration_session.feature` | Bring-your-own-session for `spoor explore`: a supplied cookie/localStorage session survives every reset-and-replay (cookies re-added after each clear, localStorage restored via an init script), so a login-gated site's real content is mapped past the login screen; Spoor never logs in itself | §2e, §2h | `spoor/exploration`, `spoor/security` | 5 |
+| `exploration_element_rules.feature` | User-configurable clickable-element rules: an operator-set `--include-element`/`--exclude-element` label-pattern allow/exclude list scoping which discovered actions exploration attempts, independent of (and unable to relax) the sandbox-only destructive-action gate — closes #152 | §2e | `spoor/exploration`, CLI | 2 |
 
 ### Exploration — per-transition signal capture & the wiki
 

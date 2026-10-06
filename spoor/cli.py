@@ -133,6 +133,55 @@ def _check_explore_output_paths(
             )
 
 
+def _read_element_patterns_file(flag: str, path: Path) -> list[str]:
+    """Read one pattern per line from `path` for --include-element/--exclude-element
+    (§2e, #152 follow-up: dozens of rules shouldn't have to be typed as repeated
+    flags). Blank lines and lines starting with `#` are skipped, so a rules file can
+    carry its own comments. Refused up front, before any browser is launched, same
+    as every other explore output/input validation here: a missing file, or a file
+    that resolves to zero patterns (every line blank or a comment — almost always a
+    mistake, not an intentional "match nothing"), is an immediate, clear error
+    rather than a run that silently behaves as if the flag were never passed.
+    """
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError as exc:
+        raise typer.BadParameter(f"{flag} @{path}: could not read file: {exc}") from exc
+    patterns = [
+        stripped
+        for line in lines
+        if (stripped := line.strip()) and not stripped.startswith("#")
+    ]
+    if not patterns:
+        raise typer.BadParameter(
+            f"{flag} @{path}: file contains no patterns (every line is blank or "
+            "a '#' comment)"
+        )
+    return patterns
+
+
+def _expand_element_patterns(
+    flag: str, values: list[str] | None
+) -> tuple[str, ...] | None:
+    """Expand --include-element/--exclude-element values into the final pattern
+    tuple `ElementRules` takes.
+
+    A value starting with `@` names a file of patterns, one per line, instead of
+    being a literal pattern itself — so dozens of rules can live in a file (under
+    version control, reused across runs) rather than as that many repeated flags.
+    Literal and `@file` values freely mix within the same flag's repeated uses.
+    """
+    if not values:
+        return None
+    expanded: list[str] = []
+    for value in values:
+        if value.startswith("@"):
+            expanded.extend(_read_element_patterns_file(flag, Path(value[1:])))
+        else:
+            expanded.append(value)
+    return tuple(expanded)
+
+
 class _CliProgress:
     """A dependency-free live spinner/bar for `spoor explore` (§2d observability).
 
@@ -301,6 +350,37 @@ def explore(
             ),
         ),
     ] = None,
+    include_elements: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--include-element",
+            help=(
+                "Only attempt an actionable element whose visible label matches one "
+                "of these patterns (e.g. 'Add to cart*'; '*' and '?' wildcards, "
+                "case-sensitive). Repeatable. A value starting with '@' names a file "
+                "of patterns instead (one per line, blank lines and '#' comments "
+                "skipped) — handy once there are more than a few, and reusable "
+                "across runs: --include-element @rules.txt. Unset: every discovered "
+                "element is a candidate, same as without this option. An "
+                "--exclude-element match always wins over this. Narrows what's "
+                "attempted only — destructive actions (delete, buy, pay, ...) still "
+                "only ever fire in a sandbox, regardless of what this matches."
+            ),
+        ),
+    ] = None,
+    exclude_elements: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--exclude-element",
+            help=(
+                "Never attempt an actionable element whose visible label matches one "
+                "of these patterns (e.g. '*Logout*'; '*' and '?' wildcards, "
+                "case-sensitive). Repeatable, and a value starting with '@' names a "
+                "file of patterns instead — see --include-element. Wins over "
+                "--include-element when both match the same element."
+            ),
+        ),
+    ] = None,
     screenshots: Annotated[
         bool,
         typer.Option(
@@ -343,12 +423,17 @@ def explore(
     fields, login points, and destructive actions — a starting point for a planned,
     not-yet-built interactive round; filling it in does nothing on its own yet. The
     mapped graph is also saved to the local map, so `spoor serve`/`serve-mcp` can hand
-    it back later without re-exploring.
+    it back later without re-exploring. Pass --include-element and/or
+    --exclude-element to scope which elements are attempted at all, by label pattern
+    (or @<file> for a file of patterns, one per line) — this only narrows what's
+    attempted, never what's permitted: a destructive action still only ever fires in
+    a sandbox either way.
     """
     import signal
 
     from spoor.exploration.control import RunBudget, RunController
     from spoor.exploration.driver import PlaywrightDriver
+    from spoor.exploration.element_rules import ElementRules
     from spoor.exploration.explorer import ElementShot
     from spoor.exploration.explorer import explore as explore_target
     from spoor.exploration.resume import ResumeError, resume_exploration
@@ -389,6 +474,10 @@ def explore(
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     controller = RunController(budget)
+    element_rules = ElementRules(
+        include=_expand_element_patterns("--include-element", include_elements),
+        exclude=_expand_element_patterns("--exclude-element", exclude_elements),
+    )
     cli_progress = _CliProgress(controller, budget)
     # The opt-in screenshot sinks: dicts only when asked for, so a default run captures
     # no pixels at all (§2e slice 8). During exploration each image is written straight
@@ -423,6 +512,7 @@ def explore(
                         saved_map=saved_map,
                         selector=resume_from,
                         declared_sandbox=sandbox,
+                        element_rules=element_rules,
                         screenshots=shots,
                         element_screenshots=element_shots,
                         screenshot_dir=screenshot_dir,
@@ -436,6 +526,7 @@ def explore(
                     target=url,
                     controller=controller,
                     declared_sandbox=sandbox,
+                    element_rules=element_rules,
                     screenshots=shots,
                     element_screenshots=element_shots,
                     screenshot_dir=screenshot_dir,

@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from spoor.exploration.control import RunController
+from spoor.exploration.element_rules import ElementRules
 from spoor.exploration.explorer import (
     BrowserDriver,
     ElementShot,
@@ -86,6 +87,7 @@ def resume_exploration(
     saved_map: Mapping[str, Any],
     selector: str,
     declared_sandbox: bool = False,
+    element_rules: ElementRules | None = None,
     screenshots: MutableMapping[str, ImageRef] | None = None,
     element_screenshots: MutableMapping[str, list[ElementShot]] | None = None,
     screenshot_dir: Path | None = None,
@@ -99,8 +101,8 @@ def resume_exploration(
     returning the loaded graph with the newly discovered states and transitions merged
     in. The depth budget on `controller` counts clicks from the anchor. The explorer
     refuses a stale map (a changed start page or an unreachable anchor) with a
-    `ValueError` that propagates unchanged. The screenshot sinks, `progress`, and
-    `hooks` behave exactly as in `explore`.
+    `ValueError` that propagates unchanged. `element_rules`, the screenshot sinks,
+    `progress`, and `hooks` behave exactly as in `explore`.
     """
     loaded = load_exploration_map(saved_map)
     anchor = resolve_resume_anchor(saved_map, selector)
@@ -109,6 +111,7 @@ def resume_exploration(
         target=target,
         controller=controller,
         declared_sandbox=declared_sandbox,
+        element_rules=element_rules,
         screenshots=screenshots,
         element_screenshots=element_screenshots,
         screenshot_dir=screenshot_dir,
