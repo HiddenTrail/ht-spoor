@@ -77,13 +77,13 @@ def run(
         typer.Option(
             "--healing-report",
             help=(
-                "Also write a markdown report of this run's tier-3 self-healing "
-                "activity to this file: for each field whose configured selector "
-                "stopped matching, the old selector, the locator tier 3 "
-                "re-resolved it to, its confidence, and a suggested config fix. "
+                "Also write a markdown report of any self-healing this run did "
+                "to this file: for each field whose configured selector stopped "
+                "matching, the old selector, the locator Spoor re-resolved it "
+                "to instead, its confidence, and a suggested config fix. "
                 "Confident heals and uncertain matches (flagged for review, never "
                 "applied automatically) are reported separately. Nothing is "
-                "written when nothing healed this run."
+                "written when nothing needed healing this run."
             ),
         ),
     ] = None,
