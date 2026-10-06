@@ -101,12 +101,20 @@ Feature: Generate replayable regression tests from an exploration graph
     And the test for "Open menu" asserts no storage key beyond "token"
     And the test for "Open menu" asserts no network request beyond "/menu.js"
 
-  Scenario: A signal kind with nothing ever recorded gets no reverse assertion
-    # Page-load noise is never recorded as any transition's own addition, so
-    # asserting "nothing at all" for an untouched kind would false-positive on it.
+  Scenario: Root page-load noise alone still populates the reverse assertion
+    # A review fix (#128 follow-up): "Refresh" fires no action that adds a
+    # signal of its own, but every generated test's replay starts with a bare
+    # page.goto() against the root page, which already carries console/storage/
+    # network values (the Background's "home" row) -- that landing-page noise
+    # is seeded into every closed set unconditionally, so a transition whose
+    # own diff is empty still gets a reverse check against whatever the root
+    # page alone produces, not an empty "assert nothing at all" that would
+    # false-positive on that same noise on every real run.
     Given a mapped transition "Refresh" from "home" to "home" that changed nothing
     When I generate a pytest suite for "https://shop.example" asserting no new signals
-    Then the test for "Refresh" asserts no signal changes
+    Then the test for "Refresh" asserts no console message beyond "home ready"
+    And the test for "Refresh" asserts no storage key beyond "session"
+    And the test for "Refresh" asserts no network request beyond "/home.js"
 
   Scenario: The reverse assertion's closed set spans the whole replayed path
     # "Add to cart" only adds "/cart.js" itself, but its test replays "Open menu"
