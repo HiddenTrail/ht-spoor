@@ -74,6 +74,10 @@ dev = [
     # Resident-memory sampling for the performance bench's resource trace (§5.5).
     # Bench-only; when absent the bench degrades to timing-only (RSS reads 0).
     "psutil",
+    # One-off benchmark only (scripts/benchmark_scrapling.py, closes #151):
+    # measures Scrapling's adaptive relocation against the same §5.3 mutation
+    # corpus tier 3 is graded on. Never imported by spoor/ itself.
+    "scrapling>=0.4",
     # Serving extras are needed to run the serving features in the gate.
     "fastapi>=0.110",
     "uvicorn>=0.29",
