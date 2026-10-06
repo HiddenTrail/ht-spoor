@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791290434440,
+  "lastUpdate": 1791295570569,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -8768,6 +8768,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5427,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f5bd45f9e30bc80dc8c5cbf75b0a88fdfc738d93",
+          "message": "Add static JS-bundle endpoint discovery, §2b layer 6 (closes #153) (#206)\n\ndocs/COMPETITIVE_PLAN.md flags OWASP ZAP/Katana's static JS-bundle\nanalysis: finding API endpoints referenced in a page's JavaScript\nwithout ever executing it -- a path that finds calls no click ever\ntriggered.\n\nspoor/api_discovery/bundle_endpoints.py:discover_bundle_endpoints\nreuses layer 1's own same-origin bundle-fetch mechanism\n(_script_srcs/_fetch) and layer 4's ID-templating rule\n(_template_path), scanning each bundle's raw text for quoted strings\nthat look like an absolute API path. A generic static-asset extension\ndenylist filters obvious noise; everything else that clears the bar is\nreported -- the match is deliberately loose, matching layer 1's own\naccepted false-positive trade-off for spec references.\n\nCandidates are never fetched to confirm they exist: validating one\nwould violate \"without ever executing it\" literally, and could itself\nbe unsafe (a destructive-looking candidate like\n/api/accounts/9/delete). This makes it Spoor's weakest-confidence\nAPI-surface signal -- not \"observed\" like layers 1/2, just \"a string\nthat looks path-shaped, somewhere in the bundle.\"\n\nWired into _probe_surface alongside layers 1/2 (every run, not a\nseparate crawl). Full candidate list writes to a local-only file\n(beside the HAR when one was captured, else a fresh run cache dir);\nonly the count reaches RunSummary and shareable_api_surface (served\nREST/MCP) -- same counts-only treatment layers 4/5 already get, for\nthe same reason: a templated path can still embed an un-clustered\nsecret.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-06T17:01:00+03:00",
+          "tree_id": "811cd6ad75d41496ce26ca1d29535f65805002f7",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/f5bd45f9e30bc80dc8c5cbf75b0a88fdfc738d93"
+        },
+        "date": 1791295568397,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 216.686,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03737,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.9053,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.11377,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.7294,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06276,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 10.3862,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11292,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 17.7595,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.04395,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2623,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.58039,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.2382,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.0473,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 12.3996,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.97704,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.0865,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.08325,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.497,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01014,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4436,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5315.2,
             "unit": "MB"
           }
         ]
