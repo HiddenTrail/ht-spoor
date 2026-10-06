@@ -101,7 +101,7 @@ are on the horizon as an **optional** tier, never the default run loop.
 
 | Feature | Approach | Why | Phase | Notes |
 |---|---|---|---|---|
-| Extract endpoints/routes from JS bundles without executing them | Adapt, in `spoor/api_discovery/` | Finds API calls no click triggered; generic | 2 | |
+| Extract endpoints/routes from JS bundles without executing them | **Adapted, closes #153** — `spoor/api_discovery/bundle_endpoints.py` | Finds API calls no click triggered; generic; see the §2b layer-6 decision note in ROADMAP.md | 2 | |
 | Scope configuration | Covered by the Crawlee row | | 1 | |
 
 ### Healenium / Testim — healing reports

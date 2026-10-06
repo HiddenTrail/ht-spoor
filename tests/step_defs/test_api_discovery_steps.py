@@ -115,6 +115,30 @@ def script_references_spec(context: dict[str, Any], path: str, spec_path: str) -
     context["routes"][path] = (200, js, "application/javascript")
 
 
+@given(parsers.parse('the script "{path}" calls the API endpoint "{endpoint}"'))
+def script_calls_endpoint(context: dict[str, Any], path: str, endpoint: str) -> None:
+    js = f'fetch("{endpoint}").then((r) => r.json());'
+    context["routes"][path] = (200, js, "application/javascript")
+
+
+@given(
+    parsers.parse('the script "{path}" calls the API endpoints "{p1}", "{p2}"')
+)
+def script_calls_endpoints(
+    context: dict[str, Any], path: str, p1: str, p2: str
+) -> None:
+    js = f'fetch("{p1}"); fetch("{p2}");'
+    context["routes"][path] = (200, js, "application/javascript")
+
+
+@given(parsers.parse('the script "{path}" references the asset "{asset_path}"'))
+def script_references_asset(
+    context: dict[str, Any], path: str, asset_path: str
+) -> None:
+    js = f'const logo = "{asset_path}";'
+    context["routes"][path] = (200, js, "application/javascript")
+
+
 @given(parsers.parse('a target whose landing page has a Redoc spec-url of "{path}"'))
 def landing_redoc_spec_url(context: dict[str, Any], path: str) -> None:
     # A path with none of the spec vocabulary: only the explicit spec-url
@@ -234,10 +258,21 @@ def run_synthesis(context: dict[str, Any]) -> None:
 
 
 @when("I run the config and capture the summary")
-def run_and_summarize(context: dict[str, Any]) -> None:
+def run_and_summarize(
+    context: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spoor.security import storage
+
+    # Any scenario that finds bundle endpoints writes a local-only doc (§2b layer
+    # 6) via storage.new_run_cache_dir() when no HAR was captured (none of these
+    # scenarios request capture.har) — redirect it so a test run never touches
+    # the real repo's .spoor-cache/.
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path)
     routes = context["routes"]
+    requested: list[str] = context.setdefault("requested_paths", [])
 
     def handler(request: httpx.Request) -> httpx.Response:
+        requested.append(request.url.path)
         if request.url.path in routes:
             status, body, content_type = routes[request.url.path]
             return httpx.Response(
@@ -490,3 +525,47 @@ def correlation_summary_counts_only(context: dict[str, Any]) -> None:
 @then("nothing is correlated")
 def correlation_none(context: dict[str, Any]) -> None:
     assert context["correlation"] is None
+
+
+# --- Then: layer 6, static JS-bundle endpoint discovery (closes #153) ----
+
+
+@then(parsers.parse('the run reports the bundle-discovered endpoint "{path}"'))
+def reports_bundle_endpoint(context: dict[str, Any], path: str) -> None:
+    assert path in context["result"].bundle_endpoints
+
+
+@then(
+    parsers.re(r"the run reports (?P<n>\d+) bundle-discovered endpoints?")
+)
+def bundle_endpoint_count(context: dict[str, Any], n: str) -> None:
+    assert len(context["result"].bundle_endpoints) == int(n)
+
+
+@then("the run reports no bundle-discovered endpoints")
+def no_bundle_endpoints(context: dict[str, Any]) -> None:
+    assert context["result"].bundle_endpoints == ()
+
+
+@then(parsers.parse('no request was ever made to "{path}"'))
+def no_request_to(context: dict[str, Any], path: str) -> None:
+    assert path not in context["requested_paths"]
+
+
+@then("the run summary reports the bundle-discovered endpoint count, not the paths")
+def bundle_summary_counts_only(context: dict[str, Any]) -> None:
+    rendered = context["summary"].render()
+    endpoints = context["result"].bundle_endpoints
+    assert f"{len(endpoints)} endpoint candidate(s)" in rendered
+    for path in endpoints:
+        assert path not in rendered
+
+
+@then("a bundle-endpoints document is written to the local-only cache")
+def bundle_doc_written(context: dict[str, Any]) -> None:
+    doc_path = context["result"].bundle_endpoints_path
+    assert doc_path is not None
+    doc = Path(doc_path)
+    assert doc.is_file()
+    written = json.loads(doc.read_text(encoding="utf-8"))
+    assert set(written) == set(context["result"].bundle_endpoints)

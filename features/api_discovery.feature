@@ -26,7 +26,15 @@
 # The synthesized document is written to the local-only cache; only counts reach
 # shared output (§2h).
 #
-# Layer 5 (action-to-endpoint correlation) is the final section: the browser tier
+# Layer 6 (static JS-bundle endpoint discovery, closes #153) is the final section:
+# scan the same-origin JS bundles a page loads for endpoint-shaped string literals
+# — without ever executing them or firing a request to confirm one is real — so a
+# call no click ever triggered still shows up. Reuses layer 1's own bundle-fetch
+# mechanism (finding a *spec* reference there; an *endpoint* reference here) and
+# layer 4's ID-templating rule. Every candidate is unconfirmed by construction;
+# only counts reach the summary, the full candidate list stays local-only (§2h).
+#
+# Layer 5 (action-to-endpoint correlation) is the second-to-last section: the browser tier
 # marks a timestamped checkpoint before each simulated action (page load, each
 # scroll); afterward, each captured request is attributed to the action whose time
 # window it fell in (the last checkpoint at or before the request). This turns a
@@ -226,3 +234,63 @@ Feature: A run discovers an official API spec when the target serves one
     And no action checkpoints were recorded
     When I correlate the captured requests with the actions
     Then nothing is correlated
+
+  # --- Layer 6: static JS-bundle endpoint discovery (closes #153) ----------
+  # Complements the runtime-observed layers above (spec discovery, GraphQL
+  # introspection, traffic synthesis, action correlation) with a static path:
+  # scan the page's same-origin JS bundles for endpoint-shaped string literals,
+  # without ever executing them or firing a single request to confirm one is
+  # real — finding calls no click ever triggered (docs/COMPETITIVE_PLAN.md's
+  # OWASP ZAP/Katana row). A candidate is reported exactly as what it is: a
+  # string that looks path-shaped, unconfirmed — never promoted to "observed"
+  # the way the layers above are. Reuses layer 1's own same-origin bundle-fetch
+  # mechanism and layer 4's ID-templating rule, so /api/users/1 and
+  # /api/users/2 found in a bundle collapse into one candidate the same way an
+  # observed-traffic endpoint would.
+
+  Scenario: An endpoint referenced only in a JS bundle is found as a candidate
+    Given a target whose landing page loads the script "/static/app.js"
+    And the script "/static/app.js" calls the API endpoint "/api/users/42"
+    When I run the config and capture the summary
+    Then the run reports the bundle-discovered endpoint "/api/users/{id}"
+
+  Scenario: Repeated ID paths in a bundle collapse into one templated candidate
+    Given a target whose landing page loads the script "/static/app.js"
+    And the script "/static/app.js" calls the API endpoints "/api/users/1", "/api/users/2"
+    When I run the config and capture the summary
+    Then the run reports the bundle-discovered endpoint "/api/users/{id}"
+    And the run reports 1 bundle-discovered endpoints
+
+  Scenario: A static asset path is never reported as an endpoint candidate
+    Given a target whose landing page loads the script "/static/app.js"
+    And the script "/static/app.js" references the asset "/static/logo.png"
+    When I run the config and capture the summary
+    Then the run reports no bundle-discovered endpoints
+
+  Scenario: A target with no JS bundles reports no candidates
+    Given a target that serves no spec at any conventional path
+    When I run the config and capture the summary
+    Then the run reports no bundle-discovered endpoints
+
+  Scenario: A JS bundle disallowed by robots.txt is not scanned for endpoints
+    Given a target whose landing page loads the script "/static/app.js"
+    And the script "/static/app.js" calls the API endpoint "/api/users/42"
+    And a robots.txt that disallows "/static/app.js"
+    When I run the config and capture the summary
+    Then the run reports no bundle-discovered endpoints
+
+  Scenario: Bundle-discovered endpoints are never fetched to confirm they exist
+    # The whole premise is "without executing it": a candidate that, if real,
+    # might even be destructive is never probed to check it's there.
+    Given a target whose landing page loads the script "/static/app.js"
+    And the script "/static/app.js" calls the API endpoint "/api/accounts/9/delete"
+    When I run the config and capture the summary
+    Then the run reports the bundle-discovered endpoint "/api/accounts/{id}/delete"
+    And no request was ever made to "/api/accounts/9/delete"
+
+  Scenario: Discovered endpoints are written to the local-only cache, counts only in the summary
+    Given a target whose landing page loads the script "/static/app.js"
+    And the script "/static/app.js" calls the API endpoint "/api/users/42"
+    When I run the config and capture the summary
+    Then the run summary reports the bundle-discovered endpoint count, not the paths
+    And a bundle-endpoints document is written to the local-only cache

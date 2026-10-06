@@ -465,7 +465,7 @@ the wiki itself shows. Leave `hooks` out entirely and nothing changes.
 - Tier-1 extraction: single-record and listing (`item`) extraction, text/`attr` field values, `number` coercion, next-link pagination, and broader link following with scope rules (`crawl:` — include/exclude glob patterns, max depth, same-origin, and opt-in sitemap seeding from robots.txt)
 - Tier-2 browser slice: escalation for infinite-scroll pages, then extraction from rendered DOM
 - Run observability: structured run summary for each run
-- API discovery: OpenAPI/Swagger discovery, GraphQL introspection, HAR-based synthesis, and action-to-endpoint correlation
+- API discovery: OpenAPI/Swagger discovery, GraphQL introspection, HAR-based synthesis, action-to-endpoint correlation, and static JS-bundle endpoint discovery (candidate endpoints found by scanning a page's scripts, never executed or fetched to confirm)
 - Tier-3 self-healing: scored matching, uncertain-match handling, cross-run fingerprint persistence, listing field/container healing, re-anchoring, and visual-signal corroboration
 - Authenticated targets: supply a captured browser session (cookies + `localStorage`) via `session:` to scrape login-gated pages — "bring-your-own-session"; Spoor performs no login itself
 - Proxy routing: supply a proxy via `proxy:` to route a run's traffic through it (including the plain fetch, `robots.txt`/sitemap lookups, and the browser tier) — "bring-your-own-proxy"; Spoor never sources a proxy itself
