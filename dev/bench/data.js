@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791281857593,
+  "lastUpdate": 1791290434440,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -8624,6 +8624,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5400.5,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0390a8f72eff086a629d2fe78b4a6f1490215775",
+          "message": "Add --assert-no-new-signals reverse assertion to generated tests (closes #128) (#205)\n\nspoor explore --gen-tests only ever asserted one direction: that\nrecorded console/storage/network values still appear. There was no\ncheck of the inverse, so a ghost call (an extra request or console\nline a backend change starts firing, with markup and discoverable\nactions untouched) produces an identical graph and a suite that stays\ngreen throughout.\n\n#128 was previously folded into the larger \"freshness by\nre-observation\" capability (#107: replay + double-replay noise\nfiltering + normalization + persistent baseline), which isn't built\nyet. This ships the scoped part of #128 that needs none of it:\n_closed_world_signals computes, from data a normal explore run already\nhas, the union of every added signal across the WHOLE replayed path\nreaching a transition -- not just its own diff, since the generated\ntest's console/network listeners stay attached for the entire replay\nand an earlier hop's own recorded addition would otherwise false-positive\na later transition's check. Pinned by a dedicated scenario using a\nthree-state fixture.\n\nChecked only for a signal kind with at least one recorded addition\nsomewhere on the path -- page-load noise is never recorded as any\ntransition's own addition, so asserting \"nothing at all\" for an\nuntouched kind would false-positive on it. No noise normalization yet,\nso a value that varies run to run can make this flag noisier than the\ndefault suite -- an explicit, documented trade-off, not a bug, and why\nit stays opt-in.\n\n#107 remains open and tracked separately for the larger re-observation\ncapability.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-06T15:35:23+03:00",
+          "tree_id": "4bc2d10986ea06994f36ab8718bdce1ce960d2a9",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/0390a8f72eff086a629d2fe78b4a6f1490215775"
+        },
+        "date": 1791290433950,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 236.308,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04553,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.3744,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.13692,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.2645,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0002,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.09025,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 14.5387,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.12663,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 21.8311,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.0712,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.419,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.60504,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 33.1498,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.06019,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 15.7315,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.06347,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 127.561,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09194,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5728,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01161,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.5082,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5427,
             "unit": "MB"
           }
         ]
