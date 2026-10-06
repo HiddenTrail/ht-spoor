@@ -32,6 +32,28 @@ accessible **name itself contains a secret** is redacted like any shared value, 
 emitted role locator would not match the live element — accepted as rare (accessible
 names are UI labels, essentially never secrets) and preferred over the §2h violation of
 writing the raw name. Nothing here is site-specific (§0): one emitter for every target.
+
+**Reverse assertion, opt-in (closes #128).** The checks above are all one-directional:
+"these recorded values must still appear." They say nothing about the inverse — a
+backend change that makes a transition start firing an *extra* request or logging a
+new console line produces no assertion failure, since nothing new was ever checked
+for. `assert_no_new_signals=True` (threaded from
+`spoor explore --assert-no-new-signals`, which requires `--gen-tests`) adds, per
+signal kind, a closed-world check: the live replay's observed values must be a
+subset of everything recorded as added *anywhere on
+the replayed path that reaches this transition* — not just this transition's own
+diff, since the generated test's console/network listeners are attached for the whole
+replay (every earlier hop's additions are still "in view" when the final assertion
+runs; checking only the leaf transition's own set would false-positive on each earlier
+transition's legitimate additions). The check is emitted **only for a signal kind that
+had at least one addition recorded somewhere on the path** — a kind with none recorded
+is left unchecked, because the initial `page.goto()` navigation's own console/network
+activity is never captured as any transition's "added" signal, so asserting "nothing at
+all" for an untouched kind would false-positive on ordinary page-load noise. This is a
+first slice with no noise normalization (ROADMAP.md §2g/#107 decision note): a value
+that legitimately varies run to run (a timestamp query parameter, a random request id)
+is asserted literally, so a generated suite using this flag can be noisier than one
+without it — an explicit, documented trade-off, not an oversight.
 """
 
 from __future__ import annotations
@@ -39,7 +61,12 @@ from __future__ import annotations
 from pathlib import Path
 
 from spoor.exploration.discovery import ActionableElement
-from spoor.exploration.graph import ExplorationGraph, Transition, paths_from_root
+from spoor.exploration.graph import (
+    ExplorationGraph,
+    Transition,
+    path_steps_from_root,
+    paths_from_root,
+)
 from spoor.security.redaction import redact
 
 # The stable filenames of the two fixed support modules the suite always carries.
@@ -147,13 +174,18 @@ def page():
 '''
 
 
-def build_tests(graph: ExplorationGraph, *, target: str) -> dict[str, str]:
+def build_tests(
+    graph: ExplorationGraph, *, target: str, assert_no_new_signals: bool = False
+) -> dict[str, str]:
     """Render an exploration graph into a pytest suite: filename -> source (§2g).
 
     Emits nothing for a graph with no transitions (there is nothing to replay). For a
     non-empty graph, returns the two fixed support modules plus one `test_transition_N`
     file per mapped transition, in the graph's transition order. Pure — no disk, no
     browser; `render_suite` (a thin writer, sub-slice 2g-ii) puts these on disk.
+
+    `assert_no_new_signals` adds the opt-in reverse assertion described in the module
+    docstring (closes #128) to every generated test.
     """
     transitions = graph.transitions
     if not transitions:
@@ -165,12 +197,23 @@ def build_tests(graph: ExplorationGraph, *, target: str) -> dict[str, str]:
     }
     for index, transition in enumerate(transitions):
         path = paths.get(transition.from_state, [])
-        files[f"test_transition_{index}.py"] = _render_test(index, transition, path)
+        closed_world = (
+            _closed_world_signals(graph, transition)
+            if assert_no_new_signals
+            else None
+        )
+        files[f"test_transition_{index}.py"] = _render_test(
+            index, transition, path, closed_world
+        )
     return files
 
 
 def render_suite(
-    graph: ExplorationGraph, out_dir: Path, *, target: str
+    graph: ExplorationGraph,
+    out_dir: Path,
+    *,
+    target: str,
+    assert_no_new_signals: bool = False,
 ) -> list[Path]:
     """Write the generated pytest suite for `graph` under `out_dir` (§2g, 2g-ii).
 
@@ -183,7 +226,9 @@ def render_suite(
     captured value, so it introduces no redaction surface of its own. Nothing here is
     site-specific (§0).
     """
-    files = build_tests(graph, target=target)
+    files = build_tests(
+        graph, target=target, assert_no_new_signals=assert_no_new_signals
+    )
     out_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     for name in sorted(files):
@@ -191,6 +236,43 @@ def render_suite(
         path.write_text(files[name], encoding="utf-8")
         written.append(path)
     return written
+
+
+def _closed_world_signals(
+    graph: ExplorationGraph, transition: Transition
+) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
+    """The redacted union of console/storage/network values recorded as added across
+    every transition on the replay path that reaches `transition`, including the
+    transition itself (§2g, closes #128).
+
+    The generated test's console/network listeners are attached for the whole replay,
+    not scoped to the final hop, so the closed set a reverse assertion checks against
+    must be the union across the path too — otherwise an earlier hop's own recorded
+    addition would false-positive the check on the later transition's test.
+    """
+    by_edge: dict[tuple[str, str, str, str], Transition] = {
+        (t.from_state, t.action.role, t.action.name, t.to_state): t
+        for t in graph.transitions
+    }
+    steps = path_steps_from_root(graph).get(transition.from_state, [])
+    chain: list[Transition] = []
+    current = graph.states[0] if graph.states else transition.from_state
+    for action, landed in steps:
+        hop = by_edge.get((current, action.role, action.name, landed))
+        if hop is not None:
+            chain.append(hop)
+        current = landed
+    chain.append(transition)
+    console: set[str] = set()
+    storage: set[str] = set()
+    network: set[str] = set()
+    for hop in chain:
+        if hop.signals is None:
+            continue
+        console.update(redact(v) for v in hop.signals.console_added)
+        storage.update(redact(v) for v in hop.signals.storage_added)
+        network.update(redact(v) for v in hop.signals.network_added)
+    return frozenset(console), frozenset(storage), frozenset(network)
 
 
 def _locator_args(action: ActionableElement) -> str:
@@ -216,7 +298,10 @@ def _fire_line(action: ActionableElement) -> str:
 
 
 def _render_test(
-    index: int, transition: Transition, path: list[ActionableElement]
+    index: int,
+    transition: Transition,
+    path: list[ActionableElement],
+    closed_world: tuple[frozenset[str], frozenset[str], frozenset[str]] | None,
 ) -> str:
     """Render one transition's regression test source (§2g)."""
     action = transition.action
@@ -226,7 +311,7 @@ def _render_test(
         f"{transition.to_state[:_SHORT_ID]}"
     )
     path_lines = "".join(f"    {_path_step_repr(step)},\n" for step in path)
-    body = _assertion_body(transition)
+    body = _assertion_body(transition, closed_world)
     return (
         "from __future__ import annotations\n\n"
         "from _spoor_testkit import fill, fire, reach, redact_all, storage_keys\n\n"
@@ -239,28 +324,57 @@ def _render_test(
     )
 
 
-def _assertion_body(transition: Transition) -> str:
+def _assertion_body(
+    transition: Transition,
+    closed_world: tuple[frozenset[str], frozenset[str], frozenset[str]] | None = None,
+) -> str:
     """The capture-and-assert lines for a transition's recorded additive signals (§2g).
 
     Only the additive string signals are asserted (see the module note on the deferred
     a11y/screenshot deltas). A transition with no recorded change gets a smoke test: it
     still replayed and fired the action above, and asserts nothing it never recorded.
+
+    `closed_world`, when given, is the three redacted closed sets
+    `_closed_world_signals` computed (closes #128): a reverse "and nothing else" check
+    is appended for each kind that has at least one entry, alongside (not instead of)
+    the existing per-item checks.
     """
     signals = transition.signals
+    closed_console, closed_storage, closed_network = closed_world or (
+        frozenset(),
+        frozenset(),
+        frozenset(),
+    )
     lines: list[str] = []
-    if signals is not None and signals.console_added:
+    if (signals is not None and signals.console_added) or closed_console:
         lines.append("    console = redact_all(page.spoor_console)")
-        for message in signals.console_added:
+        for message in signals.console_added if signals is not None else ():
             lines.append(f"    assert {redact(message)!r} in console")
-    if signals is not None and signals.storage_added:
+        if closed_console:
+            lines.append(
+                f"    assert set(console) <= {sorted(closed_console)!r}, "
+                '"unexpected console message(s) not seen during the original crawl"'
+            )
+    if (signals is not None and signals.storage_added) or closed_storage:
         lines.append("    storage = redact_all(storage_keys(page))")
-        for key in signals.storage_added:
+        for key in signals.storage_added if signals is not None else ():
             lines.append(f"    assert {redact(key)!r} in storage")
-    if signals is not None and signals.network_added:
+        if closed_storage:
+            lines.append(
+                f"    assert set(storage) <= {sorted(closed_storage)!r}, "
+                '"unexpected storage key(s) not seen during the original crawl"'
+            )
+    if (signals is not None and signals.network_added) or closed_network:
         lines.append("    network = redact_all(page.spoor_network)")
-        for url in signals.network_added:
+        for url in signals.network_added if signals is not None else ():
             lines.append(
                 f"    assert any({redact(url)!r} in request for request in network)"
+            )
+        if closed_network:
+            lines.append(
+                "    assert all(any(u in request for u in "
+                f"{sorted(closed_network)!r}) for request in network), "
+                '"unexpected network request(s) not seen during the original crawl"'
             )
     if not lines:
         lines.append("    # no signal changes were recorded for this transition")

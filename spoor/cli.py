@@ -335,6 +335,25 @@ def explore(
             ),
         ),
     ] = None,
+    assert_no_new_signals: Annotated[
+        bool,
+        typer.Option(
+            "--assert-no-new-signals",
+            help=(
+                "Requires --gen-tests. Adds a reverse check to every generated test: "
+                "besides asserting the console/storage/network values recorded during "
+                "this crawl still appear, also assert nothing *beyond* them appears — "
+                "so a later change that starts firing an unexpected extra request or "
+                "logging a new console line fails the suite instead of passing it "
+                "silently. Checked only for a signal kind that had at least one value "
+                "recorded; a kind with none recorded is left unchecked, since ordinary "
+                "page-load noise is never recorded either and would make an 'assert "
+                "nothing at all' check fail on its own. No value normalization yet, so "
+                "a value that legitimately varies run to run (a timestamp, a random "
+                "request id) can make this check noisier than the default suite."
+            ),
+        ),
+    ] = False,
     scaffold: Annotated[
         Path | None,
         typer.Option(
@@ -418,7 +437,11 @@ def explore(
     can't have secrets blanked out the way captured text can). Pass --gen-tests
     to also write a runnable
     pytest regression suite of the map (one test per mapped transition) you can re-run
-    against the live site later to catch drift. Pass --scaffold to also write a
+    against the live site later to catch drift. Add --assert-no-new-signals to also
+    make each generated test fail if the live replay produces a console message,
+    storage key, or network request that wasn't seen anywhere during this crawl — not
+    just check that what was recorded is still there, but that nothing unexpected was
+    added since. Pass --scaffold to also write a
     config-scaffold YAML file (interactive.yaml) into a directory, naming discovered
     fields, login points, and destructive actions — a starting point for a planned,
     not-yet-built interactive round; filling it in does nothing on its own yet. The
@@ -443,6 +466,11 @@ def explore(
         raise typer.BadParameter(
             "--screenshots needs --wiki: there is no wiki to put "
             "the images in without it."
+        )
+    if assert_no_new_signals and gen_tests is None:
+        raise typer.BadParameter(
+            "--assert-no-new-signals needs --gen-tests: there is no generated "
+            "suite to add the check to without it."
         )
     _check_explore_output_paths(wiki=wiki, gen_tests=gen_tests, scaffold=scaffold)
     if session is not None:
@@ -577,7 +605,12 @@ def explore(
     if gen_tests is not None:
         from spoor.testgen import render_suite
 
-        written = render_suite(graph, gen_tests, target=url)
+        written = render_suite(
+            graph,
+            gen_tests,
+            target=url,
+            assert_no_new_signals=assert_no_new_signals,
+        )
         # One test file per transition plus the two fixed support modules, so the count
         # of runnable regression tests is the written total minus those two (0 when the
         # graph had no transitions and nothing was written at all).

@@ -120,6 +120,65 @@ def test_explore_screenshots_requires_wiki(monkeypatch: pytest.MonkeyPatch) -> N
     assert "--wiki" in _flatten_cli_error(result.output)
 
 
+def test_explore_assert_no_new_signals_requires_gen_tests(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # --assert-no-new-signals without --gen-tests is rejected before any browser is
+    # launched: there is no generated suite to add the check to (closes #128).
+    from spoor.exploration import driver as driver_mod
+
+    def _boom(*_a: object, **_k: object) -> object:
+        raise AssertionError("a browser must not be launched when the flag is rejected")
+
+    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _boom)
+    result = runner.invoke(
+        cli.app, ["explore", "http://localhost:8000/", "--assert-no-new-signals"]
+    )
+    assert result.exit_code != 0
+    assert "--gen-tests" in _flatten_cli_error(result.output)
+
+
+def test_explore_assert_no_new_signals_is_threaded_into_render_suite(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spoor.exploration import driver as driver_mod
+    from spoor.exploration.graph import ExplorationGraph
+
+    class _FakeDriver:
+        def __init__(self, target: str, **_kwargs: object) -> None:
+            pass
+
+        def __enter__(self) -> _FakeDriver:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            pass
+
+    seen: dict[str, object] = {}
+
+    def _fake_render_suite(*_a: object, **kwargs: object) -> list[Path]:
+        seen["assert_no_new_signals"] = kwargs["assert_no_new_signals"]
+        return []
+
+    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _FakeDriver)
+    monkeypatch.setattr(
+        "spoor.exploration.explorer.explore", lambda *a, **k: ExplorationGraph()
+    )
+    monkeypatch.setattr("spoor.testgen.render_suite", _fake_render_suite)
+    result = runner.invoke(
+        cli.app,
+        [
+            "explore",
+            "http://localhost:8000/",
+            "--gen-tests",
+            str(tmp_path / "suite"),
+            "--assert-no-new-signals",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert seen["assert_no_new_signals"] is True
+
+
 def test_explore_resume_without_saved_map_aborts_before_browser(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

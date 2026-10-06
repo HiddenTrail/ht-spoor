@@ -144,7 +144,7 @@ chronological, slice-by-slice narrative order.
 
 | Feature file | Capability | ROADMAP | Package | Phase |
 |---|---|---|---|---|
-| `testgen.feature` | Test-automation run generation: the pure generator turns a §2e exploration graph into a pytest suite (one Playwright-driven regression test per mapped transition) — replay the path, fire the action, assert the recorded signals, with every captured value and the live observations redacted like-for-like (sub-slice 2g-i) | §2g | `spoor/testgen`, `spoor/security` | 6 |
+| `testgen.feature` | Test-automation run generation: the pure generator turns a §2e exploration graph into a pytest suite (one Playwright-driven regression test per mapped transition) — replay the path, fire the action, assert the recorded signals, with every captured value and the live observations redacted like-for-like (sub-slice 2g-i); an opt-in `--assert-no-new-signals` reverse assertion additionally fails a test if the live replay produces a console message, storage key, or network request that was never recorded as added anywhere on the replayed path — closes #128 | §2g | `spoor/testgen`, `spoor/security` | 6 |
 | `testgen_writer.feature` | Writing the generated suite to disk and running it: `render_suite` writes the pure generator's `filename → source` under a directory (created if absent, contents byte-for-byte the generator's), wired to `spoor explore --gen-tests <dir>`; a `@browser` scenario crawls a fixture, writes its suite, runs pytest on it against the same live fixture in a subprocess, and asserts it passes green — the end-to-end proof of sub-slice 2g-ii | §2g | `spoor/testgen`, CLI | 6 |
 
 The prose below describes what each feature file covers, in the present tense —
@@ -899,7 +899,14 @@ values it observes with Spoor's own primitive before comparing, so both sides ma
 like-for-like and no raw secret is ever the expected literal (which is why running the
 generated suite depends on `ht-spoor` and `playwright`). Only the additive string
 signals are asserted; the a11y-node delta and screenshot hash are deferred, and a graph
-with no transitions generates no tests. Nothing is site-specific (§0).
+with no transitions generates no tests. An opt-in `assert_no_new_signals=True`
+(`spoor explore --gen-tests --assert-no-new-signals`, closes #128) adds the inverse: a
+reverse "and nothing else" check per signal kind that had at least one addition
+recorded anywhere on the replayed path reaching that transition — the union across the
+*whole* path, not just the leaf transition's own diff, since the generated test's
+console/network listeners stay attached for the entire replay. A kind with nothing ever
+recorded gets no reverse check, since ordinary page-load noise is never captured as any
+transition's own addition. Nothing is site-specific (§0).
 
 `testgen_writer.feature` (§2g) is **sub-slice 2g-ii** — the thin on-disk writer and the
 live proof the 2g-i note named as the follow-on: `render_suite(graph, out_dir, target)`
