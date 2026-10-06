@@ -251,6 +251,108 @@ def test_apply_scaffold_session_is_threaded_into_the_driver(
     assert seen["session"] == str(session_file)
 
 
+def test_explore_include_element_patterns_from_file_are_threaded_in(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # --include-element/--exclude-element @<file> reads one pattern per line
+    # (blank lines and '#' comments skipped), mixing freely with literal patterns
+    # given via repeated flags (§2e, #152 follow-up).
+    from spoor.exploration import driver as driver_mod
+    from spoor.exploration.element_rules import ElementRules
+    from spoor.exploration.graph import ExplorationGraph
+
+    patterns_file = tmp_path / "rules.txt"
+    patterns_file.write_text(
+        "# a comment\nAdd to cart*\n\nCheckout*\n", encoding="utf-8"
+    )
+
+    class _FakeDriver:
+        def __init__(self, target: str, **_kwargs: object) -> None:
+            pass
+
+        def __enter__(self) -> _FakeDriver:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            pass
+
+    seen: dict[str, object] = {}
+
+    def _fake_explore(*_a: object, **kwargs: object) -> ExplorationGraph:
+        seen["element_rules"] = kwargs["element_rules"]
+        return ExplorationGraph()
+
+    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _FakeDriver)
+    monkeypatch.setattr("spoor.exploration.explorer.explore", _fake_explore)
+    result = runner.invoke(
+        cli.app,
+        [
+            "explore",
+            "http://localhost:8000/",
+            "--include-element",
+            f"@{patterns_file}",
+            "--include-element",
+            "Buy Now*",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    rules = seen["element_rules"]
+    assert isinstance(rules, ElementRules)
+    assert rules.include == ("Add to cart*", "Checkout*", "Buy Now*")
+    assert rules.exclude is None
+
+
+def test_explore_missing_element_patterns_file_aborts_before_browser(
+    tmp_path: Path,
+) -> None:
+    from spoor.exploration import driver as driver_mod
+
+    def _boom(*_a: object, **_k: object) -> object:
+        raise AssertionError("a browser must not be launched with a bad patterns file")
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(driver_mod, "PlaywrightDriver", _boom)
+        result = runner.invoke(
+            cli.app,
+            [
+                "explore",
+                "http://localhost:8000/",
+                "--include-element",
+                f"@{tmp_path / 'does-not-exist.txt'}",
+            ],
+        )
+    assert result.exit_code != 0
+    assert "couldnotreadfile" in _flatten_cli_error(result.output).lower()
+
+
+def test_explore_empty_element_patterns_file_aborts_before_browser(
+    tmp_path: Path,
+) -> None:
+    from spoor.exploration import driver as driver_mod
+
+    patterns_file = tmp_path / "empty.txt"
+    patterns_file.write_text("# just a comment\n\n", encoding="utf-8")
+
+    def _boom(*_a: object, **_k: object) -> object:
+        raise AssertionError(
+            "a browser must not be launched with an empty patterns file"
+        )
+
+    with pytest.MonkeyPatch.context() as mp:
+        mp.setattr(driver_mod, "PlaywrightDriver", _boom)
+        result = runner.invoke(
+            cli.app,
+            [
+                "explore",
+                "http://localhost:8000/",
+                "--exclude-element",
+                f"@{patterns_file}",
+            ],
+        )
+    assert result.exit_code != 0
+    assert "containsnopatterns" in _flatten_cli_error(result.output).lower()
+
+
 def _explore_with_skips(monkeypatch: pytest.MonkeyPatch, reasons: list[str]) -> str:
     """Run `explore` against a fake driver whose graph has one skip per reason."""
     from spoor.exploration import driver as driver_mod

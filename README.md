@@ -264,6 +264,25 @@ spoor explore https://example.com --include-element "Add to cart*" --include-ele
 spoor explore https://example.com --exclude-element "*Logout*" --exclude-element "*Delete*"
 ```
 
+On a larger site this can grow to dozens of patterns — typing that many repeated
+flags gets unwieldy fast. Give either flag a value starting with `@` instead to read
+patterns from a file, one per line (blank lines and `#` comments are skipped), and
+reuse the same rules file across runs:
+
+```bash
+spoor explore https://example.com --include-element @element-rules.txt
+```
+
+```
+# element-rules.txt
+Add to cart*
+Checkout*
+Buy Now*
+```
+
+Literal patterns and `@file` values can be mixed freely across repeated uses of the
+same flag.
+
 While it runs, a real terminal shows a live line of progress — a `[####------] NN%`
 gauge against `--max-states`/`--max-requests` when either is set, or a `|/-\` spinner
 when the run is unbounded — alongside states discovered, requests fired, and elapsed
