@@ -108,6 +108,17 @@ def generate(context: dict[str, Any], target: str) -> None:
     context["suite"] = build_tests(context["graph"], target=target)
 
 
+@when(
+    parsers.parse(
+        'I generate a pytest suite for "{target}" asserting no new signals'
+    )
+)
+def generate_closed(context: dict[str, Any], target: str) -> None:
+    context["suite"] = build_tests(
+        context["graph"], target=target, assert_no_new_signals=True
+    )
+
+
 # --- helpers -------------------------------------------------------------
 
 
@@ -224,3 +235,50 @@ def no_raw_secret(context: dict[str, Any], secret: str) -> None:
 @then("some generated file shows the redaction placeholder")
 def shows_placeholder(context: dict[str, Any]) -> None:
     assert any(REDACTED in src for src in _suite(context).values())
+
+
+# --- Then: reverse assertion (closes #128) --------------------------------
+
+
+def _reverse_assertion_line(src: str, prefix: str) -> str | None:
+    for line in src.splitlines():
+        if line.strip().startswith(prefix):
+            return line
+    return None
+
+
+@then(parsers.parse('the test for "{label}" has no reverse "nothing beyond" assertion'))
+def no_reverse_assertion(context: dict[str, Any], label: str) -> None:
+    src = _test_for(context, label)
+    assert "not seen during the original crawl" not in src
+
+
+@then(
+    parsers.parse('the test for "{label}" asserts no console message beyond "{msg}"')
+)
+def reverse_console(context: dict[str, Any], label: str, msg: str) -> None:
+    src = _test_for(context, label)
+    line = _reverse_assertion_line(src, "assert set(console) <=")
+    assert line is not None, f"no reverse console assertion in:\n{src}"
+    assert repr(redact(msg)) in line
+
+
+@then(parsers.parse('the test for "{label}" asserts no storage key beyond "{key}"'))
+def reverse_storage(context: dict[str, Any], label: str, key: str) -> None:
+    src = _test_for(context, label)
+    line = _reverse_assertion_line(src, "assert set(storage) <=")
+    assert line is not None, f"no reverse storage assertion in:\n{src}"
+    assert repr(redact(key)) in line
+
+
+@then(
+    parsers.parse(
+        'the test for "{label}" asserts no network request beyond "{urls}"'
+    )
+)
+def reverse_network(context: dict[str, Any], label: str, urls: str) -> None:
+    src = _test_for(context, label)
+    line = _reverse_assertion_line(src, "assert all(any(u in request")
+    assert line is not None, f"no reverse network assertion in:\n{src}"
+    for url in (u.strip() for u in urls.split(",")):
+        assert repr(redact(url)) in line

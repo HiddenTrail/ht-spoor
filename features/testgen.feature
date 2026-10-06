@@ -81,3 +81,44 @@ Feature: Generate replayable regression tests from an exploration graph
     Given an empty explored graph
     When I generate a pytest suite for "https://shop.example"
     Then the suite has no test files
+
+  # --- Reverse assertion, opt-in (closes #128) ------------------------------
+  #
+  # Every scenario above checks one direction only: "these recorded values must
+  # still appear." --assert-no-new-signals adds the inverse, per generated test:
+  # the live replay must produce nothing *beyond* what this crawl ever recorded as
+  # added — a ghost call (an unexpected extra request or console line) now fails
+  # the suite instead of passing it silently, since graph/state identity alone
+  # can't see it (ROADMAP.md §2g/#107 decision note).
+
+  Scenario: Without the flag, no reverse assertion is added
+    When I generate a pytest suite for "https://shop.example"
+    Then the test for "Open menu" has no reverse "nothing beyond" assertion
+
+  Scenario: With the flag, a signal kind that had something recorded gets a reverse assertion
+    When I generate a pytest suite for "https://shop.example" asserting no new signals
+    Then the test for "Open menu" asserts no console message beyond "menu opened"
+    And the test for "Open menu" asserts no storage key beyond "token"
+    And the test for "Open menu" asserts no network request beyond "/menu.js"
+
+  Scenario: A signal kind with nothing ever recorded gets no reverse assertion
+    # Page-load noise is never recorded as any transition's own addition, so
+    # asserting "nothing at all" for an untouched kind would false-positive on it.
+    Given a mapped transition "Refresh" from "home" to "home" that changed nothing
+    When I generate a pytest suite for "https://shop.example" asserting no new signals
+    Then the test for "Refresh" asserts no signal changes
+
+  Scenario: The reverse assertion's closed set spans the whole replayed path
+    # "Add to cart" only adds "/cart.js" itself, but its test replays "Open menu"
+    # first, whose listener-visible "/menu.js" request is still in view when the
+    # final assertion runs. Closing over only the leaf transition's own diff would
+    # false-positive on that earlier, legitimate request.
+    When I generate a pytest suite for "https://shop.example" asserting no new signals
+    Then the test for "Add to cart" asserts no network request beyond "/menu.js, /cart.js"
+
+  Scenario: The reverse assertion redacts secrets the same as every other assertion
+    Given a state "vault" whose console logged "Authorization: Bearer sk-supersecrettoken12345"
+    And a mapped transition "Open vault" from "home" to "vault"
+    When I generate a pytest suite for "https://shop.example" asserting no new signals
+    Then no generated file contains the raw secret "sk-supersecrettoken12345"
+    And some generated file shows the redaction placeholder
