@@ -74,17 +74,52 @@ Screenshotter = Callable[[Selector], int | None]
 
 @dataclass(frozen=True)
 class HealEvent:
-    """One tier-3 heal attempt, for the run summary (§2d).
+    """One tier-3 heal attempt, for the run summary and healing report (§2d, #154).
 
     `confidence` is the winning candidate's score; `used` is whether it cleared
     the confidence threshold and filled the field (True) or was flagged an
-    uncertain match for review, leaving the field null (False). Field name and
-    score only — never the matched text (§2h).
+    uncertain match for review, leaving the field null (False).
+
+    `old_selector` is the configured selector that matched nothing (the field's
+    `selector`, or the `item` selector for a container heal); `new_locator` is a
+    CSS-selector-shaped *description* of the element tier 3 resolved instead
+    (`_locator_for`) — a suggestion a human reviews before adopting, never a
+    claim it uniquely resolves to just that element. `new_locator` is set
+    whenever heal() found a best candidate at all (confident or not — an
+    uncertain match's best guess is still worth showing for review), and is
+    `None` only when there was no single candidate to point at (an ambiguous or
+    zero-group container refusal). Field name, the two selector/locator
+    *structural* strings, and score only — never the matched *text* (§2h).
     """
 
     field: str
     confidence: float
     used: bool
+    old_selector: str | None = None
+    new_locator: str | None = None
+
+
+def _locator_for(element: Selector) -> str:
+    """A CSS-selector-shaped description of `element`, for the healing report.
+
+    Prefers an id (`#foo`) when present — the most specific, copy-pasteable
+    locator; falls back to the tag plus its classes (`div.card.active`) when
+    there's no id; falls back to the bare tag when there's neither. A
+    *suggestion* a reviewer evaluates before adopting, not a guarantee it
+    resolves to only this element (§2, §1 — never a silent guess).
+    """
+    root = element.root
+    tag = getattr(root, "tag", None)
+    if not isinstance(tag, str):
+        return "(unknown element)"
+    attrib = dict(getattr(root, "attrib", {}))
+    element_id = attrib.get("id", "")
+    if element_id:
+        return f"#{element_id}"
+    classes = attrib.get("class", "").split()
+    if classes:
+        return tag + "".join(f".{c}" for c in classes)
+    return tag
 
 
 @dataclass
@@ -132,7 +167,12 @@ class Healer:
         )
 
     def attempt(
-        self, field_name: str, root: Selector, *, item_selector: str | None = None
+        self,
+        field_name: str,
+        root: Selector,
+        *,
+        item_selector: str | None = None,
+        old_selector: str | None = None,
     ) -> Selector | None:
         """Heal a field whose selector matched nothing; None if not confidently.
 
@@ -166,7 +206,13 @@ class Healer:
         if result is None:
             return None
         self.events.append(
-            HealEvent(field=field_name, confidence=result.score, used=result.confident)
+            HealEvent(
+                field=field_name,
+                confidence=result.score,
+                used=result.confident,
+                old_selector=old_selector,
+                new_locator=_locator_for(result.element),
+            )
         )
         if not result.confident:
             return None
@@ -241,16 +287,29 @@ class Healer:
         if len(match.groups) == 1:
             rows = list(match.groups[0])
             self.events.append(
-                HealEvent(field=item_selector, confidence=match.best_score, used=True)
+                HealEvent(
+                    field=item_selector,
+                    confidence=match.best_score,
+                    used=True,
+                    old_selector=item_selector,
+                    new_locator=_locator_for(rows[0]),
+                )
             )
             self.cache.put(key, fingerprint(rows[0], include_text=False))
             return rows
         # Zero groups (no repeating group) or 2+ (ambiguous): refuse. Flag it for
         # review only if something crossed the bar; stay silent on a page where
         # nothing looked like a row (a legitimately-empty listing, not a break).
+        # No single new_locator: with zero or multiple qualifying groups there is
+        # no one row to point at, only an ambiguous or absent candidate set.
         if match.has_confident:
             self.events.append(
-                HealEvent(field=item_selector, confidence=match.best_score, used=False)
+                HealEvent(
+                    field=item_selector,
+                    confidence=match.best_score,
+                    used=False,
+                    old_selector=item_selector,
+                )
             )
         return None
 

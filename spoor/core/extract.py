@@ -311,7 +311,9 @@ def _extract_value(
         if healer is not None and field_name is not None:
             healer.remember(field_name, element, item_selector=item_selector)
     elif healer is not None and field_name is not None:
-        element = healer.attempt(field_name, root, item_selector=item_selector)
+        element = healer.attempt(
+            field_name, root, item_selector=item_selector, old_selector=spec.selector
+        )
     if element is None:
         return None
     return _value_from_element(element, spec)

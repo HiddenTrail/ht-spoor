@@ -80,6 +80,19 @@ spoor run config.yaml -o data.csv          # CSV; columns = your config fields
 spoor run config.yaml -o out.dat -f jsonl  # force JSON Lines with --format
 ```
 
+**When a selector breaks and tier 3 quietly fixes it.** If a field's selector stops
+matching (a redesign renamed a class, say) and Spoor has seen that element before,
+it re-resolves it from what it remembers instead of giving up — this is tier-3
+self-healing. Add `--healing-report <file>` to also write a markdown report of what
+it healed this run: the selector that broke, the locator it found instead,
+confidence, and — for a confident heal — a suggested fix to your config so the next
+run doesn't need to heal at all. A less-confident match is reported separately,
+flagged for you to review rather than applied automatically.
+
+```
+spoor run config.yaml -o output.json --healing-report healing.md
+```
+
 **Not sure which flags go with which command?** `spoor wizard` builds any command
 for you interactively — pick a command from a numbered list, answer a prompt per
 flag (blank to skip an optional one), and it shows you the exact resolved command
@@ -466,7 +479,7 @@ the wiki itself shows. Leave `hooks` out entirely and nothing changes.
 - Tier-2 browser slice: escalation for infinite-scroll pages, then extraction from rendered DOM
 - Run observability: structured run summary for each run
 - API discovery: OpenAPI/Swagger discovery, GraphQL introspection, HAR-based synthesis, action-to-endpoint correlation, and static JS-bundle endpoint discovery (candidate endpoints found by scanning a page's scripts, never executed or fetched to confirm)
-- Tier-3 self-healing: scored matching, uncertain-match handling, cross-run fingerprint persistence, listing field/container healing, re-anchoring, and visual-signal corroboration
+- Tier-3 self-healing: scored matching, uncertain-match handling, cross-run fingerprint persistence, listing field/container healing, re-anchoring, visual-signal corroboration, and an opt-in markdown healing report (`spoor run --healing-report`) naming what broke, what was found instead, and a suggested config fix
 - Authenticated targets: supply a captured browser session (cookies + `localStorage`) via `session:` to scrape login-gated pages — "bring-your-own-session"; Spoor performs no login itself
 - Proxy routing: supply a proxy via `proxy:` to route a run's traffic through it (including the plain fetch, `robots.txt`/sitemap lookups, and the browser tier) — "bring-your-own-proxy"; Spoor never sources a proxy itself
 - Request/response hooks (Python API): pass `hooks=RunHooks(on_request=..., on_response=...)` to `extract.run_report` to add request headers or adjust a fetched page before extraction, without writing site-specific code into Spoor itself — see "Extending a run from Python" above

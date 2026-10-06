@@ -83,6 +83,69 @@ def test_run_format_override(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     assert json.loads(out.read_text(encoding="utf-8")) == [{"title": "A", "price": 1.0}]
 
 
+def test_run_writes_healing_report_when_something_healed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spoor.core.self_healing import HealEvent
+
+    def _healed_result(cfg: object) -> RunResult:
+        result = _stub_result()
+        result.heal_events = [
+            HealEvent(
+                field="price",
+                confidence=0.91,
+                used=True,
+                old_selector=".price-old",
+                new_locator=".price-new",
+            )
+        ]
+        return result
+
+    monkeypatch.setattr(extract, "run_report", _healed_result)
+    out = tmp_path / "out.json"
+    report_path = tmp_path / "healing.md"
+    result = runner.invoke(
+        cli.app,
+        [
+            "run",
+            str(_config_file(tmp_path)),
+            "-o",
+            str(out),
+            "--healing-report",
+            str(report_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert report_path.exists()
+    report = report_path.read_text(encoding="utf-8")
+    assert "price" in report
+    assert ".price-old" in report
+    assert ".price-new" in report
+    assert str(report_path) in result.output
+
+
+def test_run_healing_report_skipped_when_nothing_healed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(extract, "run_report", lambda cfg: _stub_result())
+    out = tmp_path / "out.json"
+    report_path = tmp_path / "healing.md"
+    result = runner.invoke(
+        cli.app,
+        [
+            "run",
+            str(_config_file(tmp_path)),
+            "-o",
+            str(out),
+            "--healing-report",
+            str(report_path),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert not report_path.exists()
+    assert "nothing healed" in result.output
+
+
 def test_bad_format_aborts_before_extraction(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

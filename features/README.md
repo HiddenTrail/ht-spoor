@@ -68,6 +68,7 @@ chronological, slice-by-slice narrative order.
 | `self_healing_reanchor.feature` | Tier-3 cross-run re-anchoring: a confident heal becomes the new anchor | §2 / §2d | `spoor/core` | 3 |
 | `self_healing_container.feature` | Tier-3 heals a broken row *container* (`item` selector), with a repeating-group gate + ambiguity refusal | §2 / §2d | `spoor/core` | 3 |
 | `self_healing_visual.feature` | Tier-3 perceptual-hash visual signal: a cropped-screenshot difference hash heals a low-text element whose markup churns | §2 / §2d | `spoor/core` | 3 |
+| `self_healing_report.feature` | Healing report: tier-3 heal events render as a markdown report (old selector, suggested new locator, confidence, suggested config fix for a confident heal; flagged for review for an uncertain match) — closes #154 | §2 / §2d | `spoor/operational` | 2 |
 
 ### Read-only map serving
 
@@ -270,7 +271,15 @@ logo whose class/attributes churn and which gains a wrapper drops below the
 DOM-only bar, and the visual signal lifts it back to a confident heal only when it
 still renders the same — a genuinely changed appearance leaves the match uncertain
 and the field null (a corroborator, never a blanket boost). Together these six
-feature files make up tier-3 self-healing.
+feature files make up tier-3 self-healing's engine and its live-run wiring.
+`self_healing_report.feature` (§2, §2d, closes #154) is the operator-facing
+follow-on: `render_healing_report` turns the same `HealEvent`s these other files
+already pin into a markdown report (`spoor run --healing-report <file>`) —
+confident heals with a suggested config-selector fix, uncertain matches flagged
+for manual review and never suggested as something to adopt. A pure-logic file,
+built directly against `HealEvent`; the wiring that populates a real run's
+`old_selector`/`new_locator` is pinned by a scenario added to
+`self_healing_runs.feature` instead, not duplicated here.
 
 `serving.feature` (§2f) has begun: its first slice is the **read-only REST API**
 over a captured map. A run remembers its extracted records for a URL in a
