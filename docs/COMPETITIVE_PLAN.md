@@ -76,7 +76,7 @@ are on the horizon as an **optional** tier, never the default run loop.
 | Feature | Approach | Why | Phase | Notes |
 |---|---|---|---|---|
 | Configurable state equivalence (which DOM differences count as "same state") | Adapt | Addresses #104 (DOM-identical screens collapse) and the §2e settling races | 2 | |
-| Clickable-element rules incl. exclusions | Adapt | User-set rules, not heuristics — fits the §1 "not an agent" principle | 2 | |
+| Clickable-element rules incl. exclusions | **Adapted, closes #152** | User-set rules, not heuristics — fits the §1 "not an agent" principle; `--include-element`/`--exclude-element`, see the §2e decision note in ROADMAP.md | 2 | |
 | Form input specifications | Adapt, feeding #103 | Deterministic form filling before any LLM | 2 | |
 | Plugin hooks (on new state, on transition) | Adapt | Same extension point as the middleware row | 2 | |
 | Invariants (assertions checked during a crawl) | Skip | A verdict — belongs in generated tests (§2g), per the observe-vs-judge boundary in the §2f freshness note | — | |

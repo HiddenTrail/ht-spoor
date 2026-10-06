@@ -301,6 +301,33 @@ def explore(
             ),
         ),
     ] = None,
+    include_elements: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--include-element",
+            help=(
+                "Only attempt an actionable element whose visible label matches one "
+                "of these patterns (e.g. 'Add to cart*'; '*' and '?' wildcards, "
+                "case-sensitive). Repeatable. Unset: every discovered element is a "
+                "candidate, same as without this option. An --exclude-element match "
+                "always wins over this. Narrows what's attempted only — destructive "
+                "actions (delete, buy, pay, ...) still only ever fire in a sandbox, "
+                "regardless of what this matches."
+            ),
+        ),
+    ] = None,
+    exclude_elements: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--exclude-element",
+            help=(
+                "Never attempt an actionable element whose visible label matches one "
+                "of these patterns (e.g. '*Logout*'; '*' and '?' wildcards, "
+                "case-sensitive). Repeatable. Wins over --include-element when both "
+                "match the same element."
+            ),
+        ),
+    ] = None,
     screenshots: Annotated[
         bool,
         typer.Option(
@@ -343,12 +370,16 @@ def explore(
     fields, login points, and destructive actions — a starting point for a planned,
     not-yet-built interactive round; filling it in does nothing on its own yet. The
     mapped graph is also saved to the local map, so `spoor serve`/`serve-mcp` can hand
-    it back later without re-exploring.
+    it back later without re-exploring. Pass --include-element and/or
+    --exclude-element to scope which elements are attempted at all, by label pattern
+    — this only narrows what's attempted, never what's permitted: a destructive
+    action still only ever fires in a sandbox either way.
     """
     import signal
 
     from spoor.exploration.control import RunBudget, RunController
     from spoor.exploration.driver import PlaywrightDriver
+    from spoor.exploration.element_rules import ElementRules
     from spoor.exploration.explorer import ElementShot
     from spoor.exploration.explorer import explore as explore_target
     from spoor.exploration.resume import ResumeError, resume_exploration
@@ -389,6 +420,10 @@ def explore(
     except ValueError as exc:
         raise typer.BadParameter(str(exc)) from exc
     controller = RunController(budget)
+    element_rules = ElementRules(
+        include=tuple(include_elements) if include_elements else None,
+        exclude=tuple(exclude_elements) if exclude_elements else None,
+    )
     cli_progress = _CliProgress(controller, budget)
     # The opt-in screenshot sinks: dicts only when asked for, so a default run captures
     # no pixels at all (§2e slice 8). During exploration each image is written straight
@@ -423,6 +458,7 @@ def explore(
                         saved_map=saved_map,
                         selector=resume_from,
                         declared_sandbox=sandbox,
+                        element_rules=element_rules,
                         screenshots=shots,
                         element_screenshots=element_shots,
                         screenshot_dir=screenshot_dir,
@@ -436,6 +472,7 @@ def explore(
                     target=url,
                     controller=controller,
                     declared_sandbox=sandbox,
+                    element_rules=element_rules,
                     screenshots=shots,
                     element_screenshots=element_shots,
                     screenshot_dir=screenshot_dir,
