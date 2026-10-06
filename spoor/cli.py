@@ -89,6 +89,7 @@ def run(
         graphql=result.graphql,
         synthesized_spec=result.synthesized_spec,
         action_correlation=result.action_correlation,
+        bundle_endpoint_count=len(result.bundle_endpoints),
     )
     MapStore().record(
         cfg.target,

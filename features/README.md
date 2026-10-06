@@ -47,7 +47,7 @@ chronological, slice-by-slice narrative order.
 
 | Feature file | Capability | ROADMAP | Package | Phase |
 |---|---|---|---|---|
-| `api_discovery.feature` | API surface discovery (spec + GraphQL introspection) | §2b | `spoor/api_discovery` | 2.5 |
+| `api_discovery.feature` | API surface discovery (spec + GraphQL introspection + traffic synthesis + action correlation + static JS-bundle endpoint discovery, closes #153) | §2b | `spoor/api_discovery` | 2.5 |
 | `capture.feature` | Raw network capture (HAR) to local-only cache | §2b/§2c/§2h | `spoor/core`, `spoor/security` | 2.5 |
 | `signals.feature`, `accessibility.feature`, `response_headers.feature`, `storage_state.feature` | Client-side signals catalog (console, a11y tree, response headers, storage state) | §2c | `spoor/signals` | 2.5 |
 
@@ -195,7 +195,12 @@ shared output, §2h), and action-to-endpoint correlation (layer 5): marking a
 checkpoint before each page load and scroll, then attributing each captured
 request to the action whose time window it fell in — a time-window approximation,
 never proven causation, with the per-action map kept local-only and only counts
-shared (§2h); `capture.feature` records the browser
+shared (§2h); and static JS-bundle endpoint discovery (layer 6, closes #153):
+scanning a page's same-origin JS bundles for endpoint-shaped string literals
+without ever executing them or fetching one to confirm it's real, templating
+candidates with layer 4's own ID rule, counts only reaching shared output and
+the full candidate list written to the local-only cache (§2h);
+`capture.feature` records the browser
 tier's HAR to a local-only, git-ignored cache (§2h); and the §2c signals catalog
 is landing signal-by-signal — console output/JS errors, the accessibility tree,
 response-header fingerprints, and client-side storage state — each opt-in,

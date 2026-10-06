@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import fnmatch
 import functools
+import json
 import math
 import re
 import time
@@ -35,6 +36,7 @@ from playwright.sync_api import BrowserContext, Page, ProxySettings, sync_playwr
 from playwright.sync_api import Error as PlaywrightError
 from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 
+from spoor.api_discovery.bundle_endpoints import discover_bundle_endpoints
 from spoor.api_discovery.correlation import (
     ActionCorrelation,
     Checkpoint,
@@ -165,6 +167,12 @@ class RunResult:
     attributed to the action that likely triggered them (§2b layer 5) — only
     present when a HAR and checkpoints were captured; the document it wrote (with
     the templated paths) stays in the local-only cache (§2h).
+    `bundle_endpoints` are templated, unconfirmed endpoint candidates found by
+    statically scanning the target's same-origin JS bundles (§2b layer 6, closes
+    #153) — never fetched to validate, so a candidate is not "observed" the way
+    `api_spec`/`graphql` are; empty when none were found. `bundle_endpoints_path`
+    is the local-only file the full candidate list was written to (§2h) — only
+    the count reaches `spoor/operational/observability.py`'s summary.
     `spoor/operational/observability.py` turns these into the operator-facing
     summary.
     """
@@ -209,6 +217,8 @@ class RunResult:
     synthesized_spec: SynthesizedSpec | None = None
     checkpoints: list[Checkpoint] = field(default_factory=list)
     action_correlation: ActionCorrelation | None = None
+    bundle_endpoints: tuple[str, ...] = ()
+    bundle_endpoints_path: Path | None = None
     # Tier-3 self-healing events for this run (§2, §2d): each is a field whose
     # broken selector tier 3 re-resolved — confidently (field filled) or as an
     # uncertain match flagged for review (field left null). Field name + winning
@@ -1212,6 +1222,7 @@ def run_report(
     # observability (a directly-invoked resolver leaves this empty).
     result.tiers_attempted = attempted
     _discover_api_surface(config, client, result)
+    _write_bundle_endpoints_doc(result)
     _synthesize_from_capture(config, result)
     _correlate_from_capture(config, result)
     return result
@@ -1268,6 +1279,37 @@ def _probe_surface(
 ) -> None:
     result.api_spec = discover_spec(config.target, client, policy=config.politeness)
     result.graphql = discover_graphql(config.target, client, policy=config.politeness)
+    result.bundle_endpoints = discover_bundle_endpoints(
+        config.target, client, policy=config.politeness
+    )
+
+
+def _write_bundle_endpoints_doc(result: RunResult) -> None:
+    """Write the run's bundle-discovered endpoint candidates to a local-only file
+    (§2b layer 6, §2h), if any were found.
+
+    Mirrors the synthesized-spec/correlation pattern: the full (unconfirmed,
+    possibly secret-shaped) candidate list never reaches shared output — only its
+    count does (`RunSummary`) — so seeing the actual candidates means looking at
+    this local file. Written beside the run's HAR when one was captured (one
+    local-only artifact directory per run); otherwise in its own fresh cache
+    directory, since this probe runs independently of HAR capture (every run gets
+    it, not only ones that opted into HAR capture). Never raises: a write failure
+    simply leaves `bundle_endpoints_path` None.
+    """
+    if not result.bundle_endpoints:
+        return
+    directory = result.har_path.parent if result.har_path is not None else None
+    try:
+        if directory is None:
+            directory = storage.new_run_cache_dir()
+        out = directory / storage.BUNDLE_ENDPOINTS_FILENAME
+        out.write_text(
+            json.dumps(list(result.bundle_endpoints), indent=2), encoding="utf-8"
+        )
+        result.bundle_endpoints_path = out
+    except OSError:
+        return
 
 
 def run(

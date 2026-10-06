@@ -97,6 +97,12 @@ class RunSummary:
     # `action_correlation.doc_path`, same §2h reasoning as the synthesized spec. A
     # time-window approximation, not proven causation (§2b).
     action_correlation: ActionCorrelation | None
+    # Count of static JS-bundle endpoint candidates found this run (§2b layer 6,
+    # closes #153), if any — a count only. The full, unconfirmed candidate list
+    # stays local-only at `bundle_endpoints_path`, same §2h reasoning as the
+    # synthesized spec: a templated path can still embed an un-clustered secret.
+    bundle_endpoint_count: int
+    bundle_endpoints_path: str | None
     # Tier-3 self-healing outcome counts for this run (§2, §2d): fields whose
     # broken selector tier 3 re-resolved confidently (field filled) versus
     # uncertain matches it flagged for review (field left null, never guessed).
@@ -154,6 +160,12 @@ class RunSummary:
             ),
             synthesized_spec=result.synthesized_spec,
             action_correlation=result.action_correlation,
+            bundle_endpoint_count=len(result.bundle_endpoints),
+            bundle_endpoints_path=(
+                str(result.bundle_endpoints_path)
+                if result.bundle_endpoints_path is not None
+                else None
+            ),
             heal_confident=sum(1 for e in result.heal_events if e.used),
             heal_uncertain=sum(1 for e in result.heal_events if not e.used),
         )
@@ -308,6 +320,16 @@ class RunSummary:
                 "triggered "
                 f"by {corr.action_count} actions"
             )
+        # Bundle-discovered endpoint count, only when at least one candidate was
+        # found scanning the target's same-origin JS bundles (§2b layer 6, #153).
+        # A count only — the templated candidate paths stay in the local-only
+        # file, never surfaced here (§2h); every candidate is unconfirmed by
+        # construction (nothing was fetched to check it's real).
+        if self.bundle_endpoint_count > 0:
+            lines.append(
+                f"  api from bundles: {self.bundle_endpoint_count} endpoint "
+                "candidate(s) found in JS, unconfirmed"
+            )
         # Capture lines: only shown when something was captured, so an ordinary run
         # stays quiet; named raw + local so it's clear this isn't shared output (§2h).
         if self.har_path is not None:
@@ -344,5 +366,10 @@ class RunSummary:
             lines.append(
                 "  captured:      action correlation (local-only) "
                 f"{self.action_correlation.doc_path}"
+            )
+        if self.bundle_endpoints_path is not None:
+            lines.append(
+                "  captured:      bundle endpoint candidates (local-only) "
+                f"{self.bundle_endpoints_path}"
             )
         return "\n".join(lines)

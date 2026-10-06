@@ -36,6 +36,10 @@ HEADERS_FILENAME = "headers.json"
 # under (§2c/§2h) — cookies + localStorage, all values.
 STORAGE_STATE_FILENAME = "storage_state.json"
 
+# The filename a run's static JS-bundle-discovered endpoint candidates are
+# written under (§2b layer 6) — unconfirmed string matches, never fetched.
+BUNDLE_ENDPOINTS_FILENAME = "bundle_endpoints.json"
+
 
 def new_run_id() -> str:
     """A sortable, collision-resistant id for one run's cache subdirectory.

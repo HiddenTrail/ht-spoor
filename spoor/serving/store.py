@@ -47,6 +47,7 @@ def shareable_api_surface(
     graphql: DiscoveredGraphQL | None,
     synthesized_spec: SynthesizedSpec | None,
     action_correlation: ActionCorrelation | None,
+    bundle_endpoint_count: int = 0,
 ) -> dict[str, object] | None:
     """Project a run's observed API surface to the §2h-shareable facts only.
 
@@ -55,8 +56,11 @@ def shareable_api_surface(
     the *synthesized* spec and action correlation are reduced to **counts only** —
     their templated paths (and the local-only ``doc_path``) can embed an
     un-clustered secret segment, so they never enter this shared surface at all.
-    Returns None when nothing was observed, so a URL with no API surface stores
-    nothing rather than an empty shell.
+    `bundle_endpoint_count` (§2b layer 6, closes #153) is the same count-only
+    treatment, for the same reason, plus one more: a bundle-discovered candidate
+    was never even fetched to confirm it is real. Returns None when nothing was
+    observed, so a URL with no API surface stores nothing rather than an empty
+    shell.
     """
     surface: dict[str, object] = {}
     if api_spec is not None:
@@ -79,6 +83,10 @@ def shareable_api_surface(
             "action_count": action_correlation.action_count,
             "request_count": action_correlation.request_count,
         }
+    if bundle_endpoint_count > 0:
+        # Count only — the templated candidate paths stay local (§2h); every
+        # candidate is unconfirmed by construction (never fetched to validate).
+        surface["bundle_endpoints"] = {"endpoint_count": bundle_endpoint_count}
     return surface or None
 
 

@@ -113,6 +113,7 @@ def record_api_surface(context: dict[str, Any], url: str) -> None:
         graphql=DiscoveredGraphQL("https://shop.example/graphql", 42),
         synthesized_spec=synthesized,
         action_correlation=None,
+        bundle_endpoint_count=5,
     )
     MapStore().record(
         url,
@@ -197,6 +198,12 @@ def surface_graphql_types(context: dict[str, Any], n: int) -> None:
 def surface_synthesized_count(context: dict[str, Any], n: int) -> None:
     surface = context["response"].json()["api_surface"]
     assert surface["synthesized"]["endpoint_count"] == n
+
+
+@then(parsers.parse("the API surface reports {n:d} bundle-discovered endpoints"))
+def surface_bundle_count(context: dict[str, Any], n: int) -> None:
+    surface = context["response"].json()["api_surface"]
+    assert surface["bundle_endpoints"]["endpoint_count"] == n
 
 
 @then("the served API surface exposes no templated endpoint path")

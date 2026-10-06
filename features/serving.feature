@@ -9,10 +9,10 @@
 # TARGET, always. It answers questions about a captured map and exposes no
 # state-changing action on a target. It serves the same extracted records the
 # output pipeline already writes, plus the §2h-safe projection of the observed API
-# surface (any published spec/GraphQL served whole; the synthesized spec and
-# correlation as counts only — their templated paths stay local-only), never a raw
-# local-only capture (HAR/storage state). Records and surface alike are redacted on
-# the way out, honoring §2h.
+# surface (any published spec/GraphQL served whole; the synthesized spec,
+# correlation, and bundle-discovered endpoint candidates as counts only — their
+# templated paths stay local-only), never a raw local-only capture (HAR/storage
+# state). Records and surface alike are redacted on the way out, honoring §2h.
 #
 # Every answer carries the capture time and its age. Spoor never *auto*-rechecks in
 # v1 (that policy is backlogged, §9) — it shows the age and waits to be asked. A
@@ -50,14 +50,16 @@ Feature: A read-only API serves a captured map with freshness
 
   Scenario: A mapped URL's observed API surface is served alongside its records
     # §2h split: the published spec and GraphQL endpoint are served whole; the
-    # synthesized spec and action correlation are counts only — their templated
-    # paths (and the local-only doc path) never reach this shared surface.
+    # synthesized spec, action correlation, and bundle-discovered endpoints are
+    # counts only — their templated paths (and the local-only doc path) never
+    # reach this shared surface.
     Given the map records an observed API surface for "https://shop.example/api-home"
     When I GET "/map?url=https://shop.example/api-home"
     Then the response status is 200
     And the API surface reports an "openapi" spec
     And the API surface reports a GraphQL endpoint with 42 types
     And the API surface reports 3 synthesized endpoints
+    And the API surface reports 5 bundle-discovered endpoints
     And the served API surface exposes no templated endpoint path
 
   Scenario: A mapped URL's exploration graph is served alongside its records
