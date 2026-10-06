@@ -68,7 +68,7 @@ are on the horizon as an **optional** tier, never the default run loop.
 
 | Feature | Approach | Why | Phase | Notes |
 |---|---|---|---|---|
-| Adaptive element relocation and its similarity scoring | Adapt the ideas; **benchmark it on Spoor's tier-3 mutation corpus** | Closest competitor to tier 3. Better than ≥95% on our corpus → learn from it; worse → a measured README claim | 2 | |
+| Adaptive element relocation and its similarity scoring | **Benchmarked, closes #151** — Scrapling scored worse; not adapted | Measured on the identical mutation corpus (`scripts/benchmark_scrapling.py`): tier 3 ≥99.3%, Scrapling ~88-89% across two independent seeds — see the §5.3 decision note in ROADMAP.md | 2 | |
 | Stealth fetchers / fingerprint spoofing | Skip | Spoor's stance is "detect bot challenges, never bypass them" (§2d) | — | |
 
 ### Crawljax — exploration (closest prior art to §2e)
