@@ -45,14 +45,20 @@ the replayed path that reaches this transition* — not just this transition's o
 diff, since the generated test's console/network listeners are attached for the whole
 replay (every earlier hop's additions are still "in view" when the final assertion
 runs; checking only the leaf transition's own set would false-positive on each earlier
-transition's legitimate additions). The check is emitted **only for a signal kind that
-had at least one addition recorded somewhere on the path** — a kind with none recorded
-is left unchecked, because the initial `page.goto()` navigation's own console/network
-activity is never captured as any transition's "added" signal, so asserting "nothing at
-all" for an untouched kind would false-positive on ordinary page-load noise. This is a
-first slice with no noise normalization (ROADMAP.md §2g/#107 decision note): a value
-that legitimately varies run to run (a timestamp query parameter, a random request id)
-is asserted literally, so a generated suite using this flag can be noisier than one
+transition's legitimate additions). The closed set also unconditionally includes the
+**root state's own captured signals** (its full snapshot, not a diff): every generated
+test's replay starts with a bare `page.goto(TARGET)` before any action fires, so
+whatever that navigation alone produces (an analytics beacon, a consent-banner console
+line, a theme preference already in storage) is in view from the first line of the
+test — but it is never recorded as any transition's own "added" diff, since there is
+no "before" state to diff the landing page against. Seeding it from the root's
+snapshot is what keeps this check usable on an ordinary real site rather than
+false-positiving on page-load noise for any touched signal kind. The check is still
+emitted only for a kind with at least one value in its closed set — root noise alone
+can be enough to emit one even for a kind no transition ever added to. This is a first
+slice with no noise normalization (ROADMAP.md §2g/#107 decision note): a value that
+legitimately varies run to run (a timestamp query parameter, a random request id) is
+asserted literally, so a generated suite using this flag can still be noisier than one
 without it — an explicit, documented trade-off, not an oversight.
 """
 
@@ -60,6 +66,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from spoor.exploration.capture import StateSignals
 from spoor.exploration.discovery import ActionableElement
 from spoor.exploration.graph import (
     ExplorationGraph,
@@ -195,10 +202,19 @@ def build_tests(
         _TESTKIT: _TESTKIT_SOURCE.format(target=redact(target)),
         _CONFTEST: _CONFTEST_SOURCE,
     }
+    # Computed once, not per transition (closes a review finding against #128):
+    # both are whole-graph structures, so rebuilding them inside the loop below
+    # was O(T) work repeated T times for no reason.
+    by_edge = _edge_index(graph) if assert_no_new_signals else {}
+    steps_from_root = path_steps_from_root(graph) if assert_no_new_signals else {}
+    root_id = graph.states[0]
+    root_signals = graph.node(root_id).signals if assert_no_new_signals else None
     for index, transition in enumerate(transitions):
         path = paths.get(transition.from_state, [])
         closed_world = (
-            _closed_world_signals(graph, transition)
+            _closed_world_signals(
+                transition, root_id, by_edge, steps_from_root, root_signals
+            )
             if assert_no_new_signals
             else None
         )
@@ -238,8 +254,33 @@ def render_suite(
     return written
 
 
+def _edge_index(
+    graph: ExplorationGraph,
+) -> dict[tuple[str, str, str, str], list[Transition]]:
+    """Every transition, grouped by the edge it fires (from/action/to) (§2g, #128).
+
+    A list per edge, not a single transition: two distinct `Transition` objects
+    can legitimately share the same edge signature (e.g. after a `--resume-from`
+    merge), and a single-value dict would silently keep only the last one seen,
+    dropping an earlier transition's own recorded signals from the closed-world
+    union below. Grouping instead means every such transition's signals are
+    counted — a closed-world set can only get *more* inclusive from that, which
+    is the safe direction for a check whose whole job is "don't false-positive
+    on something that really was seen."
+    """
+    index: dict[tuple[str, str, str, str], list[Transition]] = {}
+    for t in graph.transitions:
+        key = (t.from_state, t.action.role, t.action.name, t.to_state)
+        index.setdefault(key, []).append(t)
+    return index
+
+
 def _closed_world_signals(
-    graph: ExplorationGraph, transition: Transition
+    transition: Transition,
+    root_id: str,
+    by_edge: dict[tuple[str, str, str, str], list[Transition]],
+    steps_from_root: dict[str, list[tuple[ActionableElement, str]]],
+    root_signals: StateSignals | None,
 ) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
     """The redacted union of console/storage/network values recorded as added across
     every transition on the replay path that reaches `transition`, including the
@@ -249,23 +290,32 @@ def _closed_world_signals(
     not scoped to the final hop, so the closed set a reverse assertion checks against
     must be the union across the path too — otherwise an earlier hop's own recorded
     addition would false-positive the check on the later transition's test.
+
+    `root_signals` (the root state's own full captured snapshot, not a diff) is
+    unioned in unconditionally: every generated test's replay starts with
+    `page.goto(TARGET)` before any action fires, so whatever that bare navigation
+    alone produces (an analytics beacon, a consent-banner console warning, a
+    theme preference already in storage) is in view from the first line — but
+    it is never recorded as *any* transition's own "added" diff, since there is
+    no "before" state to diff the landing page against. Without seeding it here,
+    that ordinary page-load noise would false-positive the very first generated
+    test for any touched signal kind on any real site that logs or requests
+    anything on load — not just an edge case, the common case.
     """
-    by_edge: dict[tuple[str, str, str, str], Transition] = {
-        (t.from_state, t.action.role, t.action.name, t.to_state): t
-        for t in graph.transitions
-    }
-    steps = path_steps_from_root(graph).get(transition.from_state, [])
+    steps = steps_from_root.get(transition.from_state, [])
     chain: list[Transition] = []
-    current = graph.states[0] if graph.states else transition.from_state
+    current = root_id
     for action, landed in steps:
-        hop = by_edge.get((current, action.role, action.name, landed))
-        if hop is not None:
-            chain.append(hop)
+        chain.extend(by_edge.get((current, action.role, action.name, landed), []))
         current = landed
     chain.append(transition)
     console: set[str] = set()
     storage: set[str] = set()
     network: set[str] = set()
+    if root_signals is not None:
+        console.update(redact(v) for v in root_signals.console_messages)
+        storage.update(redact(v) for v in root_signals.storage_keys)
+        network.update(redact(v) for v in root_signals.network_requests)
     for hop in chain:
         if hop.signals is None:
             continue
@@ -352,7 +402,7 @@ def _assertion_body(
             lines.append(f"    assert {redact(message)!r} in console")
         if closed_console:
             lines.append(
-                f"    assert set(console) <= {sorted(closed_console)!r}, "
+                f"    assert set(console) <= set({sorted(closed_console)!r}), "
                 '"unexpected console message(s) not seen during the original crawl"'
             )
     if (signals is not None and signals.storage_added) or closed_storage:
@@ -361,7 +411,7 @@ def _assertion_body(
             lines.append(f"    assert {redact(key)!r} in storage")
         if closed_storage:
             lines.append(
-                f"    assert set(storage) <= {sorted(closed_storage)!r}, "
+                f"    assert set(storage) <= set({sorted(closed_storage)!r}), "
                 '"unexpected storage key(s) not seen during the original crawl"'
             )
     if (signals is not None and signals.network_added) or closed_network:
