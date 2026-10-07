@@ -670,3 +670,110 @@ def test_wizard_allows_scaffold_directory_to_match_wiki(
         "spoor explore http://localhost:8000/ --wiki demo/out --scaffold demo/out"
         in result.output
     )
+
+
+# --- `spoor session` command group (ROADMAP.md §2h, closes #215) ----------
+
+
+def _session_file(tmp_path: Path) -> Path:
+    path = tmp_path / "captured.json"
+    state = {"cookies": [{"name": "s", "value": "v", "domain": "x", "path": "/"}]}
+    path.write_text(json.dumps(state), encoding="utf-8")
+    return path
+
+
+def test_session_add_then_list_shows_the_label(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spoor.security import storage
+
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path / ".spoor-cache")
+    add = runner.invoke(
+        cli.app,
+        [
+            "session",
+            "add",
+            str(_session_file(tmp_path)),
+            "shop.example",
+            "--label",
+            "customer",
+        ],
+    )
+    assert add.exit_code == 0, add.output
+    listed = runner.invoke(cli.app, ["session", "list", "shop.example"])
+    assert listed.exit_code == 0, listed.output
+    assert "customer" in listed.output
+    # Never the stored cookie value (§2h) — the whole point of metadata-only.
+    assert "s3ss10n" not in listed.output and "'v'" not in listed.output
+
+
+def test_session_add_accepts_a_full_url_for_the_site(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spoor.security import storage
+
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path / ".spoor-cache")
+    add = runner.invoke(
+        cli.app,
+        [
+            "session",
+            "add",
+            str(_session_file(tmp_path)),
+            "https://shop.example/login",
+            "--label",
+            "customer",
+        ],
+    )
+    assert add.exit_code == 0, add.output
+    listed = runner.invoke(cli.app, ["session", "list"])
+    assert "shop.example" in listed.output
+
+
+def test_session_add_rejects_a_malformed_file(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spoor.security import storage
+
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path / ".spoor-cache")
+    bad = tmp_path / "bad.json"
+    bad.write_text("{not json", encoding="utf-8")
+    result = runner.invoke(
+        cli.app, ["session", "add", str(bad), "shop.example", "--label", "customer"]
+    )
+    assert result.exit_code != 0
+
+
+def test_session_remove_reports_removed_then_nothing_to_remove(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spoor.security import storage
+
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path / ".spoor-cache")
+    runner.invoke(
+        cli.app,
+        [
+            "session",
+            "add",
+            str(_session_file(tmp_path)),
+            "shop.example",
+            "--label",
+            "customer",
+        ],
+    )
+    first = runner.invoke(cli.app, ["session", "remove", "shop.example", "customer"])
+    assert first.exit_code == 0
+    assert "Removed" in first.output
+    second = runner.invoke(cli.app, ["session", "remove", "shop.example", "customer"])
+    assert second.exit_code == 0
+    assert "nothing removed" in second.output
+
+
+def test_session_list_with_nothing_stored_says_so(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spoor.security import storage
+
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path / ".spoor-cache")
+    result = runner.invoke(cli.app, ["session", "list"])
+    assert result.exit_code == 0
+    assert "No stored sessions" in result.output

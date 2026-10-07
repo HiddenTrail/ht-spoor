@@ -68,7 +68,7 @@ from spoor.operational.retry import (
     RetryingNavigator,
 )
 from spoor.security import storage
-from spoor.security.session import apply_cookies, load_session
+from spoor.security.session import apply_cookies, load_session, storage_state_arg
 from spoor.signals.accessibility import AccessibilityCollector, AccessibilitySignal
 from spoor.signals.console import ConsoleCollector, ConsoleSignal
 from spoor.signals.headers import HeaderCollector, HeaderSignal
@@ -539,7 +539,9 @@ class Tier1Resolver:
         nothing here and escalates to the browser tier, which applies it (§2h).
         """
         session = (
-            load_session(config.session) if config.session is not None else None
+            load_session(config.session, domain=urlsplit(config.target).netloc)
+            if config.session is not None
+            else None
         )
         owns_client = client is None
         client = client or httpx.Client(
@@ -817,7 +819,9 @@ class Tier2Resolver:
         content gated behind either.
         """
         session = (
-            load_session(config.session) if config.session is not None else None
+            load_session(config.session, domain=urlsplit(config.target).netloc)
+            if config.session is not None
+            else None
         )
         owns_client = client is None
         client = client or httpx.Client(
@@ -866,18 +870,21 @@ class Tier2Resolver:
                     # record_har_path is per-context; recording it on the context
                     # (not per page) captures the whole run in one HAR. A supplied
                     # session (§2h) is applied here too — Playwright loads the
-                    # storage-state file's cookies + localStorage into the context.
-                    # Branched explicitly (rather than building a kwargs dict) so
-                    # each optional argument keeps its precise Playwright type.
-                    session_path = str(session.path) if session is not None else None
-                    if har_path is not None and session_path is not None:
+                    # storage-state (file or stored-by-label, §2h Phase B)
+                    # cookies + localStorage into the context. Branched
+                    # explicitly (rather than building a kwargs dict) so each
+                    # optional argument keeps its precise Playwright type.
+                    session_state = (
+                        storage_state_arg(session) if session is not None else None
+                    )
+                    if har_path is not None and session_state is not None:
                         context = browser.new_context(
-                            record_har_path=har_path, storage_state=session_path
+                            record_har_path=har_path, storage_state=session_state
                         )
                     elif har_path is not None:
                         context = browser.new_context(record_har_path=har_path)
-                    elif session_path is not None:
-                        context = browser.new_context(storage_state=session_path)
+                    elif session_state is not None:
+                        context = browser.new_context(storage_state=session_state)
                     else:
                         context = browser.new_context()
                     try:

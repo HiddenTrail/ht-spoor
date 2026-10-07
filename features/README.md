@@ -57,6 +57,7 @@ chronological, slice-by-slice narrative order.
 |---|---|---|---|---|
 | `redaction.feature` | Data handling: secret redaction before shared output (sandbox registry later) | §2h | `spoor/security` | 2.5 |
 | `session.feature` | Bring-your-own-session: authenticate a run with a supplied browser storage state (cookies + localStorage); Spoor runs no login flow itself | §2h | `spoor/security`, `spoor/core` | 2.5 |
+| `session_store.feature` | Named, stored browser sessions per site (closes #215): store a captured session once under a label, resolve it by name, metadata-only listing, a real file always wins over a same-named stored label | §2h | `spoor/security` | 2.5 |
 
 ### Tier-3 self-healing
 
@@ -219,6 +220,13 @@ token naturally escalates from the static tier to the browser. A missing or
 malformed session file fails the run loudly rather than scraping anonymously, and
 the supplied secret-bearing state is never echoed to shared output. Spoor performs
 no login/MFA/SSO flow itself (§2h, §0) — bring-your-own-session only.
+`session_store.feature` (§2h Phase B, closes #215) adds a second, opt-in way to
+supply the same input: store a captured session once under a label scoped to a
+site (`spoor session add/list/remove`), then resolve it by name — a real file
+always wins over a same-named stored label, and `list` returns metadata only
+(label, timestamps), never a cookie or storage value. Shares the same SQLite
+database `MapStore` uses (§2f, closes #214) via `spoor/security/db.py`; there is
+deliberately no MCP/REST surface for stored sessions.
 
 Tier-3 self-healing (§2, §5.3) spans several feature files. `self_healing.feature`
 covers the scoring core — capture an element's fingerprint while its selector
