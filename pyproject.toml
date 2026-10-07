@@ -64,6 +64,8 @@ serve = [
 gui = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
+    # Reading the run forms' submissions (gui-2).
+    "python-multipart>=0.0.9",
 ]
 # Parquet output sink (§2d): kept optional since the other sinks (JSON/CSV/MD,
 # and SQLite via stdlib) need no extra dependency and most runs need none of
@@ -89,6 +91,8 @@ dev = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "mcp>=2",
+    # The GUI's run-form scenarios read form submissions.
+    "python-multipart>=0.0.9",
     # Parquet-sink scenarios need pyarrow in the gate too.
     "pyarrow>=14",
 ]

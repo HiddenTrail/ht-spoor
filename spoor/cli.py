@@ -14,6 +14,7 @@ take and, if confirmed, runs that invocation as a subprocess.
 
 from __future__ import annotations
 
+import os
 import sys
 import time
 from collections.abc import Callable
@@ -207,6 +208,33 @@ def _expand_element_patterns(
     return tuple(expanded)
 
 
+def _supervised_tick(
+    tick: Callable[[], None], controller: RunController, stop_file: str | None
+) -> Callable[[], None]:
+    """Wrap a progress tick so a supervisor can stop the run gracefully (§2i gui-2).
+
+    With a stop file named (`SPOOR_STOP_FILE`, set by `spoor gui`), each tick —
+    once per state found and per action fired — checks whether the file exists
+    and, once it does, throws the same kill switch Ctrl-C does: the run finishes
+    its current action, then saves the map and writes the requested outputs. A
+    file rather than a signal because a supervisor can't send Ctrl-C portably
+    (on Windows it would also reach Playwright's own processes).
+    """
+    if not stop_file:
+        return tick
+    announced = False
+
+    def supervised() -> None:
+        nonlocal announced
+        if not announced and os.path.exists(stop_file):
+            announced = True
+            typer.echo("Stop requested: finishing the current action, then saving.")
+            controller.kill()
+        tick()
+
+    return supervised
+
+
 class _CliProgress:
     """A dependency-free live spinner/bar for `spoor explore` (§2d observability).
 
@@ -222,28 +250,46 @@ class _CliProgress:
     to a file, or running under a test runner), so non-interactive output is never
     polluted with carriage-return control characters, and throttled to redraw at
     most ~10 times a second so a fast crawl spends its time exploring, not
-    repainting a terminal.
+    repainting a terminal. The one exception is plain-line mode (`lines=True`, set
+    by `SPOOR_PROGRESS=lines` for a supervisor such as `spoor gui`, §2i gui-2):
+    then it prints an ordinary progress line at most every two seconds instead,
+    terminal or not, and never a carriage return.
     """
 
     _FRAMES = "|/-\\"
     _MIN_INTERVAL_S = 0.1
+    _LINES_INTERVAL_S = 2.0
     _WIDTH = 20
 
-    def __init__(self, controller: RunController, budget: RunBudget) -> None:
+    def __init__(
+        self, controller: RunController, budget: RunBudget, *, lines: bool = False
+    ) -> None:
         self._controller = controller
         self._budget = budget
         self._frame = 0
         self._last_render = 0.0
-        self._active = sys.stdout.isatty()
+        # Plain-line mode (§2i gui-2): for a supervising process such as
+        # `spoor gui`, whose log can't show a carriage-return redraw. One ordinary
+        # line at most every couple of seconds, whether or not stdout is a terminal.
+        self._lines = lines
+        self._active = lines or sys.stdout.isatty()
 
     def tick(self) -> None:
         """Called once per state discovered and once per action fired."""
         if not self._active:
             return
         now = time.monotonic()
-        if now - self._last_render < self._MIN_INTERVAL_S:
+        interval = self._LINES_INTERVAL_S if self._lines else self._MIN_INTERVAL_S
+        if now - self._last_render < interval:
             return
         self._last_render = now
+        if self._lines:
+            elapsed = self._controller.elapsed()
+            typer.echo(
+                f"progress: {self._controller.states} state(s), "
+                f"{self._controller.requests} request(s), {elapsed:0.0f}s"
+            )
+            return
         self._render()
 
     def _render(self) -> None:
@@ -264,7 +310,7 @@ class _CliProgress:
 
     def finish(self) -> None:
         """Clear the line so whatever prints next starts clean."""
-        if not self._active:
+        if not self._active or self._lines:
             return
         sys.stdout.write("\r" + " " * 78 + "\r")
         sys.stdout.flush()
@@ -535,7 +581,12 @@ def explore(
         include=_expand_element_patterns("--include-element", include_elements),
         exclude=_expand_element_patterns("--exclude-element", exclude_elements),
     )
-    cli_progress = _CliProgress(controller, budget)
+    cli_progress = _CliProgress(
+        controller, budget, lines=os.environ.get("SPOOR_PROGRESS") == "lines"
+    )
+    progress_tick = _supervised_tick(
+        cli_progress.tick, controller, os.environ.get("SPOOR_STOP_FILE")
+    )
     # The opt-in screenshot sinks: dicts only when asked for, so a default run captures
     # no pixels at all (§2e slice 8). During exploration each image is written straight
     # to disk under the wiki directory as it is captured (§2e slice 8f) — and only when
@@ -573,7 +624,7 @@ def explore(
                         screenshots=shots,
                         element_screenshots=element_shots,
                         screenshot_dir=screenshot_dir,
-                        progress=cli_progress.tick,
+                        progress=progress_tick,
                     )
                 except (ResumeError, ValueError) as exc:
                     raise typer.BadParameter(str(exc)) from exc
@@ -587,7 +638,7 @@ def explore(
                     screenshots=shots,
                     element_screenshots=element_shots,
                     screenshot_dir=screenshot_dir,
-                    progress=cli_progress.tick,
+                    progress=progress_tick,
                 )
     finally:
         cli_progress.finish()

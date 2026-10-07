@@ -798,3 +798,50 @@ def test_gui_has_no_host_option() -> None:
     result = runner.invoke(cli.app, ["gui", "--host", "0.0.0.0"])
     assert result.exit_code != 0
     assert "No such option" in result.output
+
+
+def test_supervised_tick_without_a_stop_file_is_the_plain_tick() -> None:
+    from spoor.exploration.control import RunBudget, RunController
+
+    def tick() -> None:
+        return None
+
+    controller = RunController(RunBudget())
+    assert cli._supervised_tick(tick, controller, None) is tick
+    assert cli._supervised_tick(tick, controller, "") is tick
+
+
+def test_supervised_tick_stops_the_run_once_its_stop_file_appears(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spoor.exploration.control import RunBudget, RunController
+
+    ticks: list[int] = []
+    controller = RunController(RunBudget())
+    stop_file = tmp_path / "job.stop"
+    supervised = cli._supervised_tick(
+        lambda: ticks.append(1), controller, str(stop_file)
+    )
+    supervised()
+    assert not controller.killed
+    stop_file.touch()
+    supervised()
+    supervised()
+    assert controller.killed
+    # The wrapped tick still runs every time, and the notice prints only once.
+    assert len(ticks) == 3
+    assert capsys.readouterr().out.count("Stop requested") == 1
+
+
+def test_progress_lines_mode_prints_plain_lines_even_without_a_terminal(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    from spoor.exploration.control import RunBudget, RunController
+
+    progress = cli._CliProgress(RunController(RunBudget()), RunBudget(), lines=True)
+    progress.tick()
+    progress.tick()  # throttled: within the interval, nothing more is printed
+    progress.finish()
+    out = capsys.readouterr().out
+    assert out == "progress: 0 state(s), 0 request(s), 0s\n"
+    assert "\r" not in out

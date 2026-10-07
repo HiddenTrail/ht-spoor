@@ -1,4 +1,4 @@
-"""The local GUI's FastAPI app (ROADMAP.md §2i, slice gui-1: browse maps).
+"""The local GUI's FastAPI app (ROADMAP.md §2i): browse maps (gui-1), run jobs (gui-2).
 
 Every request passes one guard before any page runs (§2i security posture):
 
@@ -13,9 +13,10 @@ Every request passes one guard before any page runs (§2i security posture):
    request without it is refused, so neither another local user nor another web
    page can drive the GUI.
 
-The pages only read the map store, through the serving layer's shared
+The map pages only read the map store, through the serving layer's shared
 `views.map_view` — the same §2h-redacted view the REST/MCP surfaces answer with,
-so a secret-shaped value shows as ``[REDACTED]`` here too.
+so a secret-shaped value shows as ``[REDACTED]`` here too. The run-job pages
+live in `job_routes.py`.
 """
 
 from __future__ import annotations
@@ -24,6 +25,7 @@ import hmac
 import json
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlencode
 
@@ -31,6 +33,8 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from starlette.responses import Response
 
+from spoor.gui.job_routes import add_job_routes
+from spoor.gui.jobs import JobManager, SubprocessRunner, open_folder
 from spoor.gui.templates import environment
 from spoor.serving.store import MapStore
 from spoor.serving.views import map_view
@@ -81,15 +85,27 @@ def _map_href(url: str) -> str:
 
 
 def create_app(
-    store: MapStore, *, token: str, port: int, host: str = "127.0.0.1"
+    store: MapStore,
+    *,
+    token: str,
+    port: int,
+    host: str = "127.0.0.1",
+    jobs: JobManager | None = None,
+    opener: Callable[[Path], None] = open_folder,
 ) -> FastAPI:
     """Build the GUI app over `store`, guarded by `token`, for a loopback `port`.
 
     A factory so tests can inject a temp-backed store and a known token; the
     launcher (`spoor.gui.launch.start_gui`) generates a fresh token per launch
     and passes the loopback `host` it bound (bracketed if IPv6), which the Host
-    check accepts alongside the usual loopback names.
+    check accepts alongside the usual loopback names. `jobs` runs the commands
+    started from the GUI's forms (by default the real CLI in the current working
+    directory, the same one the local cache lives under); `opener` opens a job's
+    output folder. Both are injectable for tests. The manager is exposed as
+    `app.state.jobs` so the launcher can stop running jobs when the GUI closes.
     """
+    if jobs is None:
+        jobs = JobManager(SubprocessRunner(Path.cwd()), Path.cwd())
     allowed_hosts = {
         f"{name}:{port}" for name in (host, "127.0.0.1", "localhost", "[::1]")
     }
@@ -175,6 +191,7 @@ def create_app(
         return render(
             "map.html",
             view=view,
+            explore_href="/new/explore?" + urlencode({"url": entry.url}),
             domain_href="/domain?" + urlencode({"name": entry.domain}),
             age=human_age(cast(float, view["age_seconds"])),
             columns=columns,
@@ -184,6 +201,8 @@ def create_app(
             to_json=_cell,
         )
 
+    add_job_routes(app, jobs=jobs, store=store, render=render, opener=opener)
+    app.state.jobs = jobs
     return app
 
 

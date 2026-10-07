@@ -13,7 +13,7 @@ diffing (§5.4).
 Each capability maps to a `spoor/` subpackage and a ROADMAP phase (§4). Files
 are authored when their phase begins, not up front.
 
-67 feature files, grouped below by what they cover rather than listed as one
+68 feature files, grouped below by what they cover rather than listed as one
 flat table — the grouping is purely navigational (every row's text is
 unchanged from before); the prose section further down keeps its own
 chronological, slice-by-slice narrative order.
@@ -83,6 +83,7 @@ chronological, slice-by-slice narrative order.
 | Feature file | Capability | ROADMAP | Package | Phase |
 |---|---|---|---|---|
 | `gui.feature` | Local GUI, slice gui-1: `spoor gui` opens a loopback-only web app (per-launch access token, Host and Origin checks) that lists mapped domains, each domain's mapped URLs, and a URL's map (records, freshness, exploration graph with safety-gate skips) through the same redacted view the serving layer uses. A separate control plane from the read-only serving layer, which it leaves unchanged | §2i | `spoor/gui`, CLI | post-v1 |
+| `gui_jobs.feature` | Local GUI, slice gui-2: forms for `explore`, `run` and `apply-scaffold` that build and run the real command (with a live preview of it), a job page with a redacted live log, Stop (graceful for explore, via a stop file) and Force stop (kills the whole process tree), and where each output landed: absolute paths, open folder, the wiki served from the job's own folder only, and a link to the map. A form posted from another site launches nothing, and an address that starts with "-" is refused rather than passed as an option | §2i | `spoor/gui`, CLI | post-v1 |
 
 ### Exploration — safety, state identity & the core loop
 
