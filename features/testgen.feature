@@ -89,7 +89,8 @@ Feature: Generate replayable regression tests from an exploration graph
   # the live replay must produce nothing *beyond* what this crawl ever recorded as
   # added — a ghost call (an unexpected extra request or console line) now fails
   # the suite instead of passing it silently, since graph/state identity alone
-  # can't see it (ROADMAP.md §2g/#107 decision note).
+  # can't see it (ROADMAP.md §2g/#211 decision note — the "freshness by
+  # re-observation" design, previously mis-cited there as #107).
 
   Scenario: Without the flag, no reverse assertion is added
     When I generate a pytest suite for "https://shop.example"

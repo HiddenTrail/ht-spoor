@@ -56,7 +56,8 @@ snapshot is what keeps this check usable on an ordinary real site rather than
 false-positiving on page-load noise for any touched signal kind. The check is still
 emitted only for a kind with at least one value in its closed set — root noise alone
 can be enough to emit one even for a kind no transition ever added to. This is a first
-slice with no noise normalization (ROADMAP.md §2g/#107 decision note): a value that
+slice with no noise normalization (ROADMAP.md §2g/#211 decision note — the
+"freshness by re-observation" design, previously mis-cited there as #107): a value that
 legitimately varies run to run (a timestamp query parameter, a random request id) is
 asserted literally, so a generated suite using this flag can still be noisier than one
 without it — an explicit, documented trade-off, not an oversight.
