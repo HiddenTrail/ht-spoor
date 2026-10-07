@@ -151,3 +151,26 @@ def test_shutdown_removes_the_stop_file_folder(tmp_path: Path) -> None:
     assert stop_dir.is_dir()
     manager.shutdown()
     assert not stop_dir.exists()
+
+
+def test_describe_changes_lists_only_what_changed_in_plain_words() -> None:
+    from spoor.gui.app import describe_changes
+
+    assert describe_changes(
+        {
+            "ax_node_delta": 4,
+            "console_added": ["auth header Bearer [REDACTED]"],
+            "storage_added": ["cartId", "theme"],
+            "storage_removed": [],
+            "screenshot_changed": True,
+        }
+    ) == [
+        "accessibility nodes: +4",
+        "console added: auth header Bearer [REDACTED]",
+        "storage added: cartId, theme",
+        "screenshot changed",
+    ]
+    assert describe_changes({"ax_node_delta": 0, "screenshot_changed": False}) == [
+        "nothing observed"
+    ]
+    assert describe_changes(None) == []

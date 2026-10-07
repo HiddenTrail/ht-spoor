@@ -4,11 +4,127 @@ Inline Jinja2 templates in a `DictLoader`, the same approach the §2e wiki takes
 (`spoor/exploration/wiki.py`): no package data files to ship, and autoescape is
 on for every template, so a captured value can never inject markup into the page.
 Everything shown is already §2h-redacted by `views.map_view` before it gets here.
+
+The look is the wiki's own: the layout embeds Spoor's shared stylesheet
+(`spoor/exploration/theme.py`) and adds only GUI-specific rules (forms, buttons,
+job status, the log) built from the same colour tokens, so the GUI and a wiki it
+links to read as one product.
 """
 
 from __future__ import annotations
 
 from jinja2 import DictLoader, Environment, select_autoescape
+
+from spoor.exploration.theme import STYLESHEET
+
+_GUI_CSS = """
+      /* GUI-only rules, layered on Spoor's shared stylesheet (the wiki's theme,
+         spoor/exploration/theme.py) and built from the same tokens, so the GUI
+         and the wiki read as one product. */
+      :root { color-scheme: dark; }
+      nav .brand { color: var(--accent); font-weight: 700; }
+      .muted { color: var(--text-muted); }
+      .crumbs { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 0.4rem; }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin: 0 0 1rem;
+        padding: 0.9rem 1.1rem;
+      }
+      .card p:last-child { margin-bottom: 0; }
+      /* Only code and paths may break mid-word: letting every cell do so lets a
+         table squeeze short columns until words split ("Wik / i"). */
+      td { overflow-wrap: break-word; }
+      td code, td pre { overflow-wrap: anywhere; }
+      ul.changes { font-size: 0.9em; }
+      pre {
+        font-family: var(--mono);
+        font-size: 0.85rem;
+        line-height: 1.45;
+        margin: 0;
+        overflow-wrap: anywhere;
+        white-space: pre-wrap;
+      }
+      tr.skip td:first-child { box-shadow: inset 3px 0 var(--yellow); }
+      .notice { margin: 0 0 1rem; }
+      .notice.notice-error { border-left-color: var(--accent); }
+
+      /* Forms */
+      fieldset {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        margin: 0 0 1rem;
+        padding: 0.6rem 1.1rem 1.1rem;
+      }
+      legend { color: var(--teal); font-weight: 700; padding: 0 0.4rem; }
+      label { display: block; font-weight: 600; margin: 0.8rem 0 0.3rem; }
+      label.check {
+        align-items: baseline;
+        display: flex;
+        font-weight: 600;
+        gap: 0.5rem;
+      }
+      label.check input { accent-color: var(--accent); }
+      .hint { color: var(--text-muted); font-size: 0.85rem; margin: 0.2rem 0 0; }
+      input[type=text], select, textarea {
+        background: var(--surface-2);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        color: var(--text);
+        font: inherit;
+        padding: 0.45rem 0.6rem;
+        width: 100%;
+      }
+      input[type=text]:focus, select:focus, textarea:focus {
+        border-color: var(--accent);
+        outline: none;
+      }
+      textarea { font-family: var(--mono); min-height: 4.5rem; }
+      .grid {
+        display: grid;
+        gap: 0 1rem;
+        grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+      }
+      .indent { margin-left: 1.6rem; }
+      .spaced { margin-top: 0.8rem; }
+      button {
+        background: var(--accent);
+        border: 1px solid var(--accent);
+        border-radius: var(--radius-sm);
+        color: var(--bg);
+        cursor: pointer;
+        font: inherit;
+        font-weight: 700;
+        padding: 0.45rem 1.1rem;
+      }
+      button:hover { background: var(--yellow); border-color: var(--yellow); }
+      button.secondary { background: transparent; color: var(--accent); }
+      button.secondary:hover { color: var(--yellow); }
+      form.inline { display: inline; }
+
+      /* Jobs */
+      code.cmd {
+        background: var(--surface-2);
+        display: block;
+        overflow-wrap: anywhere;
+        padding: 0.6rem 0.8rem;
+        white-space: pre-wrap;
+      }
+      .status { font-weight: 700; }
+      .status-running { color: var(--teal); }
+      .status-failed { color: var(--accent); }
+      .status-stopped { color: var(--yellow); }
+      pre.log {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        max-height: 60vh;
+        overflow: auto;
+        padding: 0.8rem 1rem;
+      }
+"""
 
 _LAYOUT = """<!DOCTYPE html>
 <html lang="en">
@@ -16,106 +132,17 @@ _LAYOUT = """<!DOCTYPE html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Spoor{% endblock %}</title>
-    <style>
-      :root {
-        --bg: #f7f6f3; --surface: #ffffff; --text: #1f1c1b; --muted: #6b6560;
-        --border: #e2ded8; --accent: #2f6f5e; --warn-bg: #fdf3e2; --warn: #8a5a00;
-      }
-      @media (prefers-color-scheme: dark) {
-        :root {
-          --bg: #1f1c1b; --surface: #2a2724; --text: #eeeae4; --muted: #a59e96;
-          --border: #3d3934; --accent: #7cc4ad; --warn-bg: #3a2f1c; --warn: #f0c070;
-        }
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0; background: var(--bg); color: var(--text);
-        font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
-      }
-      header {
-        background: var(--surface); border-bottom: 1px solid var(--border);
-        padding: 12px 16px;
-      }
-      nav { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; }
-      nav a { color: var(--text); text-decoration: none; }
-      nav a:hover { color: var(--accent); }
-      nav .brand { font-weight: 700; margin-right: 8px; }
-      fieldset {
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: 8px; padding: 12px 16px 16px; margin: 0 0 16px;
-      }
-      legend { font-weight: 600; padding: 0 6px; }
-      label { display: block; margin: 10px 0 4px; font-weight: 500; }
-      label.check { display: flex; gap: 8px; align-items: baseline; font-weight: 500; }
-      .hint { color: var(--muted); font-size: 0.85rem; margin: 2px 0 0; }
-      input[type=text], input[type=number], select, textarea {
-        width: 100%; padding: 7px 9px; font: inherit; color: var(--text);
-        background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
-      }
-      textarea { min-height: 70px; font-family: ui-monospace, Consolas, monospace; }
-      .grid {
-        display: grid; gap: 0 16px;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      }
-      .indent { margin-left: 26px; }
-      .spaced { margin-top: 12px; }
-      button {
-        font: inherit; padding: 8px 16px; border-radius: 6px; cursor: pointer;
-        border: 1px solid var(--accent); background: var(--accent); color: var(--bg);
-      }
-      button.secondary { background: transparent; color: var(--accent); }
-      form.inline { display: inline; }
-      .error {
-        background: var(--warn-bg); color: var(--warn); border-radius: 8px;
-        padding: 10px 14px; margin-bottom: 16px;
-      }
-      .status { font-weight: 600; }
-      .status-running { color: var(--accent); }
-      .status-failed { color: var(--warn); }
-      pre.log {
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: 8px; padding: 10px 12px; max-height: 60vh; overflow: auto;
-      }
-      code.cmd { display: block; white-space: pre-wrap; overflow-wrap: anywhere;
-        font: 13px/1.45 ui-monospace, Consolas, monospace; }
-      main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
-      a { color: var(--accent); }
-      h1 { font-size: 1.4rem; margin: 0 0 4px; overflow-wrap: anywhere; }
-      h2 { font-size: 1.1rem; margin: 28px 0 8px; }
-      .muted { color: var(--muted); }
-      .crumbs { font-size: 0.9rem; margin-bottom: 12px; }
-      .card {
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: 8px; padding: 12px 16px;
-      }
-      .scroll { overflow-x: auto; }
-      table { border-collapse: collapse; width: 100%; }
-      th, td {
-        text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border);
-        vertical-align: top; overflow-wrap: anywhere;
-      }
-      th { font-weight: 600; color: var(--muted); font-size: 0.85rem; }
-      ul.plain { list-style: none; padding: 0; margin: 0; }
-      ul.plain li { padding: 6px 0; border-bottom: 1px solid var(--border); }
-      ul.plain li:last-child { border-bottom: 0; }
-      pre {
-        margin: 0; white-space: pre-wrap; overflow-wrap: anywhere;
-        font: 13px/1.45 ui-monospace, Consolas, monospace;
-      }
-      .skip { background: var(--warn-bg); color: var(--warn); }
-    </style>
+    <style>""" + STYLESHEET + _GUI_CSS + """    </style>
   </head>
   <body>
-    <header>
-      <nav>
-        <a class="brand" href="/">Spoor</a>
-        <a href="/">Maps</a>
-        <a href="/new/explore">Explore</a>
-        <a href="/new/run">Extract</a>
-        <a href="/new/apply-scaffold">Apply scaffold</a>
-        <a href="/jobs">Jobs</a>
-      </nav>
-    </header>
+    <nav>
+      <a class="brand" href="/">Spoor</a>
+      <a href="/">Maps</a>
+      <a href="/new/explore">Explore</a>
+      <a href="/new/run">Extract</a>
+      <a href="/new/apply-scaffold">Apply scaffold</a>
+      <a href="/jobs">Jobs</a>
+    </nav>
     <main>{% block body %}{% endblock %}</main>
   </body>
 </html>
@@ -127,7 +154,7 @@ _HOME = """{% extends "layout.html" %}
 {% if domains %}
 <p class="muted">Pick a site to see the pages Spoor has mapped on it.</p>
 <div class="card">
-  <ul class="plain">
+  <ul class="index-list">
   {% for d in domains %}
     <li><a href="{{ d.href }}">{{ d.name }}</a></li>
   {% endfor %}
@@ -149,7 +176,7 @@ _DOMAIN = """{% extends "layout.html" %}
 <div class="crumbs"><a href="/">Mapped sites</a> /</div>
 <h1>{{ domain }}</h1>
 {% if urls %}
-<div class="card scroll">
+<div class="table-wrap">
   <table>
     <thead><tr><th>Page</th><th>Last captured</th></tr></thead>
     <tbody>
@@ -183,7 +210,7 @@ _MAP = """{% extends "layout.html" %}
 
 <h2>Records</h2>
 {% if rows %}
-<div class="card scroll">
+<div class="table-wrap">
   <table>
     <thead><tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
     <tbody>
@@ -199,19 +226,21 @@ _MAP = """{% extends "layout.html" %}
 
 {% if api_surface %}
 <h2>Observed API</h2>
-<div class="card scroll"><pre>{{ api_surface }}</pre></div>
+<div class="card"><pre>{{ api_surface }}</pre></div>
 {% endif %}
 
 {% if exploration %}
 {% set counts = exploration.counts or {} %}
 <h2>Exploration</h2>
-<p class="muted">
-  {{ counts.states or 0 }} screens, {{ counts.transitions or 0 }} actions fired,
-  {{ counts.skipped or 0 }} skipped by the safety check.
-</p>
+<div class="stats">
+  <div class="stat"><strong>{{ counts.states or 0 }}</strong> screens</div>
+  <div class="stat"><strong>{{ counts.transitions or 0 }}</strong> actions fired</div>
+  <div class="stat"><strong>{{ counts.skipped or 0 }}</strong> skipped by the safety
+    check</div>
+</div>
 
 <h2>Screens</h2>
-<div class="card scroll">
+<div class="table-wrap">
   <table>
     <thead><tr><th>Screen</th><th>Actions found</th></tr></thead>
     <tbody>
@@ -231,7 +260,7 @@ _MAP = """{% extends "layout.html" %}
 
 <h2>Actions fired</h2>
 {% if exploration.transitions %}
-<div class="card scroll">
+<div class="table-wrap">
   <table>
     <thead><tr><th>From</th><th>Action</th><th>To</th><th>What changed</th></tr></thead>
     <tbody>
@@ -240,7 +269,13 @@ _MAP = """{% extends "layout.html" %}
         <td>{{ t["from"] }}</td>
         <td>{{ t.action.role }} “{{ t.action.name }}”</td>
         <td>{{ t.to }}</td>
-        <td><pre>{{ to_json(t.changed) }}</pre></td>
+        <td>
+          <ul class="changes">
+          {% for change in describe_changes(t.changed) %}
+            <li>{{ change }}</li>
+          {% endfor %}
+          </ul>
+        </td>
       </tr>
     {% endfor %}
     </tbody>
@@ -252,7 +287,7 @@ _MAP = """{% extends "layout.html" %}
 
 {% if exploration.skipped %}
 <h2>Skipped by the safety check</h2>
-<div class="card scroll">
+<div class="table-wrap">
   <table>
     <thead><tr><th>On screen</th><th>Action</th><th>Why it was skipped</th></tr></thead>
     <tbody>
@@ -357,7 +392,7 @@ _FORM_EXPLORE = """{% extends "layout.html" %}
 <h1>{{ title }}</h1>
 <p class="muted">Spoor opens the site in a hidden browser, finds everything you can
 click on each screen, tries it, and records where it leads.</p>
-{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if error %}<div class="notice notice-error">{{ error }}</div>{% endif %}
 <form id="job-form" method="post" action="/new/explore">
 <fieldset>
   <legend>Site</legend>
@@ -375,7 +410,7 @@ click on each screen, tries it, and records where it leads.</p>
     {{ m.number("max_states", "Max screens", v) }}
     {{ m.number("max_requests", "Max actions", v) }}
     {{ m.number("max_seconds", "Time limit (seconds)", v) }}
-    {{ m.number("max_depth", "Max depth (clicks from the start)", v) }}
+    {{ m.number("max_depth", "Max clicks from the start", v) }}
   </div>
 </fieldset>
 <fieldset>
@@ -426,7 +461,7 @@ _FORM_RUN = """{% extends "layout.html" %}
 <h1>{{ title }}</h1>
 <p class="muted">Runs an extraction config against its site and writes the records
 it finds.</p>
-{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if error %}<div class="notice notice-error">{{ error }}</div>{% endif %}
 <form id="job-form" method="post" action="/new/run">
 <fieldset>
   <legend>Config</legend>
@@ -459,7 +494,7 @@ _FORM_APPLY_SCAFFOLD = """{% extends "layout.html" %}
 <h1>{{ title }}</h1>
 <p class="muted">Types the values from a filled-in scaffold into their fields on an
 explored page. It only types: it never presses Enter or clicks submit.</p>
-{% if error %}<div class="error">{{ error }}</div>{% endif %}
+{% if error %}<div class="notice notice-error">{{ error }}</div>{% endif %}
 <form id="job-form" method="post" action="/new/apply-scaffold">
 <fieldset>
   <legend>Page and scaffold</legend>
@@ -516,7 +551,7 @@ _JOB = """{% extends "layout.html" %}
 
 {% if not job.running and (outputs or map_href) %}
 <h2>Where the output landed</h2>
-<div class="card scroll">
+<div class="table-wrap">
   <table>
     <tbody>
     {% for o in outputs %}
@@ -576,7 +611,7 @@ _JOBS = """{% extends "layout.html" %}
 {% block body %}
 <h1>Jobs</h1>
 {% if jobs %}
-<div class="card scroll">
+<div class="table-wrap">
   <table>
     <thead><tr><th>Started</th><th>Command</th><th>Status</th></tr></thead>
     <tbody>
