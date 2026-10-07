@@ -1,4 +1,5 @@
-"""Unit tests for the map store's shareable projections (ROADMAP.md §2f/§2h).
+"""Unit tests for the map store's shareable projections and SQLite backing
+(ROADMAP.md §2f/§2h, closes #214).
 
 The serving surfaces answer from projections built here, not from live objects, so
 the projection is where the §2h split is enforced. `shareable_exploration_map`
@@ -7,16 +8,29 @@ to plain strings/ints/bools that `map_view` can redact wholesale — per-state s
 as counts only (raw values stay local), per-transition the actual before/after diff
 (the "what changed" §2f serves). These pin its shape and its empty-graph contract
 directly, below the BDD scenarios.
+
+The `MapStore`-specific tests below pin internal behavior the BDD scenarios in
+`features/serving.feature`/`features/serving_mcp.feature` don't reach directly:
+that run history is actually retained in the database (not just that `get()`
+answers with the latest — the BDD recheck scenario already proves that), that the
+migration runner is idempotent, and that concurrent writers from multiple threads
+don't corrupt the database.
 """
 
 from __future__ import annotations
 
+import sqlite3
+import threading
+from pathlib import Path
 from typing import Any
+
+import pytest
 
 from spoor.exploration.capture import StateSignals, TransitionSignals
 from spoor.exploration.discovery import ActionableElement
 from spoor.exploration.graph import ExplorationGraph
-from spoor.serving.store import shareable_exploration_map
+from spoor.security import storage
+from spoor.serving.store import MapStore, shareable_exploration_map
 
 
 def test_empty_graph_projects_to_none() -> None:
@@ -110,3 +124,104 @@ def test_missing_signals_project_to_none_not_empty() -> None:
     assert projected is not None
     assert projected["states"][0]["signals"] is None
     assert projected["transitions"][0]["changed"] is None
+
+
+# --- MapStore: SQLite backing (closes #214) -------------------------------
+
+
+@pytest.fixture
+def store(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> MapStore:
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path / ".spoor-cache")
+    return MapStore()
+
+
+def test_get_on_an_unmapped_url_returns_none(store: MapStore) -> None:
+    # No database file exists yet at all -- must not raise, just report unmapped.
+    assert store.get("https://shop.example/never-mapped") is None
+
+
+def test_record_then_get_round_trips_every_field(store: MapStore) -> None:
+    entry = store.record(
+        "https://shop.example/p/1",
+        [{"title": "Widget"}],
+        tier=1,
+        api_surface={"spec": {"kind": "openapi", "version": "3.0", "url": "x"}},
+        config={"target": "https://shop.example/p/1"},
+        exploration={"states": [], "transitions": [], "skipped": [], "counts": {}},
+    )
+    fetched = store.get("https://shop.example/p/1")
+    assert fetched == entry
+    assert fetched is not None
+    assert fetched.domain == "shop.example"
+    assert fetched.records == [{"title": "Widget"}]
+    assert fetched.tier == 1
+    assert fetched.api_surface == {
+        "spec": {"kind": "openapi", "version": "3.0", "url": "x"}
+    }
+    assert fetched.config == {"target": "https://shop.example/p/1"}
+    assert fetched.exploration == {
+        "states": [],
+        "transitions": [],
+        "skipped": [],
+        "counts": {},
+    }
+
+
+def test_record_retains_history_not_just_the_latest(store: MapStore) -> None:
+    # get() answers with only the latest (features/serving.feature's force-recheck
+    # scenario already pins that), but the earlier row must still be in the
+    # database -- real history, the whole point of moving off the old
+    # overwrite-only per-domain JSON file.
+    store.record("https://shop.example/p/1", [{"title": "Widget v1"}])
+    store.record("https://shop.example/p/1", [{"title": "Widget v2"}])
+    conn = sqlite3.connect(storage.CACHE_ROOT / "spoor.db")
+    try:
+        (count,) = conn.execute(
+            "SELECT COUNT(*) FROM runs WHERE url = ?", ("https://shop.example/p/1",)
+        ).fetchone()
+    finally:
+        conn.close()
+    assert count == 2
+    assert store.get("https://shop.example/p/1").records == [{"title": "Widget v2"}]  # type: ignore[union-attr]
+
+
+def test_domains_lists_every_distinct_domain_once(store: MapStore) -> None:
+    store.record("https://shop.example/p/1", [{"title": "A"}])
+    store.record("https://shop.example/p/2", [{"title": "B"}])
+    store.record("https://other.example/x", [{"title": "C"}])
+    assert store.domains() == ["other.example", "shop.example"]
+
+
+def test_domains_on_an_empty_store_returns_empty_list(store: MapStore) -> None:
+    assert store.domains() == []
+
+
+def test_migration_runner_is_idempotent(store: MapStore) -> None:
+    # Opening the database repeatedly (every MapStore call does) must not re-run
+    # already-applied migrations or raise on a table that already exists.
+    store.record("https://shop.example/p/1", [{"title": "A"}])
+    store.record("https://shop.example/p/2", [{"title": "B"}])  # second _connect()
+    assert store.get("https://shop.example/p/1") is not None
+    assert store.get("https://shop.example/p/2") is not None
+
+
+def test_concurrent_writers_do_not_corrupt_the_database(store: MapStore) -> None:
+    # spoor serve may field concurrent requests (each recheck call writes); a
+    # fresh connection per call plus busy_timeout must survive genuinely
+    # concurrent writers without a "database is locked" error or lost writes.
+    urls = [f"https://shop.example/p/{i}" for i in range(20)]
+
+    def _record(url: str) -> None:
+        store.record(url, [{"title": url}])
+
+    threads = [threading.Thread(target=_record, args=(url,)) for url in urls]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+
+    for url in urls:
+        entry = store.get(url)
+        assert entry is not None
+        assert entry.records == [{"title": url}]
+    assert len(store.domains()) == 1

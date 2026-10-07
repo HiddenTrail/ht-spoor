@@ -1,22 +1,37 @@
-"""Persisted per-domain map that the read-only serving layer answers from (§2f).
+"""Persisted map that the read-only serving layer answers from (§2f).
 
 The serving layer (`spoor/serving/api.py`) is a *thin* read-over of what a run
 already produced — it holds no capture or analysis logic of its own (§2f). This
-module is that data: a run records its extracted records for a URL here, keyed by
-domain, with the capture time; the API reads it back and attaches a freshness age
-(§2f "always show the age, never auto-recheck" in v1).
+module is that data: a run records its extracted records for a URL here, with
+the capture time; the API reads it back and attaches a freshness age (§2f
+"always show the age, never auto-recheck" in v1).
 
 Placement (§0/§2h): the map holds the same extracted records the output pipeline
 already writes to shared output — not a raw local-only capture (HAR/storage
-state), which never enters here. It persists under the git-ignored cache root
-(`maps/<domain>.json`), the local-first home the rest of the stack uses; a
-missing or corrupt file is simply "nothing mapped yet", never an error.
+state), which never enters here.
+
+**Storage (closes #214, epic #216).** A single SQLite database under the
+git-ignored cache root (`spoor.db`), replacing the earlier one-JSON-file-per-domain
+convention — `sqlite3` is stdlib, so this adds no new dependency, and matches the
+house style the existing SQLite *output sink* (`spoor/operational/output.py`)
+already set: plain `sqlite3`, explicit SQL, no ORM. Every `record()` call is an
+**insert**, not an overwrite — real run history is kept (a thing the old
+per-domain-JSON approach could not do without an unbounded full-file rewrite on
+every run) — but `get()` still returns only the **latest** row for a URL, so the
+public behavior every caller already depends on (`record()` "replaces" what
+`get()` answers) is unchanged; history exists in the table but isn't exposed
+through this interface yet. Schema migrations are tracked with SQLite's own
+`PRAGMA user_version` (a tiny, Spoor-native migration runner — no
+Alembic/SQLAlchemy). A missing or freshly-created database is simply "nothing
+mapped yet", never an error. Existing `.spoor-cache/maps/*.json` files from
+before this change are orphaned, not imported — Spoor is pre-alpha, and every
+record in them is re-capturable by re-running.
 """
 
 from __future__ import annotations
 
 import json
-import re
+import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -37,8 +52,49 @@ if TYPE_CHECKING:
     from spoor.exploration.discovery import ActionableElement
     from spoor.exploration.graph import ExplorationGraph
 
-# Subdirectory of the cache root holding one JSON file per mapped domain.
-MAPS_DIRNAME = "maps"
+# The SQLite database file holding the map, under the git-ignored cache root.
+DB_FILENAME = "spoor.db"
+
+# Schema migrations, applied in order and tracked via `PRAGMA user_version`
+# (index + 1 = the version that script brings the database to). Each script may
+# hold multiple statements (`executescript`, not `execute`). Append, never edit,
+# a shipped migration — the same "schema only ever grows forward" discipline
+# any persistent store needs.
+_MIGRATIONS: tuple[str, ...] = (
+    """
+    CREATE TABLE IF NOT EXISTS sites (
+        id INTEGER PRIMARY KEY,
+        domain TEXT NOT NULL UNIQUE
+    );
+    CREATE TABLE IF NOT EXISTS runs (
+        id INTEGER PRIMARY KEY,
+        site_id INTEGER NOT NULL REFERENCES sites(id),
+        url TEXT NOT NULL,
+        captured_at TEXT NOT NULL,
+        tier INTEGER,
+        records_json TEXT NOT NULL,
+        api_surface_json TEXT,
+        exploration_json TEXT,
+        config_json TEXT
+    );
+    CREATE INDEX IF NOT EXISTS idx_runs_url_captured
+        ON runs(url, captured_at DESC, id DESC);
+    CREATE INDEX IF NOT EXISTS idx_runs_site ON runs(site_id);
+    """,
+)
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Apply any schema migrations this connection's database hasn't seen yet."""
+    (current,) = conn.execute("PRAGMA user_version").fetchone()
+    for version, script in enumerate(_MIGRATIONS, start=1):
+        if version > current:
+            conn.executescript(script)
+            # PRAGMA doesn't accept bound parameters; `version` is our own loop
+            # counter, never external input, so the f-string carries no
+            # injection risk.
+            conn.execute(f"PRAGMA user_version = {version}")
+    conn.commit()
 
 
 def shareable_api_surface(
@@ -188,11 +244,6 @@ def shareable_exploration_map(
         },
     }
 
-# Characters not safe in a cross-platform filename (Windows forbids ':' etc.);
-# the real domain is preserved inside the file, so this is only for the path.
-_UNSAFE_IN_FILENAME = re.compile(r"[^A-Za-z0-9._-]")
-
-
 @dataclass(frozen=True)
 class MapEntry:
     """One mapped URL: its extracted records, resolving tier, and capture time."""
@@ -219,30 +270,59 @@ def _domain_of(url: str) -> str:
     return urlsplit(url).netloc
 
 
+def _get_or_create_site(conn: sqlite3.Connection, domain: str) -> int:
+    """The `sites.id` for `domain`, inserting a row first if needed."""
+    conn.execute("INSERT OR IGNORE INTO sites (domain) VALUES (?)", (domain,))
+    (site_id,) = conn.execute(
+        "SELECT id FROM sites WHERE domain = ?", (domain,)
+    ).fetchone()
+    return cast(int, site_id)
+
+
+def _dump(value: dict[str, object] | None) -> str | None:
+    return None if value is None else json.dumps(value)
+
+
+def _load(value: str | None) -> dict[str, object] | None:
+    return None if value is None else cast("dict[str, object]", json.loads(value))
+
+
 class MapStore:
-    """Read/write access to the persisted map, one JSON file per domain.
+    """Read/write access to the persisted map (§2f), a single SQLite database.
 
     The cache root is read from `spoor.security.storage.CACHE_ROOT` at call time
     (not import), so a test's monkeypatch of it — or a future configurable base —
-    takes effect without reconstructing the store.
+    takes effect without reconstructing the store. A fresh `sqlite3.Connection` is
+    opened per call (never held across calls or shared across threads), matching
+    this store's existing "open, do the one thing, close" posture — `spoor serve`
+    may field concurrent requests, and SQLite connections aren't safe to share
+    across threads.
     """
 
     @property
-    def _root(self) -> Path:
-        return storage.CACHE_ROOT / MAPS_DIRNAME
+    def _db_path(self) -> Path:
+        return storage.CACHE_ROOT / DB_FILENAME
 
-    def _path_for_domain(self, domain: str) -> Path:
-        safe = _UNSAFE_IN_FILENAME.sub("_", domain) or "_"
-        return self._root / f"{safe}.json"
-
-    def _load_domain(self, domain: str) -> dict[str, dict[str, object]]:
-        path = self._path_for_domain(domain)
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, ValueError):
-            # No file yet, or a corrupt one: nothing mapped for this domain.
-            return {}
-        return data if isinstance(data, dict) else {}
+    def _connect(self) -> sqlite3.Connection:
+        path = self._db_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        # busy_timeout: `spoor serve` may field genuinely concurrent requests, each
+        # opening its own connection (see the class docstring) — without this, a
+        # writer that loses a race for SQLite's file lock gets an immediate
+        # "database is locked" error instead of waiting briefly and retrying.
+        # Deliberately NOT switching to WAL journal mode: that switch itself
+        # requires an exclusive lock, so issuing it from every connection racing
+        # to open a brand-new database file is a real deadlock-shaped bug, not a
+        # hypothetical one — caught by this module's own concurrent-writer test.
+        # WAL is a concurrent-reader-during-write performance optimization Spoor's
+        # actual write pattern (occasional CLI runs, rare recheck calls) doesn't
+        # need; the default rollback-journal mode plus busy_timeout is correct and
+        # sufficient.
+        conn = sqlite3.connect(path, timeout=5.0)
+        conn.execute("PRAGMA busy_timeout = 5000")
+        conn.execute("PRAGMA foreign_keys=ON")
+        _migrate(conn)
+        return conn
 
     def record(
         self,
@@ -257,14 +337,17 @@ class MapStore:
     ) -> MapEntry:
         """Remember a run's result for `url` so the API can serve it later.
 
-        Overwrites any prior entry for the same URL — the map holds the latest
-        known-good result, and its capture time is what freshness is measured
-        against. Defaults the capture time to now (UTC). `api_surface` is the
-        already-§2h-projected surface (see `shareable_api_surface`), or None.
-        `config` is the serialized ExtractionConfig the result came from, kept
-        local-only so a forced recheck can re-run the same extraction (§2f).
-        `exploration` is the already-§2h-projected exploration graph (see
-        `shareable_exploration_map`), or None for an extraction-only run.
+        Inserted as a new row — `get()` still answers with only the *latest* one
+        for the URL, so callers see the same "this run's result replaces what's
+        served" behavior as before; the earlier row isn't deleted, it's simply
+        not the one `get()` returns (real run history, not yet exposed through
+        this interface — see the module docstring). Defaults the capture time to
+        now (UTC). `api_surface` is the already-§2h-projected surface (see
+        `shareable_api_surface`), or None. `config` is the serialized
+        ExtractionConfig the result came from, kept local-only so a forced
+        recheck can re-run the same extraction (§2f). `exploration` is the
+        already-§2h-projected exploration graph (see `shareable_exploration_map`),
+        or None for an extraction-only run.
         """
         domain = _domain_of(url)
         stamp = (captured_at or datetime.now(UTC)).isoformat()
@@ -278,75 +361,69 @@ class MapStore:
             config=config,
             exploration=exploration,
         )
-        by_url = self._load_domain(domain)
-        by_url[url] = {
-            "url": entry.url,
-            "domain": entry.domain,
-            "records": entry.records,
-            "tier": entry.tier,
-            "captured_at": entry.captured_at,
-            "api_surface": entry.api_surface,
-            "config": entry.config,
-            "exploration": entry.exploration,
-        }
-        path = self._path_for_domain(domain)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(by_url, indent=2), encoding="utf-8")
+        conn = self._connect()
+        try:
+            with conn:
+                site_id = _get_or_create_site(conn, domain)
+                conn.execute(
+                    "INSERT INTO runs (site_id, url, captured_at, tier,"
+                    " records_json, api_surface_json, exploration_json,"
+                    " config_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        site_id,
+                        url,
+                        stamp,
+                        tier,
+                        json.dumps(records),
+                        _dump(api_surface),
+                        _dump(exploration),
+                        _dump(config),
+                    ),
+                )
+        finally:
+            conn.close()
         return entry
 
     def get(self, url: str) -> MapEntry | None:
-        """The mapped entry for `url`, or None if it has never been mapped."""
-        raw = self._load_domain(_domain_of(url)).get(url)
-        if not isinstance(raw, dict):
+        """The latest mapped entry for `url`, or None if it has never been mapped."""
+        conn = self._connect()
+        try:
+            row = conn.execute(
+                "SELECT sites.domain, runs.tier, runs.captured_at,"
+                " runs.records_json, runs.api_surface_json,"
+                " runs.exploration_json, runs.config_json"
+                " FROM runs JOIN sites ON runs.site_id = sites.id"
+                " WHERE runs.url = ?"
+                " ORDER BY runs.captured_at DESC, runs.id DESC LIMIT 1",
+                (url,),
+            ).fetchone()
+        finally:
+            conn.close()
+        if row is None:
             return None
-        records_raw = raw.get("records")
-        records = (
-            cast("list[dict[str, object]]", records_raw)
-            if isinstance(records_raw, list)
-            else []
+        domain, tier, captured_at, records_json, surface_json, expl_json, cfg_json = (
+            row
         )
-        tier_raw = raw.get("tier")
-        surface_raw = raw.get("api_surface")
-        config_raw = raw.get("config")
-        exploration_raw = raw.get("exploration")
         return MapEntry(
-            url=str(raw["url"]),
-            domain=str(raw["domain"]),
-            records=records,
-            tier=tier_raw if isinstance(tier_raw, int) else None,
-            captured_at=str(raw["captured_at"]),
-            api_surface=(
-                cast("dict[str, object]", surface_raw)
-                if isinstance(surface_raw, dict)
-                else None
-            ),
-            config=(
-                cast("dict[str, object]", config_raw)
-                if isinstance(config_raw, dict)
-                else None
-            ),
-            exploration=(
-                cast("dict[str, object]", exploration_raw)
-                if isinstance(exploration_raw, dict)
-                else None
-            ),
+            url=url,
+            domain=domain,
+            records=cast("list[dict[str, object]]", json.loads(records_json)),
+            tier=tier,
+            captured_at=captured_at,
+            api_surface=_load(surface_json),
+            config=_load(cfg_json),
+            exploration=_load(expl_json),
         )
 
     def domains(self) -> list[str]:
         """Every domain with at least one mapped URL, sorted."""
-        root = self._root
-        if not root.is_dir():
-            return []
-        seen: set[str] = set()
-        for path in root.glob("*.json"):
-            try:
-                data = json.loads(path.read_text(encoding="utf-8"))
-            except (OSError, ValueError):
-                continue
-            if isinstance(data, dict):
-                seen.update(
-                    str(entry["domain"])
-                    for entry in data.values()
-                    if isinstance(entry, dict) and "domain" in entry
-                )
-        return sorted(seen)
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                "SELECT DISTINCT sites.domain FROM sites"
+                " JOIN runs ON runs.site_id = sites.id"
+                " ORDER BY sites.domain"
+            ).fetchall()
+        finally:
+            conn.close()
+        return [row[0] for row in rows]

@@ -2,8 +2,9 @@
 
 The third slice of the anchored, depth-relative *resume* capability (§2e v2, see the
 resume design note), and the one that lets the earlier slices be validated across a
-real save/load boundary. A run persists its graph to `maps/<domain>.json` as the
-§2h-shareable projection `spoor/serving/store.py:shareable_exploration_map` produces;
+real save/load boundary. A run persists its graph to the serving layer's map store
+(`spoor/serving/store.py:MapStore`, a SQLite database — closes #214) as the
+§2h-shareable projection `shareable_exploration_map` produces;
 this is that projection's inverse — it reconstructs an `ExplorationGraph` from the
 stored dict, so a *later* invocation can build anchor candidates
 (`selector.graph_candidates`) and resolve a selector against a crawl it no longer
