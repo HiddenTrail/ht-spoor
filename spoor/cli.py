@@ -757,6 +757,53 @@ def serve_mcp(
     asyncio.run(server.run_stdio_async())  # pragma: no cover
 
 
+@app.command()
+def gui(
+    port: Annotated[
+        int,
+        typer.Option(
+            min=0,
+            max=65535,
+            help="Port to use on this computer. Leave at 0 to pick a free one.",
+        ),
+    ] = 0,
+    no_browser: Annotated[
+        bool,
+        typer.Option(
+            "--no-browser",
+            help="Don't open a browser; just print the link to open yourself.",
+        ),
+    ] = False,
+) -> None:
+    """Open Spoor in your web browser instead of using the command line.
+
+    Starts a small web app that only this computer can reach, then opens it in
+    your default browser. The printed link carries a one-time access key for
+    this session; other programs and web pages can't use the app without it.
+    Press Ctrl+C here to stop. Requires the optional GUI extras:
+    pip install 'ht-spoor[gui]'.
+    """
+    try:
+        from spoor.gui.launch import GuiError, start_gui
+    except ModuleNotFoundError as exc:  # pragma: no cover - exercised via message
+        raise typer.BadParameter(
+            "The GUI extras are not installed. Run: pip install 'ht-spoor[gui]'"
+        ) from exc
+    import webbrowser
+
+    try:
+        running = start_gui(MapStore(), port=port)
+    except GuiError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Spoor is running at {running.url}")
+    typer.echo(f"Open this link to use it: {running.launch_url}")
+    typer.echo("Press Ctrl+C to stop.")
+    if not no_browser:
+        webbrowser.open(running.launch_url)
+    running.wait()  # pragma: no cover - blocks until Ctrl+C
+
+
 session_app = typer.Typer(
     name="session",
     help="Store and manage named, reusable logged-in sessions, per site.",

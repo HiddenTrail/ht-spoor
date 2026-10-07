@@ -345,3 +345,22 @@ class MapStore:
         finally:
             conn.close()
         return [row[0] for row in rows]
+
+    def urls(self, domain: str) -> list[tuple[str, str]]:
+        """Every mapped URL under `domain` with its latest capture time, sorted by URL.
+
+        A read-only listing for browsing the map (the local GUI's site page,
+        §2i); an unknown domain is simply an empty list, never an error.
+        """
+        conn = db.connect()
+        try:
+            rows = conn.execute(
+                "SELECT runs.url, MAX(runs.captured_at) FROM runs"
+                " JOIN sites ON runs.site_id = sites.id"
+                " WHERE sites.domain = ?"
+                " GROUP BY runs.url ORDER BY runs.url",
+                (domain,),
+            ).fetchall()
+        finally:
+            conn.close()
+        return [(row[0], row[1]) for row in rows]

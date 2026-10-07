@@ -777,3 +777,24 @@ def test_session_list_with_nothing_stored_says_so(
     result = runner.invoke(cli.app, ["session", "list"])
     assert result.exit_code == 0
     assert "No stored sessions" in result.output
+
+
+def test_gui_reports_a_launch_failure_and_exits_nonzero(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from spoor.gui import launch
+
+    def refuse(*_args: object, **_kwargs: object) -> None:
+        raise launch.GuiError("Could not listen on 127.0.0.1:1: in use")
+
+    monkeypatch.setattr(launch, "start_gui", refuse)
+    result = runner.invoke(cli.app, ["gui", "--no-browser"])
+    assert result.exit_code == 1
+    assert "Could not listen" in result.output
+
+
+def test_gui_has_no_host_option() -> None:
+    # Loopback-only is non-configurable (ROADMAP.md §2i): no --host to pass.
+    result = runner.invoke(cli.app, ["gui", "--host", "0.0.0.0"])
+    assert result.exit_code != 0
+    assert "No such option" in result.output

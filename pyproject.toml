@@ -58,6 +58,13 @@ serve = [
     "uvicorn>=0.29",
     "mcp>=2",
 ]
+# Local GUI (§2i): `spoor gui`, a loopback-only web app for operating Spoor
+# without the command line. Same web stack as the serving extra; Jinja2 is
+# already a core dependency. Kept optional like `serve`.
+gui = [
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+]
 # Parquet output sink (§2d): kept optional since the other sinks (JSON/CSV/MD,
 # and SQLite via stdlib) need no extra dependency and most runs need none of
 # this either.

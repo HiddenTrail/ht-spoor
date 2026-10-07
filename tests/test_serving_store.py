@@ -225,3 +225,22 @@ def test_concurrent_writers_do_not_corrupt_the_database(store: MapStore) -> None
         assert entry is not None
         assert entry.records == [{"title": url}]
     assert len(store.domains()) == 1
+
+
+def test_urls_lists_a_domains_urls_with_their_latest_capture(store: MapStore) -> None:
+    from datetime import UTC, datetime
+
+    early = datetime(2026, 1, 1, tzinfo=UTC)
+    late = datetime(2026, 2, 1, tzinfo=UTC)
+    store.record("https://a.example/z", [], captured_at=early)
+    store.record("https://a.example/b", [], captured_at=early)
+    store.record("https://a.example/b", [], captured_at=late)
+    store.record("https://other.example/x", [], captured_at=late)
+    assert store.urls("a.example") == [
+        ("https://a.example/b", late.isoformat()),
+        ("https://a.example/z", early.isoformat()),
+    ]
+
+
+def test_urls_for_an_unknown_domain_is_empty(store: MapStore) -> None:
+    assert store.urls("nowhere.example") == []
