@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791407140797,
+  "lastUpdate": 1791407463692,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -10352,6 +10352,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5402.1,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a221a53c7eff8ada0922bddb44a10d4f6ae62591",
+          "message": "Add GUI slice gui-2: run explore/run/apply-scaffold jobs (§2i) (#223)\n\nForms for the three commands that act on a site build the real `spoor`\nargument list (with a live preview of the exact command) and run it as a\nsupervised subprocess, so every safety gate applies exactly as in a terminal.\nJob pages stream the redacted log over Server-Sent Events, offer Stop and\nForce stop, and show where each output landed (absolute paths, open folder,\nthe wiki served from the job's own folder only, and a link to the map).\n\n`spoor explore` gains two supervisor hooks, both off unless set:\nSPOOR_PROGRESS=lines prints plain progress lines, and SPOOR_STOP_FILE gives a\ngraceful stop that works the same on every OS (a console signal on Windows\nwould also hit Playwright's processes). Force stop kills the whole process\ntree; closing the GUI force-stops jobs still running.\n\nRecords the gui-2 mechanics decision in ROADMAP §2i (htmx withdrawn in favour\nof plain EventSource; validation stays the CLI's). BDD:\nfeatures/gui_jobs.feature (26 scenarios, one @browser end to end).\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-08T00:06:12+03:00",
+          "tree_id": "72c57623f112a7ab0e6b3f94e6d16b2286e510f8",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/a221a53c7eff8ada0922bddb44a10d4f6ae62591"
+        },
+        "date": 1791407461956,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 198.424,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.02661,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.538,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.09511,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.2401,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.04934,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 7.6867,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.08623,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 13.149,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.0285,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.1876,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.5575,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 31.6281,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.03257,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 8.8762,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.90982,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 124.5828,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.0706,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.4296,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.00749,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.3244,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5410,
             "unit": "MB"
           }
         ]
