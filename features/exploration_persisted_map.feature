@@ -2,7 +2,8 @@
 #
 # The third slice of the anchored, depth-relative *resume* capability (§2e v2, see
 # the resume design note), and the one that makes the earlier slices testable across
-# a real save/load boundary. A run persists its graph to maps/<domain>.json as the
+# a real save/load boundary. A run persists its graph to the serving layer's map
+# store (`spoor/serving/store.py`, a SQLite database — closes #214) as the
 # §2h-shareable projection the serving layer produces; this slice is that
 # projection's inverse, so a LATER invocation can rebuild the graph, build anchor
 # candidates from it, and resolve a selector against a crawl no longer held in memory.

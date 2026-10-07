@@ -855,8 +855,9 @@ resolving end to end through the built candidates. Nothing is site-specific (§0
 
 `exploration_persisted_map.feature` (§2e) is the **third resume slice** — and the one
 that makes the first two testable across a real save/load boundary rather than only in
-one process. A run persists its graph to `maps/<domain>.json` as the §2h-shareable
-projection the serving layer produces (`shareable_exploration_map`);
+one process. A run persists its graph to the serving layer's map store
+(`spoor/serving/store.py:MapStore`, a SQLite database — closes #214) as the
+§2h-shareable projection the serving layer produces (`shareable_exploration_map`);
 `spoor/exploration/persisted_map.py:load_exploration_map(data)` is that projection's
 inverse, rebuilding an `ExplorationGraph` from the stored dict so a *later* invocation
 can build candidates and resolve a selector against a crawl it no longer holds in
