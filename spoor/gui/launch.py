@@ -17,11 +17,13 @@ import socket
 import threading
 import time
 from dataclasses import dataclass
+from pathlib import Path
 from urllib.parse import urlencode
 
 import uvicorn
 
 from spoor.gui.app import create_app
+from spoor.gui.jobs import JobManager, SubprocessRunner
 from spoor.serving.store import MapStore
 
 LOOPBACK = "127.0.0.1"
@@ -47,6 +49,7 @@ class RunningGui:
     launch_url: str
     _server: uvicorn.Server
     _thread: threading.Thread
+    _jobs: JobManager
 
     def wait(self, poll_seconds: float = 0.5) -> None:
         """Block until the server stops; Ctrl+C stops it cleanly."""
@@ -57,14 +60,28 @@ class RunningGui:
             self.stop()
 
     def stop(self) -> None:
+        """Stop the server, force-stopping any job still running first.
+
+        A job left running after the GUI closes would be an unsupervised browser
+        nobody can see or stop, so closing the GUI ends them (§2i gui-2).
+        """
+        self._jobs.shutdown()
         self._server.should_exit = True
         self._thread.join(_STARTUP_TIMEOUT_SECONDS)
 
 
 def start_gui(
-    store: MapStore, *, host: str = LOOPBACK, port: int = 0
+    store: MapStore,
+    *,
+    host: str = LOOPBACK,
+    port: int = 0,
+    workdir: Path | None = None,
 ) -> RunningGui:
     """Start the GUI on `host:port` (loopback only) and return once it's serving.
+
+    Jobs started from it run the real CLI in `workdir` (default: the current
+    working directory), which is also where relative form paths are taken from
+    and where the child's local cache lives.
 
     Raises GuiError for a non-loopback `host` (nothing is bound), or when the
     port can't be bound or the server doesn't come up.
@@ -85,7 +102,14 @@ def start_gui(
 
     shown_host = f"[{host}]" if family == socket.AF_INET6 else host
     token = secrets.token_urlsafe(32)
-    app = create_app(store, token=token, port=bound_port, host=shown_host)
+    workdir = workdir or Path.cwd()
+    app = create_app(
+        store,
+        token=token,
+        port=bound_port,
+        host=shown_host,
+        jobs=JobManager(SubprocessRunner(workdir), workdir),
+    )
     server = uvicorn.Server(uvicorn.Config(app, log_level="warning"))
     thread = threading.Thread(
         target=server.run, kwargs={"sockets": [sock]}, daemon=True
@@ -106,4 +130,5 @@ def start_gui(
         launch_url=f"{url}/launch?" + urlencode({"token": token}),
         _server=server,
         _thread=thread,
+        _jobs=app.state.jobs,
     )

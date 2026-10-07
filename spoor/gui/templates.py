@@ -36,7 +36,48 @@ _LAYOUT = """<!DOCTYPE html>
         background: var(--surface); border-bottom: 1px solid var(--border);
         padding: 12px 16px;
       }
-      header a { color: var(--text); font-weight: 600; text-decoration: none; }
+      nav { display: flex; flex-wrap: wrap; gap: 4px 18px; align-items: baseline; }
+      nav a { color: var(--text); text-decoration: none; }
+      nav a:hover { color: var(--accent); }
+      nav .brand { font-weight: 700; margin-right: 8px; }
+      fieldset {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 8px; padding: 12px 16px 16px; margin: 0 0 16px;
+      }
+      legend { font-weight: 600; padding: 0 6px; }
+      label { display: block; margin: 10px 0 4px; font-weight: 500; }
+      label.check { display: flex; gap: 8px; align-items: baseline; font-weight: 500; }
+      .hint { color: var(--muted); font-size: 0.85rem; margin: 2px 0 0; }
+      input[type=text], input[type=number], select, textarea {
+        width: 100%; padding: 7px 9px; font: inherit; color: var(--text);
+        background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      }
+      textarea { min-height: 70px; font-family: ui-monospace, Consolas, monospace; }
+      .grid {
+        display: grid; gap: 0 16px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+      .indent { margin-left: 26px; }
+      .spaced { margin-top: 12px; }
+      button {
+        font: inherit; padding: 8px 16px; border-radius: 6px; cursor: pointer;
+        border: 1px solid var(--accent); background: var(--accent); color: var(--bg);
+      }
+      button.secondary { background: transparent; color: var(--accent); }
+      form.inline { display: inline; }
+      .error {
+        background: var(--warn-bg); color: var(--warn); border-radius: 8px;
+        padding: 10px 14px; margin-bottom: 16px;
+      }
+      .status { font-weight: 600; }
+      .status-running { color: var(--accent); }
+      .status-failed { color: var(--warn); }
+      pre.log {
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 8px; padding: 10px 12px; max-height: 60vh; overflow: auto;
+      }
+      code.cmd { display: block; white-space: pre-wrap; overflow-wrap: anywhere;
+        font: 13px/1.45 ui-monospace, Consolas, monospace; }
       main { max-width: 1100px; margin: 0 auto; padding: 20px 16px 48px; }
       a { color: var(--accent); }
       h1 { font-size: 1.4rem; margin: 0 0 4px; overflow-wrap: anywhere; }
@@ -65,7 +106,16 @@ _LAYOUT = """<!DOCTYPE html>
     </style>
   </head>
   <body>
-    <header><a href="/">Spoor</a></header>
+    <header>
+      <nav>
+        <a class="brand" href="/">Spoor</a>
+        <a href="/">Maps</a>
+        <a href="/new/explore">Explore</a>
+        <a href="/new/run">Extract</a>
+        <a href="/new/apply-scaffold">Apply scaffold</a>
+        <a href="/jobs">Jobs</a>
+      </nav>
+    </header>
     <main>{% block body %}{% endblock %}</main>
   </body>
 </html>
@@ -127,7 +177,8 @@ _MAP = """{% extends "layout.html" %}
 <h1>{{ view.url }}</h1>
 <p class="muted">
   Captured {{ view.captured_at }} ({{ age }}){% if view.tier %} ·
-  resolved by tier {{ view.tier }}{% endif %}
+  resolved by tier {{ view.tier }}{% endif %} ·
+  <a href="{{ explore_href }}">Explore this page again</a>
 </p>
 
 <h2>Records</h2>
@@ -229,12 +280,341 @@ _NOT_MAPPED = """{% extends "layout.html" %}
 {% endblock %}
 """
 
+_MACROS = """{% macro text(name, label, v, hint=None, placeholder="", list=None) %}
+<label for="{{ name }}">{{ label }}</label>
+<input type="text" id="{{ name }}" name="{{ name }}" value="{{ v.get(name, '') }}"
+  placeholder="{{ placeholder }}"{% if list %} list="{{ list }}"{% endif %} />
+{% if hint %}<p class="hint">{{ hint }}</p>{% endif %}
+{% endmacro %}
+
+{% macro number(name, label, v) %}
+<div>
+<label for="{{ name }}">{{ label }}</label>
+<input type="text" inputmode="decimal" id="{{ name }}" name="{{ name }}"
+  value="{{ v.get(name, '') }}" placeholder="no limit" />
+</div>
+{% endmacro %}
+
+{% macro check(name, label, v, hint=None) %}
+<label class="check">
+  <input type="checkbox" name="{{ name }}"{% if v.get(name) %} checked{% endif %} />
+  <span>{{ label }}</span>
+</label>
+{% if hint %}<p class="hint indent">{{ hint }}</p>{% endif %}
+{% endmacro %}
+
+{% macro output(tick, path_name, label, v) %}
+{{ check(tick, label, v) }}
+<div class="indent">
+  <input type="text" name="{{ path_name }}" value="{{ v.get(path_name, '') }}"
+    aria-label="{{ label }}: folder" />
+</div>
+{% endmacro %}
+
+{% macro sandbox(v, what) %}
+{{ check("sandbox", "This is a sandbox I own (allow destructive actions)", v,
+  "Only for a local or test system you own. Spoor then also " ~ what ~
+  ". On any real, public site those actions are always skipped, whether or not "
+  ~ "you tick this.") }}
+{% endmacro %}
+
+{% macro footer(kind) %}
+<fieldset>
+  <legend>Command</legend>
+  <p class="hint">This is the exact command that will run.</p>
+  <code class="cmd" id="preview">…</code>
+</fieldset>
+<button type="submit">Start</button>
+<script>
+(() => {
+  const form = document.getElementById("job-form");
+  const preview = document.getElementById("preview");
+  let timer = null;
+  async function refresh() {
+    const body = new URLSearchParams(new FormData(form));
+    try {
+      const response = await fetch("/preview/{{ kind }}", { method: "POST", body });
+      preview.textContent = await response.text();
+      preview.classList.toggle("muted", !response.ok);
+    } catch (e) {
+      preview.textContent = "Preview unavailable.";
+    }
+  }
+  form.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(refresh, 250);
+  });
+  refresh();
+})();
+</script>
+{% endmacro %}
+"""
+
+_FORM_EXPLORE = """{% extends "layout.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ title }} · Spoor{% endblock %}
+{% block body %}
+<h1>{{ title }}</h1>
+<p class="muted">Spoor opens the site in a hidden browser, finds everything you can
+click on each screen, tries it, and records where it leads.</p>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+<form id="job-form" method="post" action="/new/explore">
+<fieldset>
+  <legend>Site</legend>
+  {{ m.text("url", "Start address", v, placeholder="https://example.com/",
+    list="mapped-urls") }}
+  <datalist id="mapped-urls">
+  {% for u in mapped_urls %}<option value="{{ u }}"></option>{% endfor %}
+  </datalist>
+  {{ m.sandbox(v, "tries actions such as delete, buy or pay") }}
+</fieldset>
+<fieldset>
+  <legend>Limits</legend>
+  <p class="hint">Leave empty for no limit. You can also stop a run at any time.</p>
+  <div class="grid">
+    {{ m.number("max_states", "Max screens", v) }}
+    {{ m.number("max_requests", "Max actions", v) }}
+    {{ m.number("max_seconds", "Time limit (seconds)", v) }}
+    {{ m.number("max_depth", "Max depth (clicks from the start)", v) }}
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Login and resuming</legend>
+  {{ m.text("session", "Saved login (optional)", v,
+    "The name of a login saved with Spoor's sessions, or the path of a "
+    ~ "storage-state file you captured. Spoor never logs in on its own.") }}
+  {{ m.text("resume_from", "Continue from screen (optional)", v,
+    "Continue an earlier exploration of this address instead of starting over: "
+    ~ "id: followed by the start of a screen id, as shown on its map.") }}
+</fieldset>
+<fieldset>
+  <legend>What to write</legend>
+  {{ m.output("wiki", "wiki_dir", "A browsable wiki", v) }}
+  <div class="indent">
+  {{ m.check("screenshots", "Include screenshots in the wiki", v,
+    "Pictures can show secrets that can't be blanked out the way text is. "
+    ~ "Only tick this if you're comfortable sharing the images.") }}
+  </div>
+  {{ m.output("gen_tests", "gen_tests_dir", "A runnable regression test suite", v) }}
+  <div class="indent">
+  {{ m.check("assert_no_new_signals", "Also fail a test on unexpected new activity",
+    v, "Fails if a later run logs, stores or requests something this run never saw.") }}
+  </div>
+  {{ m.output("scaffold", "scaffold_dir", "A form-filling scaffold (interactive.yaml)",
+    v) }}
+</fieldset>
+<fieldset>
+  <legend>Which elements to try</legend>
+  <label for="include_elements">Only try elements whose label matches</label>
+  <textarea id="include_elements" name="include_elements"
+    placeholder="Add to cart*">{{ v.get("include_elements", "") }}</textarea>
+  <label for="exclude_elements">Never try elements whose label matches</label>
+  <textarea id="exclude_elements" name="exclude_elements"
+    placeholder="*Logout*">{{ v.get("exclude_elements", "") }}</textarea>
+  <p class="hint">One pattern per line; * and ? are wildcards. "Never" wins over
+  "only". Neither can allow a destructive action outside a sandbox.</p>
+</fieldset>
+{{ m.footer(kind) }}
+</form>
+{% endblock %}
+"""
+
+_FORM_RUN = """{% extends "layout.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ title }} · Spoor{% endblock %}
+{% block body %}
+<h1>{{ title }}</h1>
+<p class="muted">Runs an extraction config against its site and writes the records
+it finds.</p>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+<form id="job-form" method="post" action="/new/run">
+<fieldset>
+  <legend>Config</legend>
+  {{ m.text("config", "Config file", v, placeholder="configs/shop.yaml") }}
+</fieldset>
+<fieldset>
+  <legend>Output</legend>
+  {{ m.text("output", "Write records to", v) }}
+  <label for="format">Format</label>
+  <select id="format" name="format">
+  {% for f in formats %}
+    <option value="{{ f }}"{% if v.get("format", "") == f %} selected{% endif %}>
+      {{- f or "From the file name" -}}</option>
+  {% endfor %}
+  </select>
+  <div class="spaced">
+  {{ m.output("healing_report", "healing_report_path",
+    "A report of selectors that stopped matching and how they were repaired", v) }}
+  </div>
+</fieldset>
+{{ m.footer(kind) }}
+</form>
+{% endblock %}
+"""
+
+_FORM_APPLY_SCAFFOLD = """{% extends "layout.html" %}
+{% import "macros.html" as m %}
+{% block title %}{{ title }} · Spoor{% endblock %}
+{% block body %}
+<h1>{{ title }}</h1>
+<p class="muted">Types the values from a filled-in scaffold into their fields on an
+explored page. It only types: it never presses Enter or clicks submit.</p>
+{% if error %}<div class="error">{{ error }}</div>{% endif %}
+<form id="job-form" method="post" action="/new/apply-scaffold">
+<fieldset>
+  <legend>Page and scaffold</legend>
+  {{ m.text("url", "Explored address", v, list="mapped-urls") }}
+  <datalist id="mapped-urls">
+  {% for u in mapped_urls %}<option value="{{ u }}"></option>{% endfor %}
+  </datalist>
+  {{ m.text("scaffold", "Filled-in scaffold file", v,
+    placeholder="spoor-output/.../scaffold/interactive.yaml") }}
+  {{ m.sandbox(v, "types into fields") }}
+  <p class="hint">Without a sandbox, nothing is typed.</p>
+  {{ m.text("session", "Saved login (optional)", v,
+    "Only needed if the fields are behind a login.") }}
+</fieldset>
+<fieldset>
+  <legend>What to update</legend>
+  {{ m.output("wiki", "wiki_dir", "Refresh the wiki in this folder", v) }}
+</fieldset>
+{{ m.footer(kind) }}
+</form>
+{% endblock %}
+"""
+
+_JOB = """{% extends "layout.html" %}
+{% block title %}Job {{ job.id }} · Spoor{% endblock %}
+{% block body %}
+<div class="crumbs"><a href="/jobs">Jobs</a> /</div>
+<h1>{{ job.spec.kind|capitalize }} job</h1>
+<div class="card">
+  <code class="cmd">{{ job.spec.command_line }}</code>
+</div>
+<p>
+  <span class="status status-{{ job.status }}">{{ job.status|capitalize }}</span>
+  {% if job.exit_code is not none %} · exit code {{ job.exit_code }}{% endif %}
+  · {{ status_text }}
+</p>
+{% if job.running %}
+<p>
+  {% if job.graceful_stop and not job.stop_requested %}
+  <form class="inline" method="post" action="/jobs/{{ job.id }}/stop">
+    <button type="submit">Stop</button>
+  </form>
+  {% endif %}
+  <form class="inline" method="post" action="/jobs/{{ job.id }}/kill">
+    <button type="submit" class="secondary">Force stop</button>
+  </form>
+</p>
+<p class="hint">
+  {% if job.graceful_stop %}Stop finishes the current action, then saves what was
+  mapped so far and writes the outputs. {% endif %}Force stop ends the run at once;
+  nothing more from it is saved.
+</p>
+{% endif %}
+
+{% if not job.running and (outputs or map_href) %}
+<h2>Where the output landed</h2>
+<div class="card scroll">
+  <table>
+    <tbody>
+    {% for o in outputs %}
+      <tr>
+        <td>{{ o.label|capitalize }}</td>
+        <td><code>{{ o.path }}</code>{% if not o.exists %}
+          <span class="muted">(not written)</span>{% endif %}</td>
+        <td>
+          {% if o.browse %}
+          <a href="{{ o.browse }}" target="_blank" rel="noopener">Open wiki</a>
+          {% endif %}
+          {% if o.exists %}
+          <form class="inline" method="post"
+            action="/jobs/{{ job.id }}/open/{{ o.label|urlencode }}">
+            <button type="submit" class="secondary">Open folder</button>
+          </form>
+          {% endif %}
+        </td>
+      </tr>
+    {% endfor %}
+    {% if map_href %}
+      <tr>
+        <td>Map</td>
+        <td colspan="2"><a href="{{ map_href }}">View the map</a></td>
+      </tr>
+    {% endif %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<h2>Log</h2>
+<pre class="log" id="log">{% for line in lines %}{{ line }}
+{% endfor %}</pre>
+{% if job.running %}
+<script>
+(() => {
+  const log = document.getElementById("log");
+  const events = new EventSource("/jobs/{{ job.id }}/events?from={{ next_line }}");
+  events.onmessage = (e) => {
+    const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 4;
+    log.append(e.data + "\\n");
+    if (atBottom) log.scrollTop = log.scrollHeight;
+  };
+  events.addEventListener("done", () => {
+    events.close();
+    location.reload();
+  });
+})();
+</script>
+{% endif %}
+{% endblock %}
+"""
+
+_JOBS = """{% extends "layout.html" %}
+{% block title %}Jobs · Spoor{% endblock %}
+{% block body %}
+<h1>Jobs</h1>
+{% if jobs %}
+<div class="card scroll">
+  <table>
+    <thead><tr><th>Started</th><th>Command</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for job in jobs %}
+      <tr>
+        <td>{{ job.started_at.astimezone().strftime("%H:%M:%S") }}</td>
+        <td>
+          <a href="/jobs/{{ job.id }}"><code>{{ job.spec.command_line }}</code></a>
+        </td>
+        <td class="status status-{{ job.status }}">{{ job.status|capitalize }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card">
+  <p>No jobs yet in this session.</p>
+  <p class="muted">Start one from <a href="/new/explore">Explore</a>,
+  <a href="/new/run">Extract</a> or <a href="/new/apply-scaffold">Apply scaffold</a>.
+  Jobs are listed until you close the GUI.</p>
+</div>
+{% endif %}
+{% endblock %}
+"""
+
 _TEMPLATES = {
     "layout.html": _LAYOUT,
     "home.html": _HOME,
     "domain.html": _DOMAIN,
     "map.html": _MAP,
     "not_mapped.html": _NOT_MAPPED,
+    "macros.html": _MACROS,
+    "form_explore.html": _FORM_EXPLORE,
+    "form_run.html": _FORM_RUN,
+    "form_apply_scaffold.html": _FORM_APPLY_SCAFFOLD,
+    "job.html": _JOB,
+    "jobs.html": _JOBS,
 }
 
 

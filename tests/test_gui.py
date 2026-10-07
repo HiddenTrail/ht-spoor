@@ -82,3 +82,72 @@ def test_a_gui_on_another_loopback_address_accepts_its_own_host(
         assert "Nothing has been mapped yet" in response.text
     finally:
         gui.stop()
+
+
+def test_closing_the_gui_stops_its_running_jobs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # An unsupervised browser left running after the GUI closes is exactly what
+    # §2i gui-2 rules out, so stopping the server must shut the job manager down.
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path)
+    gui = start_gui(MapStore(), workdir=tmp_path)
+    calls: list[str] = []
+    monkeypatch.setattr(gui._jobs, "shutdown", lambda: calls.append("shutdown"))
+    gui.stop()
+    assert calls == ["shutdown"]
+
+
+def test_a_clean_exit_that_beats_a_force_stop_is_reported_as_finished(
+    tmp_path: Path,
+) -> None:
+    # Force stop pressed just as the command exits cleanly on its own: the run
+    # did finish, so it must not be labelled as stopped.
+    from spoor.gui.commands import CommandSpec
+    from spoor.gui.jobs import Job, JobManager
+
+    manager = JobManager(runner=None, workdir=tmp_path)  # type: ignore[arg-type]
+    job = Job("j1", CommandSpec("explore", ["explore", "x"]), tmp_path / "s")
+    job.killed = True
+    manager._finish(job, 0)
+    assert job.status == "succeeded"
+    killed = Job("j2", CommandSpec("explore", ["explore", "x"]), tmp_path / "s")
+    killed.killed = True
+    manager._finish(killed, 1)
+    assert killed.status == "stopped"
+
+
+def test_a_carriage_return_never_splits_a_log_line(tmp_path: Path) -> None:
+    from spoor.gui.commands import CommandSpec
+    from spoor.gui.jobs import Job, JobManager
+
+    manager = JobManager(runner=None, workdir=tmp_path)  # type: ignore[arg-type]
+    job = Job("j1", CommandSpec("run", ["run", "x"]), tmp_path / "s")
+    manager._append(job, "[###--] 50%\rprogress: 3 state(s)")
+    assert job.lines_from(0) == (1, ["[###--] 50%progress: 3 state(s)"])
+
+
+def test_shutdown_removes_the_stop_file_folder(tmp_path: Path) -> None:
+    from spoor.gui.jobs import JobManager
+
+    class Instant:
+        def start(self, args: object, env: dict[str, str]) -> object:
+            class Done:
+                def readline(self) -> str:
+                    return ""
+
+                def wait(self) -> int:
+                    return 0
+
+                def kill(self) -> None:
+                    pass
+
+            return Done()
+
+    from spoor.gui.commands import CommandSpec
+
+    manager = JobManager(Instant(), tmp_path)  # type: ignore[arg-type]
+    job = manager.start(CommandSpec("explore", ["explore", "x"]))
+    stop_dir = job.stop_file.parent
+    assert stop_dir.is_dir()
+    manager.shutdown()
+    assert not stop_dir.exists()

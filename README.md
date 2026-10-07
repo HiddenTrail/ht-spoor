@@ -106,12 +106,24 @@ spoor wizard
 ```
 
 **Prefer a browser to the terminal?** `spoor gui` opens Spoor in your web browser.
-This first version lets you browse everything Spoor has mapped: the sites, each
-mapped page, its extracted records, the API it was seen calling, and, for an
-explored site, every screen, the actions fired, and the actions the safety check
-skipped (with the reason). Secrets are shown as `[REDACTED]`, just as `spoor serve`
-returns them. Starting runs, managing saved logins and editing configs from the
-browser are coming next.
+There you can:
+
+- **Browse what Spoor has mapped:** the sites, each mapped page, its extracted
+  records, the API it was seen calling, and, for an explored site, every screen,
+  the actions fired, and the actions the safety check skipped (with the reason).
+- **Explore a site, run an extraction config, or apply a filled-in scaffold** from
+  a form instead of a command line. The form shows the exact command it will run,
+  and the GUI runs that same command, so every safety rule applies just as it does
+  in a terminal.
+- **Watch a run's log live, and stop it.** Stop lets an exploration finish its
+  current action and save what it mapped so far; Force stop ends any run at once.
+- **See where each run's output landed**, open its folder, open its wiki, or jump
+  to the map it produced.
+
+Secrets are shown as `[REDACTED]` everywhere in the GUI, just as `spoor serve`
+returns them. Output goes to the folders the form names, by default
+`spoor-output/<date and time>/` under the folder you started `spoor gui` in. Managing
+saved logins and editing configs from the browser are coming next.
 
 The app is reachable only from your own computer, and only through the link
 `spoor gui` prints when it starts. That link carries a one-time access key, so
@@ -543,7 +555,7 @@ Captured artifacts are written to a local-only, git-ignored cache.
 
 ### Still on the roadmap
 
-- Running explorations and extractions, managing saved logins, editing configs, and starting the map server from the browser GUI (`spoor gui` browses maps today)
+- Managing saved logins, editing configs, and starting the map server from the browser GUI (`spoor gui` browses maps and runs explore/extract/apply-scaffold today)
 - Default-on capture behavior (today capture remains opt-in)
 - Automatic re-checking of a served map entry once it is "too old" (today the serving layer always shows how old an answer is and only re-fetches when a caller explicitly asks via `--recheck`, never on its own)
 
