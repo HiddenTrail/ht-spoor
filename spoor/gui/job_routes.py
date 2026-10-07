@@ -77,7 +77,7 @@ def _status_text(job: Job) -> str:
     if job.status == "succeeded":
         return "Finished."
     if job.status == "failed":
-        return f"Failed (exit code {job.exit_code}). The log below says why."
+        return "The log below says why."
     if job.killed:
         return "Force-stopped. Nothing more was saved from this run."
     return "Stopped at your request. What was mapped so far was saved."

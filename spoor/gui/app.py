@@ -80,6 +80,38 @@ def _cell(value: object) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
+#: Plain names for signal-diff keys that don't read well as-is.
+_CHANGE_NAMES = {"ax_node_delta": "accessibility nodes"}
+
+
+def describe_changes(changed: object) -> list[str]:
+    """A transition's recorded signal diff as short plain-language lines.
+
+    Generic over whatever keys the diff carries: a non-empty list reads as
+    "console added: a, b", a non-zero number as "accessibility nodes: +4", and a
+    true flag as its name ("screenshot changed"). Empty, zero and false entries
+    are left out, so only what actually changed is shown. Values arrive already
+    §2h-redacted (`views.map_view`).
+    """
+    if not isinstance(changed, dict):
+        return []
+    lines: list[str] = []
+    for key, value in changed.items():
+        name = _CHANGE_NAMES.get(key, str(key).replace("_", " "))
+        if isinstance(value, bool):
+            if value:
+                lines.append(name)
+        elif isinstance(value, int | float):
+            if value:
+                lines.append(f"{name}: {value:+}")
+        elif isinstance(value, list):
+            if value:
+                lines.append(f"{name}: " + ", ".join(_cell(v) for v in value))
+        elif value:
+            lines.append(f"{name}: {_cell(value)}")
+    return lines or ["nothing observed"]
+
+
 def _map_href(url: str) -> str:
     return "/map?" + urlencode({"url": url})
 
@@ -198,7 +230,7 @@ def create_app(
             rows=rows,
             api_surface=_pretty(view["api_surface"]),
             exploration=view["exploration"] or None,
-            to_json=_cell,
+            describe_changes=describe_changes,
         )
 
     add_job_routes(app, jobs=jobs, store=store, render=render, opener=opener)
