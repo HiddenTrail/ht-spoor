@@ -64,10 +64,23 @@ jobs:
             docker compose -f fixtures/docker-compose.yml pull
             docker save bkimminich/juice-shop:v17.1.1 -o /tmp/juice-shop-image.tar
           fi
+      - name: Initialize Odoo demo database (§5.1, one-time — see fixtures/README.md)
+        # Unlike PrestaShop (which auto-installs via its own steady-state command,
+        # PS_INSTALL_AUTO=1), Odoo's install flags redo real work on every start,
+        # not just the first (measured: ~81s/boot vs. ~7s plain) — so they are
+        # deliberately NOT baked into the odoo service's command (see the header
+        # comment in docker-compose.yml). A CI runner is a fresh volume every
+        # run, so this one-time init step runs here, every night, before the
+        # bench comes up — the same two-step sequence a human runs locally.
+        run: |
+          docker compose -f fixtures/docker-compose.yml up -d odoo-db
+          docker compose -f fixtures/docker-compose.yml run --rm odoo \
+            odoo -d spoor_demo -i base,website_sale --without-demo=False --stop-after-init
       - name: Start archetype bench (§5.1)
         # Unscoped: boots every archetype the compose file defines (Juice Shop,
-        # Sauce Demo, PrestaShop + its DB) — appropriate here since nothing is
-        # racing a PR, unlike the gate this replaced.
+        # Sauce Demo, PrestaShop + its DB, Odoo + its DB) — appropriate here
+        # since nothing is racing a PR, unlike the gate this replaced. Odoo's
+        # database was already seeded by the step above, so this starts it fast.
         run: docker compose -f fixtures/docker-compose.yml up -d
       - name: Wait for Juice Shop to be ready
         # Poll the port from outside (the image is distroless — no in-container
