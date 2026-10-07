@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791373139439,
+  "lastUpdate": 1791376100115,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -10064,6 +10064,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5371.5,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "644f5a3b78f96a180ee8501a0743291bfa901946",
+          "message": "Add local web GUI (§2i): decision + slice gui-1, browse maps (#221)\n\n* Record the local GUI decision (§2i) and spec slice gui-1\n\nPromotes the §9 \"possible GUI front-end\" backlog item to a decided capability:\na loopback-only, token-gated local web app (`spoor gui`) that is a separate\ncontrol plane from the read-only §2f serving layer and drives Spoor only by\nrunning the real CLI as a subprocess. Adds features/gui.feature for the first\nslice (shell, security posture, browsing maps), registers it in\nfeatures/README.md, and records the new package and the GUI's loopback rule in\nCLAUDE.md. Docs and Gherkin only; no implementation yet.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Add `spoor gui`: local web GUI, slice gui-1 (browse maps) (§2i)\n\nA loopback-only web app for browsing captured maps without the command line:\nmapped sites, each site's mapped pages, and a page's records, observed API\nsurface and exploration graph (including actions the safety check skipped),\nall through the serving layer's shared redacted view.\n\nSecurity posture from the first slice: loopback-only bind with no host option,\na per-launch access token moved from the launch URL into a per-port HttpOnly,\nSameSite=Strict cookie, and Host/Origin checks against DNS rebinding and\ncross-site requests. The read-only serving layer gains no route or tool; the\nonly store change is a new read, MapStore.urls(domain).\n\nBDD: features/gui.feature (16 scenarios, one @browser end to end), plus unit\ntests for the helpers, launcher and CLI command.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-07T15:22:59+03:00",
+          "tree_id": "3763bd48f976ec5078e5956cdb62b16b97c011b9",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/644f5a3b78f96a180ee8501a0743291bfa901946"
+        },
+        "date": 1791376099647,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 211.285,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.02952,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 1.8275,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.10648,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 2.4925,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.06187,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 10.0525,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.09912,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 15.7182,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.03821,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2281,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.56595,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.0153,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.03711,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 9.9184,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.95132,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 124.9796,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.07782,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.4605,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.00883,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.3823,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5352.4,
             "unit": "MB"
           }
         ]
