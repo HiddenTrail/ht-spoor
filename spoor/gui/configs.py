@@ -109,11 +109,21 @@ def read(path: Path) -> str:
 
 
 def write(path: Path, text: str) -> None:
-    """Save a config. A browser submits a text area with CRLF line breaks, so
-    those are turned back into plain newlines first."""
+    """Save a config, keeping the line-break style the file already has.
+
+    A browser always submits a text area with CRLF line breaks, whatever the
+    file used. They're normalized, then written back in the existing file's
+    style (CRLF if it had any, else LF; LF for a new file). Otherwise merely
+    opening and saving a file would rewrite every line ending, a whole-file
+    change in version control with no real edit.
+    """
+    newline = "\n"
+    if path.is_file() and b"\r\n" in path.read_bytes():
+        newline = "\r\n"
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8", newline="") as handle:
-        handle.write(text.replace("\r\n", "\n"))
+        handle.write(normalized.replace("\n", newline))
 
 
 def find(workdir: Path) -> list[ConfigFile]:

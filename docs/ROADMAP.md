@@ -609,7 +609,7 @@ The captured HAR path is surfaced on the run summary so an operator can find it.
 - Both session commands put the site, label and upload path after a `--` separator, so a name or site that starts with "-" is still read as a value, never as an option. This was checked against the real CLI. gui-2 refuses such an address instead, because `explore`'s options follow its address and so can't sit after a `--`. Refusing here would have left a login saved from the command line under such a name impossible to remove from the GUI.
 - A session command that overruns the 30-second wait is force-stopped, and the page says to check the list, because it may already have saved the login.
 - Two problems found in review are fixed. A config the editor can't safely round-trip (over 1 MB, or not UTF-8) gets no editor at all, because an empty editor with a working Save button would let one click wipe or corrupt the file. Symlinks pointing outside the folder aren't listed.
-- The config editor turns the CRLF line breaks a browser submits back into plain newlines when it saves.
+- A browser always submits the editor's text with CRLF line breaks. Saving writes them back in the file's existing style (CRLF if it had any, LF otherwise and for new files). This was found when a merely opened-and-saved fixture showed up as a whole-file line-ending change in git.
 - The fake runner the GUI scenarios share moved to `tests/step_defs/_gui_fakes.py`.
 
 `features/gui_sessions_configs.feature` (23 scenarios, 25 test cases with the path outline's examples; two `@browser`: a login saved through the real `spoor session add`, and a config fixed in the editor) covers it.

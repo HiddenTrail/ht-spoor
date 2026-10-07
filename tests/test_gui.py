@@ -248,3 +248,26 @@ def test_config_check_reports_where_each_problem_is() -> None:
     yaml_problem = configs.check("target: [unclosed\n")
     assert len(yaml_problem) == 1 and "line 2" in yaml_problem[0]
     assert configs.check("")[0].startswith("the whole file:")
+
+
+@pytest.mark.parametrize(
+    ("existing", "expected"),
+    [
+        (b"target: x\r\nfields: {}\r\n", b"target: y\r\nfields: {}\r\n"),
+        (b"target: x\nfields: {}\n", b"target: y\nfields: {}\n"),
+        (None, b"target: y\nfields: {}\n"),
+    ],
+    ids=["keeps-crlf", "keeps-lf", "new-file-lf"],
+)
+def test_saving_keeps_the_files_line_break_style(
+    tmp_path: Path, existing: bytes | None, expected: bytes
+) -> None:
+    # A browser submits CRLF whatever the file used; saving must not rewrite
+    # every line ending of a file that wasn't really changed.
+    from spoor.gui import configs
+
+    path = tmp_path / "c.yaml"
+    if existing is not None:
+        path.write_bytes(existing)
+    configs.write(path, "target: y\r\nfields: {}\r\n")
+    assert path.read_bytes() == expected
