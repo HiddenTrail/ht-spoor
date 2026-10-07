@@ -15,6 +15,17 @@ that applies is simply that nothing loaded here is ever echoed into the run
 summary or records. A missing or malformed file raises `SessionError` so a run
 fails loudly rather than silently proceeding unauthenticated. Nothing here is
 site-specific (§0): the same format is read for every target.
+
+**Second source: a stored, named session (§2h Phase B, closes #215).**
+`load_session` also accepts the *label* of a session previously stored via
+`spoor session add`, scoped to a `domain` the caller supplies (the target
+site's host) — resolved through `spoor/security/session_store.py:SessionStore`.
+A real file on disk always wins: `load_session` only attempts a label lookup
+when `path` does not name an existing file, so a stored label can never shadow
+an actual storage-state file a caller pointed at. A session resolved this way
+has no on-disk path of its own (`LoadedSession.path` is `None`), since it was
+never a file to begin with — `storage_state_arg` below is how a caller gets a
+Playwright-ready value either way, file or stored.
 """
 
 from __future__ import annotations
@@ -22,6 +33,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -67,33 +79,73 @@ class LoadedSession:
     keeps that restoration exact (`secure`/`httpOnly`/`sameSite`/`expires` and
     all), rather than lossily round-tripping through `SessionCookie`, which
     only carries what the static tier's `httpx` cookie jar needs.
+
+    `path` is `None` for a session resolved from the store by label (§2h Phase
+    B) rather than read from a file — there is no on-disk path to hand
+    Playwright in that case. Use `storage_state_arg` to get a value that works
+    for either source.
     """
 
-    path: Path
+    path: Path | None
     cookies: tuple[SessionCookie, ...]
     raw: dict[str, object]
 
 
-def load_session(path: str | Path) -> LoadedSession:
-    """Read and validate a supplied storage-state file (ROADMAP.md §2h).
+def load_session(path: str | Path, *, domain: str | None = None) -> LoadedSession:
+    """Read and validate a supplied session — a file, or (with `domain`) a stored
+    label (ROADMAP.md §2h; the stored-label path is Phase B, closes #215).
 
-    Raises `SessionError` on a file that cannot be read, is not valid JSON, or is
-    not a storage-state object — so the failure surfaces before any fetch. A
-    valid state with no cookies (e.g. a purely localStorage-based session) loads
-    fine with an empty `cookies` tuple.
+    When `path` names an existing file, behavior is exactly the original
+    file-only contract: `SessionError` on a file that cannot be read, is not
+    valid JSON, or is not a storage-state object. When it does not, and `domain`
+    is given, `path` is tried instead as the label of a session stored for that
+    site (`spoor session add`) — found, it loads from there; not found, or
+    `domain` was not given, `SessionError` names both of what was tried so the
+    message stays actionable either way. A valid state with no cookies (e.g. a
+    purely localStorage-based session) loads fine with an empty `cookies` tuple,
+    from either source.
     """
     file_path = Path(path)
-    try:
-        text = file_path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise SessionError(f"session file could not be read: {path}") from exc
-    try:
-        data = json.loads(text)
-    except json.JSONDecodeError as exc:
-        raise SessionError(f"session file is not valid JSON: {path}") from exc
-    if not isinstance(data, dict):
-        raise SessionError(f"session file must be a storage-state object: {path}")
-    return LoadedSession(path=file_path, cookies=_cookies_from(data), raw=data)
+    if file_path.is_file():
+        try:
+            text = file_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            raise SessionError(f"session file could not be read: {path}") from exc
+        try:
+            data = json.loads(text)
+        except json.JSONDecodeError as exc:
+            raise SessionError(f"session file is not valid JSON: {path}") from exc
+        if not isinstance(data, dict):
+            raise SessionError(
+                f"session file must be a storage-state object: {path}"
+            )
+        return LoadedSession(path=file_path, cookies=_cookies_from(data), raw=data)
+    if domain is not None:
+        from spoor.security.session_store import SessionStore
+
+        stored = SessionStore().get(domain, str(path))
+        if stored is not None:
+            return LoadedSession(path=None, cookies=_cookies_from(stored), raw=stored)
+        raise SessionError(
+            f"no session file at {path!r} and no stored session named {path!r} "
+            f"for {domain}"
+        )
+    raise SessionError(f"session file could not be read: {path}")
+
+
+def storage_state_arg(session: LoadedSession) -> Any:
+    """The value to pass as Playwright's `storage_state=` for a loaded session.
+
+    A file-backed session passes its path (Playwright reads the file itself); a
+    stored, label-resolved session (`path` is None, §2h Phase B) has no file to
+    point at, so its raw storage-state dict is passed directly instead —
+    Playwright's `new_context(storage_state=...)` accepts either shape. Typed
+    `Any` (not `StorageState`, Playwright's precise TypedDict) because `raw` is
+    plain `dict[str, object]` parsed from JSON, matching the existing
+    `cast(Any, ...)` precedent `driver.py` already uses for the same reason
+    (`_cookies_for_playwright`).
+    """
+    return str(session.path) if session.path is not None else session.raw
 
 
 def _cookies_from(data: dict[str, object]) -> tuple[SessionCookie, ...]:

@@ -96,7 +96,7 @@ from spoor.exploration.explorer import (
     ElementNotLocated,
 )
 from spoor.exploration.settling import SettleResult, wait_for_quiescence
-from spoor.security.session import LoadedSession, load_session
+from spoor.security.session import LoadedSession, load_session, storage_state_arg
 
 # JS that lists both web-storage areas' keys — the "storage-state diff" §2e signal.
 _STORAGE_KEYS_JS = (
@@ -490,9 +490,12 @@ class PlaywrightDriver:
         # `SessionError` on a missing/malformed file) so a bad `--session` fails
         # loudly before a browser ever launches, matching the static/browser tiers'
         # own posture. Spoor performs no login itself (§2h, §0) — this only replays
-        # an already-captured session.
+        # an already-captured session. `domain=` lets `session` also name a
+        # stored session (§2h Phase B, closes #215) when it isn't a file.
         self._session: LoadedSession | None = (
-            load_session(session) if session is not None else None
+            load_session(session, domain=urlparse(target).netloc)
+            if session is not None
+            else None
         )
         self._playwright: Playwright | None = None
         self._browser: Browser | None = None
@@ -535,7 +538,9 @@ class PlaywrightDriver:
             # this first page load (ROADMAP.md §2h); every reset after this one
             # re-applies it explicitly (see `reset`), since Playwright only ever
             # reads `storage_state` at context creation.
-            storage_state=str(self._session.path) if self._session else None,
+            storage_state=(
+                storage_state_arg(self._session) if self._session else None
+            ),
         )
         # Install the mutation counter on every document the context loads, so the
         # settle wait (§2e, 7b) has a real rendering-stopped signal after each reset

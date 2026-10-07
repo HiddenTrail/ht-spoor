@@ -328,7 +328,8 @@ def explore(
                 "Explore as a logged-in user, using a session you already captured "
                 "yourself (a storage-state file from Playwright's "
                 "context.storage_state(), or from the same login flow the --scaffold "
-                "help text points at). Spoor never logs in on its own; this only "
+                "help text points at) — or the name of one you stored earlier with "
+                "`spoor session add`. Spoor never logs in on its own; this only "
                 "replays a session you already have. Combines freely with "
                 "--resume-from: that picks up where a crawl continues from, this "
                 "decides whether it's authenticated, and neither depends on the "
@@ -454,8 +455,9 @@ def explore(
     named screen instead of starting over: the crawl picks up there, any --max-depth is
     counted from that screen, and the newly found screens are merged into the saved map.
     Pass --session to explore as a logged-in user, using a session you captured
-    yourself — Spoor never logs in on its own, so anything behind a login stays
-    unmapped without one. Pass --wiki to also write a browsable wiki of the
+    yourself, or one you stored earlier under a name with `spoor session add` —
+    Spoor never logs in on its own, so anything behind a login stays unmapped
+    without one. Pass --wiki to also write a browsable wiki of the
     result, and --screenshots to include pictures in that wiki — a full-page
     shot of each screen, a clip of each interactive element, and a shot of what
     a dropdown or list reveals when opened (off by default, because a picture
@@ -499,10 +501,12 @@ def explore(
         )
     _check_explore_output_paths(wiki=wiki, gen_tests=gen_tests, scaffold=scaffold)
     if session is not None:
+        from urllib.parse import urlsplit
+
         from spoor.security.session import SessionError, load_session
 
         try:
-            load_session(session)
+            load_session(session, domain=urlsplit(url).netloc)
         except SessionError as exc:
             raise typer.BadParameter(str(exc)) from exc
     # The saved map to continue, when resuming: the §2h-shareable projection an earlier
@@ -753,6 +757,98 @@ def serve_mcp(
     asyncio.run(server.run_stdio_async())  # pragma: no cover
 
 
+session_app = typer.Typer(
+    name="session",
+    help="Store and manage named, reusable logged-in sessions, per site.",
+    no_args_is_help=True,
+    add_completion=False,
+)
+app.add_typer(session_app, name="session")
+
+
+@session_app.command(name="add")
+def session_add(
+    file: Annotated[
+        Path, typer.Argument(help="A storage-state file you already captured.")
+    ],
+    site: Annotated[
+        str,
+        typer.Argument(
+            help="The site this session is for — a bare domain or a full URL."
+        ),
+    ],
+    label: Annotated[
+        str, typer.Option("--label", help="The name to store this session under.")
+    ],
+) -> None:
+    """Store a captured session under a name, scoped to a site.
+
+    Validates the file is a real storage-state export before storing it, the
+    same check `--session <file>` already applies. Re-adding an existing label
+    for the same site replaces what it points to — useful once a session
+    expires and you've captured a fresh one under the same name.
+    """
+    from spoor.security.session import SessionError, load_session
+    from spoor.security.session_store import SessionStore, domain_of
+
+    try:
+        loaded = load_session(file)
+    except SessionError as exc:
+        raise typer.BadParameter(str(exc)) from exc
+    domain = domain_of(site)
+    SessionStore().add(domain, label, loaded.raw)
+    typer.echo(f"Stored session {label!r} for {domain}.")
+
+
+@session_app.command(name="list")
+def session_list(
+    site: Annotated[
+        str | None,
+        typer.Argument(
+            help="Only list sessions for this site. Every stored session if omitted."
+        ),
+    ] = None,
+) -> None:
+    """List stored sessions — labels and timestamps only, never their contents.
+
+    A stored session's cookies/storage values are never shown or exported by
+    this command (ROADMAP.md §2h) — only what you'd need to decide which to use
+    or remove.
+    """
+    from spoor.security.session_store import SessionStore, domain_of
+
+    domain = domain_of(site) if site is not None else None
+    sessions = SessionStore().list(domain)
+    if not sessions:
+        if domain is None:
+            typer.echo("No stored sessions.")
+        else:
+            typer.echo(f"No stored sessions for {domain}.")
+        return
+    for meta in sessions:
+        used = meta.last_used_at or "never"
+        typer.echo(
+            f"{meta.domain}  {meta.label!r}  "
+            f"created {meta.created_at}  last used {used}"
+        )
+
+
+@session_app.command(name="remove")
+def session_remove(
+    site: Annotated[str, typer.Argument(help="The site the session is stored for.")],
+    label: Annotated[str, typer.Argument(help="The stored session's name.")],
+) -> None:
+    """Delete a stored session."""
+    from spoor.security.session_store import SessionStore, domain_of
+
+    domain = domain_of(site)
+    removed = SessionStore().remove(domain, label)
+    if removed:
+        typer.echo(f"Removed session {label!r} for {domain}.")
+    else:
+        typer.echo(f"No stored session {label!r} for {domain} — nothing removed.")
+
+
 @app.command(name="apply-scaffold")
 def apply_scaffold_cmd(
     url: Annotated[
@@ -783,8 +879,9 @@ def apply_scaffold_cmd(
             "--session",
             help=(
                 "Apply the scaffold as a logged-in user, using a session you already "
-                "captured yourself. Only needed if the screen the scaffold's fields "
-                "live on is itself behind a login; Spoor never logs in on its own."
+                "captured yourself — or the name of one stored earlier with `spoor "
+                "session add`. Only needed if the screen the scaffold's fields live "
+                "on is itself behind a login; Spoor never logs in on its own."
             ),
         ),
     ] = None,
@@ -816,7 +913,8 @@ def apply_scaffold_cmd(
     address such as localhost, or this flag) — on any other site nothing is typed,
     the same rule exploration's own destructive-action gate already follows.
     Pass --session if the scaffold's fields live behind a login, using a session
-    you already captured yourself; Spoor never logs in on its own.
+    you already captured yourself or one stored earlier with `spoor session add`;
+    Spoor never logs in on its own.
 
     When a fill changes what's on the page, that new state is read the same
     read-only way exploration reads any other state, and saved into the map
@@ -835,10 +933,12 @@ def apply_scaffold_cmd(
     from spoor.scaffold.apply import apply_scaffold, load_scaffold
 
     if session is not None:
+        from urllib.parse import urlsplit
+
         from spoor.security.session import SessionError, load_session
 
         try:
-            load_session(session)
+            load_session(session, domain=urlsplit(url).netloc)
         except SessionError as exc:
             raise typer.BadParameter(str(exc)) from exc
 

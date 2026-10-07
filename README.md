@@ -172,6 +172,32 @@ secret: it is read locally and never written into your output or the run summary
 A missing or malformed session file fails the run loudly rather than quietly
 scraping as an anonymous visitor.
 
+**Storing a session under a name, for reuse.** Instead of re-pointing `session:`
+or `--session` at a file path every run, store a captured session once under a
+name, scoped to a site, and reuse it by name from then on — handy once you're
+juggling more than one logged-in role for the same site:
+
+```bash
+spoor session add ./my-session.json shop.example --label customer
+spoor session list                # labels and timestamps only — never cookie values
+spoor session remove shop.example customer
+```
+
+```yaml
+target: https://shop.example/account/orders
+session: customer   # resolves to the stored session if no file exists at this path
+fields:
+  order: { selector: ".order-id" }
+```
+
+A real file always takes priority: if a value you pass as `session:` or
+`--session` names an existing file, Spoor reads that file exactly as before —
+only when it doesn't is the value tried as a stored session's name instead, so
+storing a session can never shadow a file you point at by the same name. Stored
+sessions live in the same local, git-ignored place as everything else Spoor
+caches, and are never exposed by `spoor serve`/`serve-mcp` — listing shows only
+a label and when it was added/last used, never a cookie or storage value.
+
 ## Routing through a proxy (bring-your-own-proxy)
 
 Spoor never sources a proxy for you — it only routes a run's traffic through
@@ -480,7 +506,7 @@ the wiki itself shows. Leave `hooks` out entirely and nothing changes.
 - Run observability: structured run summary for each run
 - API discovery: OpenAPI/Swagger discovery, GraphQL introspection, HAR-based synthesis, action-to-endpoint correlation, and static JS-bundle endpoint discovery (candidate endpoints found by scanning a page's scripts, never executed or fetched to confirm)
 - Tier-3 self-healing: scored matching, uncertain-match handling, cross-run fingerprint persistence, listing field/container healing, re-anchoring, visual-signal corroboration, and an opt-in markdown healing report (`spoor run --healing-report`) naming what broke, what was found instead, and a suggested config fix
-- Authenticated targets: supply a captured browser session (cookies + `localStorage`) via `session:` to scrape login-gated pages — "bring-your-own-session"; Spoor performs no login itself
+- Authenticated targets: supply a captured browser session (cookies + `localStorage`) via `session:` to scrape login-gated pages — "bring-your-own-session"; Spoor performs no login itself. Store one under a name with `spoor session add` to reuse it by name across runs instead of a file path, scoped per site; `spoor session list`/`remove` manage what's stored, and listing never shows cookie or storage values
 - Proxy routing: supply a proxy via `proxy:` to route a run's traffic through it (including the plain fetch, `robots.txt`/sitemap lookups, and the browser tier) — "bring-your-own-proxy"; Spoor never sources a proxy itself
 - Request/response hooks (Python API): pass `hooks=RunHooks(on_request=..., on_response=...)` to `extract.run_report` to add request headers or adjust a fetched page before extraction, without writing site-specific code into Spoor itself — see "Extending a run from Python" above
 - Exploration hooks (Python API): pass `hooks=ExplorationHooks(on_state_discovered=..., on_transition_taken=...)` to `explore()` to observe a newly discovered screen or a fired action as the map is built — both fire only after Spoor has already decided and recorded what happened, and both only ever see counts and already-redacted text, never a raw captured value — see "Extending an exploration run from Python" above

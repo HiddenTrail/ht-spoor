@@ -25,16 +25,17 @@ through this interface yet. Schema migrations are tracked with SQLite's own
 Alembic/SQLAlchemy). A missing or freshly-created database is simply "nothing
 mapped yet", never an error. Existing `.spoor-cache/maps/*.json` files from
 before this change are orphaned, not imported — Spoor is pre-alpha, and every
-record in them is re-capturable by re-running.
+record in them is re-capturable by re-running. The connection/migration
+machinery itself lives in `spoor/security/db.py`, shared with
+`spoor/security/session_store.py` (§2h, closes #215) — one database, one place
+that opens it, not two independently-evolving SQLite implementations.
 """
 
 from __future__ import annotations
 
 import json
-import sqlite3
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 from urllib.parse import urlsplit
 
@@ -42,7 +43,7 @@ from spoor.api_discovery.correlation import ActionCorrelation
 from spoor.api_discovery.discovery import DiscoveredSpec
 from spoor.api_discovery.graphql import DiscoveredGraphQL
 from spoor.api_discovery.synthesis import SynthesizedSpec
-from spoor.security import storage
+from spoor.security import db
 
 if TYPE_CHECKING:
     # Type-only: the projection reads the graph's attributes, so serving never
@@ -51,50 +52,6 @@ if TYPE_CHECKING:
     from spoor.exploration.capture import StateSignals, TransitionSignals
     from spoor.exploration.discovery import ActionableElement
     from spoor.exploration.graph import ExplorationGraph
-
-# The SQLite database file holding the map, under the git-ignored cache root.
-DB_FILENAME = "spoor.db"
-
-# Schema migrations, applied in order and tracked via `PRAGMA user_version`
-# (index + 1 = the version that script brings the database to). Each script may
-# hold multiple statements (`executescript`, not `execute`). Append, never edit,
-# a shipped migration — the same "schema only ever grows forward" discipline
-# any persistent store needs.
-_MIGRATIONS: tuple[str, ...] = (
-    """
-    CREATE TABLE IF NOT EXISTS sites (
-        id INTEGER PRIMARY KEY,
-        domain TEXT NOT NULL UNIQUE
-    );
-    CREATE TABLE IF NOT EXISTS runs (
-        id INTEGER PRIMARY KEY,
-        site_id INTEGER NOT NULL REFERENCES sites(id),
-        url TEXT NOT NULL,
-        captured_at TEXT NOT NULL,
-        tier INTEGER,
-        records_json TEXT NOT NULL,
-        api_surface_json TEXT,
-        exploration_json TEXT,
-        config_json TEXT
-    );
-    CREATE INDEX IF NOT EXISTS idx_runs_url_captured
-        ON runs(url, captured_at DESC, id DESC);
-    CREATE INDEX IF NOT EXISTS idx_runs_site ON runs(site_id);
-    """,
-)
-
-
-def _migrate(conn: sqlite3.Connection) -> None:
-    """Apply any schema migrations this connection's database hasn't seen yet."""
-    (current,) = conn.execute("PRAGMA user_version").fetchone()
-    for version, script in enumerate(_MIGRATIONS, start=1):
-        if version > current:
-            conn.executescript(script)
-            # PRAGMA doesn't accept bound parameters; `version` is our own loop
-            # counter, never external input, so the f-string carries no
-            # injection risk.
-            conn.execute(f"PRAGMA user_version = {version}")
-    conn.commit()
 
 
 def shareable_api_surface(
@@ -270,15 +227,6 @@ def _domain_of(url: str) -> str:
     return urlsplit(url).netloc
 
 
-def _get_or_create_site(conn: sqlite3.Connection, domain: str) -> int:
-    """The `sites.id` for `domain`, inserting a row first if needed."""
-    conn.execute("INSERT OR IGNORE INTO sites (domain) VALUES (?)", (domain,))
-    (site_id,) = conn.execute(
-        "SELECT id FROM sites WHERE domain = ?", (domain,)
-    ).fetchone()
-    return cast(int, site_id)
-
-
 def _dump(value: dict[str, object] | None) -> str | None:
     return None if value is None else json.dumps(value)
 
@@ -290,39 +238,9 @@ def _load(value: str | None) -> dict[str, object] | None:
 class MapStore:
     """Read/write access to the persisted map (§2f), a single SQLite database.
 
-    The cache root is read from `spoor.security.storage.CACHE_ROOT` at call time
-    (not import), so a test's monkeypatch of it — or a future configurable base —
-    takes effect without reconstructing the store. A fresh `sqlite3.Connection` is
-    opened per call (never held across calls or shared across threads), matching
-    this store's existing "open, do the one thing, close" posture — `spoor serve`
-    may field concurrent requests, and SQLite connections aren't safe to share
-    across threads.
+    Connects via `spoor.security.db.connect()`, shared with `SessionStore` (§2h,
+    closes #215) — see that module for the connection/migration posture.
     """
-
-    @property
-    def _db_path(self) -> Path:
-        return storage.CACHE_ROOT / DB_FILENAME
-
-    def _connect(self) -> sqlite3.Connection:
-        path = self._db_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        # busy_timeout: `spoor serve` may field genuinely concurrent requests, each
-        # opening its own connection (see the class docstring) — without this, a
-        # writer that loses a race for SQLite's file lock gets an immediate
-        # "database is locked" error instead of waiting briefly and retrying.
-        # Deliberately NOT switching to WAL journal mode: that switch itself
-        # requires an exclusive lock, so issuing it from every connection racing
-        # to open a brand-new database file is a real deadlock-shaped bug, not a
-        # hypothetical one — caught by this module's own concurrent-writer test.
-        # WAL is a concurrent-reader-during-write performance optimization Spoor's
-        # actual write pattern (occasional CLI runs, rare recheck calls) doesn't
-        # need; the default rollback-journal mode plus busy_timeout is correct and
-        # sufficient.
-        conn = sqlite3.connect(path, timeout=5.0)
-        conn.execute("PRAGMA busy_timeout = 5000")
-        conn.execute("PRAGMA foreign_keys=ON")
-        _migrate(conn)
-        return conn
 
     def record(
         self,
@@ -361,10 +279,10 @@ class MapStore:
             config=config,
             exploration=exploration,
         )
-        conn = self._connect()
+        conn = db.connect()
         try:
             with conn:
-                site_id = _get_or_create_site(conn, domain)
+                site_id = db.get_or_create_site(conn, domain)
                 conn.execute(
                     "INSERT INTO runs (site_id, url, captured_at, tier,"
                     " records_json, api_surface_json, exploration_json,"
@@ -386,7 +304,7 @@ class MapStore:
 
     def get(self, url: str) -> MapEntry | None:
         """The latest mapped entry for `url`, or None if it has never been mapped."""
-        conn = self._connect()
+        conn = db.connect()
         try:
             row = conn.execute(
                 "SELECT sites.domain, runs.tier, runs.captured_at,"
@@ -417,7 +335,7 @@ class MapStore:
 
     def domains(self) -> list[str]:
         """Every domain with at least one mapped URL, sorted."""
-        conn = self._connect()
+        conn = db.connect()
         try:
             rows = conn.execute(
                 "SELECT DISTINCT sites.domain FROM sites"
