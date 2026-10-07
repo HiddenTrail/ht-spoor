@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791359993622,
+  "lastUpdate": 1791364267367,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -9344,6 +9344,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5325.3,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c55a796c04c671c1ea75b50a09b589127e0490e5",
+          "message": "docs/COMPETITIVE_PLAN.md: mark D1 decided and Phase 1/2 done (#213)\n\nD1 (#146) was decided and closed 2026-10-01 -- build the crawl engine\nin-house, against adopting Crawlee -- but this planning doc still\nshowed the D1 row as \"_open_\" and every one of the seven dependent\n\"Crawlee table stakes\" rows as \"Depend (Crawlee)\". All seven have\nsince shipped in-house with zero new dependency: link following with\nscope rules (#169), bounded concurrency (#174), sitemap/robots.txt\nseeding (#170), resumable crawl state (#175), bring-your-own-proxy\n(#149), SQLite/Parquet sinks (#108), request/response + exploration\nhooks (#150, #187). Markdown output (Crawl4AI/Firecrawl table) was\nalso already shipped (`-f md`) and still showed unbuilt.\n\nAlso found Phase 2's remaining unmarked rows are done too: configurable\nstate equivalence (#104), form input specifications (#103), plugin\nhooks (#187) -- bringing Phase 1 and Phase 2 both to fully shipped.\n\nEvery issue number cited was verified directly via `gh issue view`\nbefore being written in, not assumed from memory.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-07T12:06:08+03:00",
+          "tree_id": "5be3ba7f219eb48206c6b777b99f89894eb0ff9f",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/c55a796c04c671c1ea75b50a09b589127e0490e5"
+        },
+        "date": 1791364266488,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 221.346,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.03831,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.0126,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12386,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.022,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.07496,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 11.6546,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11263,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 19.4766,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.05486,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.3078,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.58709,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.743,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05124,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.2648,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 5.99444,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.6973,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.08194,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5061,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01013,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4464,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5316,
             "unit": "MB"
           }
         ]
