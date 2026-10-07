@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791376100115,
+  "lastUpdate": 1791407140797,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -10208,6 +10208,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5352.4,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d8233d44b2c10b6c843224707dc9e4279103deff",
+          "message": "Add Odoo as the fifth archetype bench target (§5.1) (#222)\n\nAPI discovery (§2b) shipping was the gate this fixture was waiting on\n(see the header comment it replaces). Adds odoo + odoo-db (PostgreSQL,\nOdoo's only supported backend) to fixtures/docker-compose.yml, the same\ntwo-service pairing pattern PrestaShop uses. The official odoo:17.0\nCommunity-edition image gives a structurally new target: a heavy SPA\nbackend admin UI in front of JSON-RPC/XML-RPC web services, plus a\nserver-rendered eCommerce storefront (website_sale) in the same app.\n\nUnlike PrestaShop, demo-database init is NOT baked into the steady-state\ncommand: measured empirically, Odoo's -i install flags redo real work on\nevery start, not just the first (~81s/boot vs ~7s plain), and a never-run\nfresh database auto-bootstraps a minimal base-only install rather than\nfailing loudly (both found and fixed/documented during verification, not\nassumed). A one-time `docker compose run --rm ... --stop-after-init`\nseeds base+website_sale+demo data once; nightly.yml's CI job (a fresh\nvolume every run) gets the same one-time step before its existing\nblanket `up -d`.\n\nVerified end to end: the documented two-step flow brings up a working\nstorefront with real demo products, confirmed via the actual rendered\n/shop HTML, not just an HTTP 200.\n\nCo-authored-by: Claude Sonnet 5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-08T00:00:43+03:00",
+          "tree_id": "b69adad6815ecc3738aa24d721266c43d5ca836a",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/d8233d44b2c10b6c843224707dc9e4279103deff"
+        },
+        "date": 1791407139427,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 226.977,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.0452,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.2293,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.13017,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.1461,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.07613,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 12.0668,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.11736,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 19.5518,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.05689,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.3146,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.58091,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.5531,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.05274,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.3687,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.01793,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.8847,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09676,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5931,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01074,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4725,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5402.1,
             "unit": "MB"
           }
         ]
