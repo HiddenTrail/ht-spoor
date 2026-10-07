@@ -48,7 +48,7 @@ are on the horizon as an **optional** tier, never the default run loop.
 | ID | Decision | Options | Owner | Decision / date |
 |---|---|---|---|---|
 | D1 | Adopt Crawlee (Python) as the crawl engine? | Depend on Crawlee · build a minimal frontier · correct §2d and stay single-URL | maintainer | **decided 2026-10-01 — build in-house (#146, closed).** Rationale: Crawlee's `AutoscaledPool` needs an asyncio seam in a codebase that's synchronous throughout (`httpx.Client`, Playwright's *sync* API) — that cost, not a capability gap, is what tipped it. Every item the §4 table below named as gated on this decision has since shipped in-house with zero new dependencies (see that table). |
-| D2 | Record "LLM once, replay forever" as the model for the optional LLM tier? | Yes · no · decide later | maintainer | _open_ |
+| D2 | Record "LLM once, replay forever" as the model for the optional LLM tier? | Yes · no · decide later | maintainer | **decided 2026-09-30 — yes (#147, closed).** An LLM works out an action or config once, Spoor records it as a deterministic step, and every later run replays it without the model — fits Spoor's core determinism guarantee (§1: the model is consulted only for discovery, never something a later run's correctness depends on). See the "shape of the future optional LLM tier" decision note in ROADMAP.md §9. Not yet implemented — this only settled the *shape*, Phase 3 itself hasn't started. |
 | D3 | _add your own_ | | | |
 
 ## 4. What to take, by source
@@ -88,7 +88,7 @@ are on the horizon as an **optional** tier, never the default run loop.
 
 | Feature | Approach | Why | Phase | Notes |
 |---|---|---|---|---|
-| "LLM once, replay forever": an LLM works out an action, Spoor records it as a deterministic step and replays without the model (cf. Stagehand's action caching) | Adapt (optional LLM tier) | How LLMs fit Spoor's determinism: model for discovery, every later run free and repeatable | 3 | depends on D2 |
+| "LLM once, replay forever": an LLM works out an action, Spoor records it as a deterministic step and replays without the model (cf. Stagehand's action caching) | Adapt (optional LLM tier) | How LLMs fit Spoor's determinism: model for discovery, every later run free and repeatable | 3 | D2 decided (yes); not yet built |
 | LLM form filling in a sandbox | Adapt, gated by the existing sandbox registry | Covers the form-filling work; the safety gate already exists | 3 | |
 | Accessibility-tree page representation for prompts | Adapt | Spoor already captures accessibility trees (§2c) | 3 | |
 | Autonomous goal-driven agents | Skip | §1: Spoor is "not an agent" | — | |
@@ -98,7 +98,7 @@ are on the horizon as an **optional** tier, never the default run loop.
 | Feature | Approach | Why | Phase | Notes |
 |---|---|---|---|---|
 | Page → clean markdown output | **Built — shipped** (`spoor run -f md`) | Cheap parity with a highly visible feature | 1 or 2 | |
-| LLM generates the extraction config once, then runs deterministically (cf. Crawl4AI's schema generation) | Adapt | Same "LLM once" pattern; eases the hardest onboarding step (writing configs) | 3 | depends on D2 |
+| LLM generates the extraction config once, then runs deterministically (cf. Crawl4AI's schema generation) | Adapt | Same "LLM once" pattern; eases the hardest onboarding step (writing configs) | 3 | D2 decided (yes); not yet built |
 
 ### OWASP ZAP / Katana — discovery
 
@@ -136,8 +136,9 @@ Stated plainly in the README as choices, not gaps:
       specifications (#103); generated-test reverse assertion (#128, a scoped
       first piece — the fuller "freshness by re-observation" mechanism remains
       open as #211, low priority, tracked separately).
-- [ ] **Phase 3 — optional LLM tier ("LLM once, replay forever").** Decide D2;
-      config generation; sandbox form filling; action caching for replay.
+- [ ] **Phase 3 — optional LLM tier ("LLM once, replay forever").** D2 decided
+      (#147, closed — "LLM once, replay forever"); not yet implemented: config
+      generation; sandbox form filling; action caching for replay.
 
 Each item still goes through the normal workflow when picked up: a ROADMAP
 decision note, then the `.feature` file first (CLAUDE.md, BDD first).
@@ -146,8 +147,9 @@ decision note, then the `.feature` file first (CLAUDE.md, BDD first).
 
 Phases 1 and 2 are done — the crawling-basics gap this plan opened with is
 closed, in-house, with no new dependency tree. What's left is Phase 3 (the
-optional LLM tier, gated on deciding D2) and whatever this plan doesn't yet
-name. The differentiators were always broader than signals, wikis and MCP:
+optional LLM tier — its shape is decided, D2, but it isn't built yet) and
+whatever this plan doesn't yet name. The differentiators were always broader
+than signals, wikis and MCP:
 
 1. Self-healing measured against an honest, merge-blocking bar (≥95%, §5.3)
 2. Safety guarantees built into the design (sandbox-only destructive actions,
