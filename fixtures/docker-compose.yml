@@ -33,8 +33,26 @@
 # exercise the media/streaming-capture signal ROADMAP §2c already names. No database,
 # so (like the two SPAs) it's a single service; it's built from our own checked-in
 # source, the same way Sauce Demo is built rather than pulled as a prebuilt image.
-# A self-hosted ERPNext/Odoo still waits for its phase (API discovery §2b/§2.5) —
-# standing it up now would be scaffolding for a capability that does not yet exist.
+#
+# Odoo is the fifth archetype, joining now that API discovery (§2b) has shipped —
+# this was the gate the earlier version of this comment named. It's a self-hosted
+# ERP/eCommerce suite (Community edition, the official `odoo` image), structurally
+# unlike every prior archetype: its web client is itself a heavy SPA (the backend
+# admin UI) sitting in front of JSON-RPC/XML-RPC web-service endpoints, and the
+# `website_sale` module gives it a second, server-rendered storefront surface
+# (products/categories/cart) in the same app — a single target exercising both
+# API-discovery shapes at once, plus a structurally different SPA for tier-2/§2e
+# than Juice Shop's or Sauce Demo's. Needs a database (PostgreSQL, Odoo's only
+# supported backend), so it ships as two services (odoo + odoo-db), same pairing
+# pattern as PrestaShop. UNLIKE PrestaShop, init is **not** auto-run by `up -d`:
+# measured empirically, Odoo's `-i` (install) flags redo real, non-trivial work
+# (re-walking every targeted module's view/data XML) on *every* start, not just
+# the first — 81s per boot in testing, against ~7s for a plain start with no `-i`.
+# Baking `-i` into the steady-state command would tax every `up`/restart forever,
+# not just the first one, unlike PrestaShop's genuinely-one-time PS_INSTALL_AUTO.
+# So: a one-time `docker compose run` (see fixtures/README.md) creates and seeds
+# `spoor_demo` with `base`,`website_sale`,demo data via `--stop-after-init`; the
+# service's own command is a plain, fast start against whatever already exists.
 
 services:
   juice-shop:
@@ -151,6 +169,61 @@ services:
       timeout: 5s
       retries: 20
 
+  odoo:
+    # Odoo, the fifth live archetype (see the header comment above). Official
+    # Community-edition image, version-pinned like the rest of the bench.
+    image: odoo:17.0
+    depends_on:
+      odoo-db:
+        condition: service_healthy
+    ports:
+      # Host port defaults to Odoo's own conventional port, 8069 (distinct from
+      # every other archetype's port, so no collision with the defaults above) and
+      # is overridable: `ODOO_PORT=8070 docker compose ... up -d`. The container
+      # always serves on 8069.
+      - "${ODOO_PORT:-8069}:8069"
+    environment:
+      # The image's own connection vars (HOST/USER/PASSWORD, not PrestaShop's
+      # DB_SERVER/DB_USER/DB_PASSWD naming) — Odoo only supports PostgreSQL.
+      HOST: odoo-db
+      USER: odoo
+      PASSWORD: odoo
+    # Plain start against `spoor_demo` — no `-i` here (see the header comment
+    # above for why: `-i` redoes real work on every start, not just the first).
+    # Before the first `up`, run the one-time init command in
+    # fixtures/README.md to create and seed the database. Skip it and this
+    # still starts (Odoo auto-bootstraps a minimal, demo-data-free `base`-only
+    # database the first time nothing named `spoor_demo` exists) — a working
+    # instance, but a *wrong* one for this bench: `/web/login` answers 200,
+    # `/shop` 404s (`website_sale` was never installed), empirically confirmed.
+    command: odoo -d spoor_demo
+    volumes:
+      - odoo-web-data:/var/lib/odoo
+    # Same §5.1 sandbox label as the others: a dedicated test target §2e
+    # exploration mode may exercise freely.
+    labels:
+      spoor.sandbox: "true"
+
+  odoo-db:
+    # Odoo's datastore. Not itself a scrape target (no sandbox label) — it is
+    # infrastructure for the odoo service and is not exposed on a host port.
+    image: postgres:15
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: odoo
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+    healthcheck:
+      # Odoo's init command must wait for Postgres to actually accept connections,
+      # not merely for the container to start, or the first-boot init races and fails.
+      test: ["CMD-SHELL", "pg_isready -U odoo"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
 volumes:
   ps-data:
   ps-db-data:
+  odoo-web-data:
+  odoo-db-data:
