@@ -24,16 +24,17 @@ are on the horizon as an **optional** tier, never the default run loop.
 
 ## 2. Findings that shape the plan
 
-- **The biggest gap is basic crawling, not advanced features.** Spoor extracts
-  from a target URL and follows *pagination* (next-link, infinite scroll), but has
-  no request queue/frontier, no cross-site link following, no sitemap ingestion,
-  no scope rules, and no concurrency. That is exactly what Scrapy and Crawlee are
-  built on.
-- **ROADMAP / code mismatch to resolve.** ROADMAP §2d says "Crawlee's autoscaling
-  pool already handles per-domain concurrency and backoff," but `crawlee` is not a
-  dependency in `pyproject.toml`, and `spoor/core/config.py` says concurrency caps
-  are "deferred until a request pool exists." Either adopt Crawlee (decision D1)
-  or correct §2d.
+- ~~**The biggest gap is basic crawling, not advanced features.**~~ **Resolved —
+  closed.** This was true when this plan was written; it no longer is. A request
+  queue/frontier with scope rules (#169), sitemap/robots.txt ingestion (#170),
+  bounded per-domain concurrency (#174), resumable persisted crawl state (#175),
+  bring-your-own-proxy (#149), SQLite/Parquet sinks (#108), and request/response +
+  exploration hooks (#150, #187) have all shipped, in-house. See the §3 D1 row and
+  the updated §4 Crawlee/Scrapy table below.
+- ~~**ROADMAP / code mismatch to resolve.**~~ **Resolved.** D1 (#146) decided
+  against Crawlee; `spoor/core/config.py`'s concurrency comment and ROADMAP.md
+  were brought in line with the shipped in-house implementation (#174). No
+  `crawlee` dependency exists in `pyproject.toml`.
 - **"Glue several tools side by side" doesn't work.** Spoor's guarantees —
   destructive actions sandbox-only, redaction on by default, deterministic runs,
   read-only serving — hold only if **one layer owns every action that reaches the
@@ -46,7 +47,7 @@ are on the horizon as an **optional** tier, never the default run loop.
 
 | ID | Decision | Options | Owner | Decision / date |
 |---|---|---|---|---|
-| D1 | Adopt Crawlee (Python) as the crawl engine? | Depend on Crawlee · build a minimal frontier · correct §2d and stay single-URL | maintainer | _open_ |
+| D1 | Adopt Crawlee (Python) as the crawl engine? | Depend on Crawlee · build a minimal frontier · correct §2d and stay single-URL | maintainer | **decided 2026-10-01 — build in-house (#146, closed).** Rationale: Crawlee's `AutoscaledPool` needs an asyncio seam in a codebase that's synchronous throughout (`httpx.Client`, Playwright's *sync* API) — that cost, not a capability gap, is what tipped it. Every item the §4 table below named as gated on this decision has since shipped in-house with zero new dependencies (see that table). |
 | D2 | Record "LLM once, replay forever" as the model for the optional LLM tier? | Yes · no · decide later | maintainer | _open_ |
 | D3 | _add your own_ | | | |
 
@@ -54,15 +55,17 @@ are on the horizon as an **optional** tier, never the default run loop.
 
 ### Crawlee / Scrapy — scraper table stakes
 
+**All seven rows below are shipped, in-house, with no `crawlee` (or other crawl-engine) dependency — see the D1 row in §3.** This table's rows were written when D1 was still open and this whole section was the plan's "biggest gap"; kept here, corrected, as the record of what closed it.
+
 | Feature | Approach | Why | Phase | Notes |
 |---|---|---|---|---|
-| Request queue + link following with scope rules (include/exclude patterns, depth, same-origin) | Depend (Crawlee) | The core gap; rebuilding it would take years to catch up | 1 | |
-| Autoscaling concurrency, per-domain limits, backoff | Depend (comes with the queue) | Spoor's politeness/retry code becomes configuration on top | 1 | |
-| Sitemap and robots.txt as sources of URLs to crawl | Depend or Adapt | Cheap; users expect it | 1 | |
-| Resumable, persisted crawl state | Depend | Fits the existing resume story | 1 | |
-| Proxy support (bring your own) | Adapt | Already designed in §2d; Spoor never provides proxies | 1 | |
-| Output sinks: SQLite, Parquet | Build (small) | Already planned (#108) | 1 | |
-| Request/response hooks (middleware) | Adapt | Lets users extend without forking; keeps site-specific logic out of core (§0) | 2 | |
+| Request queue + link following with scope rules (include/exclude patterns, depth, same-origin) | **Built in-house, closes #169** | A `deque`-based frontier + `crawl:` config block; no engine dependency needed | 1 | See the "link following with scope rules" decision note in ROADMAP.md §2d |
+| Autoscaling concurrency, per-domain limits, backoff | **Built in-house, closes #174** | `concurrent.futures.ThreadPoolExecutor` + a per-domain semaphore — no asyncio seam, which is exactly the cost that tipped D1 against Crawlee | 1 | See the "bounded concurrent fetching, in-house" decision note in ROADMAP.md §2d |
+| Sitemap and robots.txt as sources of URLs to crawl | **Built in-house, closes #170** | Cheap; users expect it — no engine dependency needed for this either | 1 | See the "sitemap.xml and robots.txt as crawl seed sources" decision note in ROADMAP.md §2d |
+| Resumable, persisted crawl state | **Built in-house, closes #175** | Fits the existing resume story | 1 | See the "resumable, persisted crawl state" decision note in ROADMAP.md §2d |
+| Proxy support (bring your own) | **Built in-house, closes #149** | Already designed in §2d; Spoor never provides proxies | 1 | See the "bring-your-own-proxy" decision note in ROADMAP.md §2d |
+| Output sinks: SQLite, Parquet | **Built, closes #108** | Small, Spoor-native sinks | 1 | |
+| Request/response hooks (middleware) | **Built in-house, closes #150 (+ exploration hooks #187)** | Lets users extend without forking; keeps site-specific logic out of core (§0) | 2 | See the "request/response hooks" and "exploration hooks" decision notes in ROADMAP.md |
 
 ### Scrapling — self-healing
 
@@ -75,10 +78,10 @@ are on the horizon as an **optional** tier, never the default run loop.
 
 | Feature | Approach | Why | Phase | Notes |
 |---|---|---|---|---|
-| Configurable state equivalence (which DOM differences count as "same state") | Adapt | Addresses #104 (DOM-identical screens collapse) and the §2e settling races | 2 | |
+| Configurable state equivalence (which DOM differences count as "same state") | **Adapted, closes #104** | Addresses DOM-identical screens collapsing, and the §2e settling races; see the "visual state identity" decision note in ROADMAP.md | 2 | |
 | Clickable-element rules incl. exclusions | **Adapted, closes #152** | User-set rules, not heuristics — fits the §1 "not an agent" principle; `--include-element`/`--exclude-element`, see the §2e decision note in ROADMAP.md | 2 | |
-| Form input specifications | Adapt, feeding #103 | Deterministic form filling before any LLM | 2 | |
-| Plugin hooks (on new state, on transition) | Adapt | Same extension point as the middleware row | 2 | |
+| Form input specifications | **Adapted, closes #103** | Deterministic form filling before any LLM | 2 | |
+| Plugin hooks (on new state, on transition) | **Adapted, closes #187** | Same extension point as the middleware row (#150) | 2 | |
 | Invariants (assertions checked during a crawl) | Skip | A verdict — belongs in generated tests (§2g), per the observe-vs-judge boundary in the §2f freshness note | — | |
 
 ### browser-use / Skyvern / Stagehand — the LLM horizon
@@ -94,7 +97,7 @@ are on the horizon as an **optional** tier, never the default run loop.
 
 | Feature | Approach | Why | Phase | Notes |
 |---|---|---|---|---|
-| Page → clean markdown output | Build (small; a sink) | Cheap parity with a highly visible feature | 1 or 2 | |
+| Page → clean markdown output | **Built — shipped** (`spoor run -f md`) | Cheap parity with a highly visible feature | 1 or 2 | |
 | LLM generates the extraction config once, then runs deterministically (cf. Crawl4AI's schema generation) | Adapt | Same "LLM once" pattern; eases the hardest onboarding step (writing configs) | 3 | depends on D2 |
 
 ### OWASP ZAP / Katana — discovery
@@ -102,7 +105,7 @@ are on the horizon as an **optional** tier, never the default run loop.
 | Feature | Approach | Why | Phase | Notes |
 |---|---|---|---|---|
 | Extract endpoints/routes from JS bundles without executing them | **Adapted, closes #153** — `spoor/api_discovery/bundle_endpoints.py` | Finds API calls no click triggered; generic; see the §2b layer-6 decision note in ROADMAP.md | 2 | |
-| Scope configuration | Covered by the Crawlee row | | 1 | |
+| Scope configuration | Covered by the scope-rules row above (#169, shipped) | | 1 | |
 
 ### Healenium / Testim — healing reports
 
@@ -121,13 +124,18 @@ Stated plainly in the README as choices, not gaps:
 
 ## 6. Phases
 
-- [ ] **Phase 1 — scraper table stakes.** Decide D1; request queue + link
-      following + scope rules; sitemaps; concurrency; proxy hook; SQLite/Parquet
-      sinks; (optionally) markdown output. Until this lands, "scraper" is not a
-      fair claim.
-- [ ] **Phase 2 — robustness.** Configurable state equivalence; Scrapling
-      benchmark on the tier-3 corpus; healing reports; JS-bundle endpoint
-      extraction; request and exploration hooks; form input specifications.
+- [x] **Phase 1 — scraper table stakes. Done.** D1 decided (build in-house,
+      #146); request queue + link following + scope rules (#169); sitemaps
+      (#170); concurrency (#174); resumable crawl state (#175); proxy hook
+      (#149); SQLite/Parquet sinks (#108); markdown output (`-f md`, shipped
+      alongside the other sinks). "Scraper" is now a fair claim.
+- [x] **Phase 2 — robustness. Done.** Configurable state equivalence (#104);
+      Scrapling benchmark on the tier-3 corpus (#151, not adapted — tier 3
+      measured better); healing reports (#154); JS-bundle endpoint extraction
+      (#153); request and exploration hooks (#150, #187); form input
+      specifications (#103); generated-test reverse assertion (#128, a scoped
+      first piece — the fuller "freshness by re-observation" mechanism remains
+      open as #211, low priority, tracked separately).
 - [ ] **Phase 3 — optional LLM tier ("LLM once, replay forever").** Decide D2;
       config generation; sandbox form filling; action caching for replay.
 
@@ -136,8 +144,10 @@ decision note, then the `.feature` file first (CLAUDE.md, BDD first).
 
 ## 7. Why continue
 
-The gap is concentrated in crawling basics — the part a library supplies most
-cheaply. The differentiators are broader than signals, wikis and MCP:
+Phases 1 and 2 are done — the crawling-basics gap this plan opened with is
+closed, in-house, with no new dependency tree. What's left is Phase 3 (the
+optional LLM tier, gated on deciding D2) and whatever this plan doesn't yet
+name. The differentiators were always broader than signals, wikis and MCP:
 
 1. Self-healing measured against an honest, merge-blocking bar (≥95%, §5.3)
 2. Safety guarantees built into the design (sandbox-only destructive actions,
@@ -146,9 +156,10 @@ cheaply. The differentiators are broader than signals, wikis and MCP:
 4. The map as the product — generated tests, drift detection (§2f freshness
    note), and agent serving all built on it
 
-None of the tools above has more than two of these. 90% parity is realistic
-because most of that 90% is crawling basics; the effort spreads too thin only if
-Spoor *builds* the basics as well as the differentiators.
+None of the tools above has more than two of these. Most of the §1 90%-parity
+goal *was* crawling basics, and that's now built — the remaining gap to that
+goal is narrower than this plan's original framing, concentrated in whatever
+Phase 3 and §8's open notes turn out to name.
 
 ## 8. Open notes
 
