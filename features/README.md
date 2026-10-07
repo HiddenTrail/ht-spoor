@@ -13,7 +13,7 @@ diffing (§5.4).
 Each capability maps to a `spoor/` subpackage and a ROADMAP phase (§4). Files
 are authored when their phase begins, not up front.
 
-64 feature files, grouped below by what they cover rather than listed as one
+67 feature files, grouped below by what they cover rather than listed as one
 flat table — the grouping is purely navigational (every row's text is
 unchanged from before); the prose section further down keeps its own
 chronological, slice-by-slice narrative order.
@@ -77,6 +77,12 @@ chronological, slice-by-slice narrative order.
 |---|---|---|---|---|
 | `serving.feature` | Read-only serving of a captured map over a REST API (records + observed API surface + exploration graph, with freshness) | §2f | `spoor/serving` | 4 / 5 |
 | `serving_mcp.feature` | Read-only serving of the same map over an MCP server (agent-facing tools; records, API surface, and exploration graph) | §2f | `spoor/serving` | 4 / 5 |
+
+### Local GUI
+
+| Feature file | Capability | ROADMAP | Package | Phase |
+|---|---|---|---|---|
+| `gui.feature` | Local GUI, slice gui-1: `spoor gui` opens a loopback-only web app (per-launch access token, Host checks) that lists mapped domains and shows a URL's map (records, freshness, exploration graph with safety-gate skips) through the same redacted view the serving layer uses. A separate control plane from the read-only serving layer, which it leaves unchanged | §2i | `spoor/gui`, CLI | post-v1 |
 
 ### Exploration — safety, state identity & the core loop
 
