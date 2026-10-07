@@ -35,6 +35,7 @@ from starlette.responses import Response
 
 from spoor.gui.job_routes import add_job_routes
 from spoor.gui.jobs import JobManager, SubprocessRunner, open_folder
+from spoor.gui.manage_routes import add_manage_routes
 from spoor.gui.templates import environment
 from spoor.serving.store import MapStore
 from spoor.serving.views import map_view
@@ -234,6 +235,7 @@ def create_app(
         )
 
     add_job_routes(app, jobs=jobs, store=store, render=render, opener=opener)
+    add_manage_routes(app, jobs=jobs, render=render)
     app.state.jobs = jobs
     return app
 

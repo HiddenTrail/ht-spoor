@@ -27,6 +27,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 from collections import deque
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
@@ -188,6 +189,8 @@ class JobManager:
         self.workdir = workdir
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
+        #: How long `run_and_wait` lets a short command run before stopping it.
+        self.quick_command_seconds = 30.0
         # Created on the first job, removed on shutdown.
         self._stop_dir: Path | None = None
 
@@ -209,6 +212,24 @@ class JobManager:
             return job
         threading.Thread(target=self._pump, args=(job,), daemon=True).start()
         return job
+
+    def run_and_wait(self, spec: CommandSpec) -> tuple[Job, bool]:
+        """Run a short command (e.g. `spoor session add`) and wait for it.
+
+        Waits at most `quick_command_seconds`; a command still running then is
+        force-stopped. Returns the job and whether it finished in time.
+        """
+        job = self.start(spec)
+        deadline = time.monotonic() + self.quick_command_seconds
+        while job.running and time.monotonic() < deadline:
+            time.sleep(0.02)
+        if not job.running:
+            return job, True
+        self.kill(job)
+        grace = time.monotonic() + 5.0
+        while job.running and time.monotonic() < grace:
+            time.sleep(0.02)
+        return job, False
 
     def get(self, job_id: str) -> Job | None:
         return self._jobs.get(job_id)

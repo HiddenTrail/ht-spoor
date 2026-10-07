@@ -174,3 +174,77 @@ def test_describe_changes_lists_only_what_changed_in_plain_words() -> None:
         "nothing observed"
     ]
     assert describe_changes(None) == []
+
+
+def _config_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    from spoor.gui.jobs import JobManager
+
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path / ".spoor-cache")
+    jobs = JobManager(runner=None, workdir=tmp_path)  # type: ignore[arg-type]
+    app = create_app(MapStore(), token="t", port=9000, jobs=jobs)
+    client = TestClient(app, base_url="http://127.0.0.1:9000")
+    client.cookies.set(token_cookie(9000), "t")
+    return client
+
+
+@pytest.mark.parametrize(
+    ("content", "reason"),
+    [
+        (b"target: x\n" + b"#" * 1_000_001, "too large"),
+        (b"target: caf\xe9\n", "UTF-8"),
+    ],
+    ids=["too-large", "not-utf8"],
+)
+def test_a_config_that_cant_be_edited_safely_gets_no_editor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, content: bytes, reason: str
+) -> None:
+    # An empty editor with a Save button would let one click wipe or corrupt the
+    # file, so no editor (and no Save) is offered at all.
+    (tmp_path / "big.yaml").write_bytes(content)
+    response = _config_client(tmp_path, monkeypatch).get(
+        "/configs/edit", params={"path": "big.yaml"}
+    )
+    assert response.status_code == 400
+    assert reason in response.text
+    assert "/configs/save" not in response.text
+    assert (tmp_path / "big.yaml").read_bytes() == content
+
+
+def test_saving_onto_a_folder_is_refused_not_a_crash(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "odd.yaml").mkdir()
+    response = _config_client(tmp_path, monkeypatch).post(
+        "/configs/save",
+        data={"path": "odd.yaml", "text": "target: x\n"},
+        headers={"origin": "http://127.0.0.1:9000"},
+    )
+    assert response.status_code == 404
+
+
+def test_a_symlink_out_of_the_working_folder_is_not_listed(tmp_path: Path) -> None:
+    from spoor.gui import configs
+
+    work = tmp_path / "work"
+    work.mkdir()
+    outside = tmp_path / "outside.yaml"
+    outside.write_text("target: x\n", encoding="utf-8")
+    (work / "inside.yaml").write_text("target: x\n", encoding="utf-8")
+    try:
+        (work / "link.yaml").symlink_to(outside)
+    except OSError:
+        pytest.skip("creating symlinks isn't permitted here")
+    assert [c.path for c in configs.find(work)] == ["inside.yaml"]
+
+
+def test_config_check_reports_where_each_problem_is() -> None:
+    from spoor.gui import configs
+
+    valid = "target: https://x.example/\nfields:\n  title: { selector: h2 }\n"
+    assert configs.check(valid) == []
+    assert configs.check("target: https://x.example/\n") == ["fields: Field required"]
+    # A new config starts from the starter, which must itself be valid.
+    assert configs.check(configs.STARTER) == []
+    yaml_problem = configs.check("target: [unclosed\n")
+    assert len(yaml_problem) == 1 and "line 2" in yaml_problem[0]
+    assert configs.check("")[0].startswith("the whole file:")

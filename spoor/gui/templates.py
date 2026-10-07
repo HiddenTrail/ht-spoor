@@ -82,6 +82,10 @@ _GUI_CSS = """
         outline: none;
       }
       textarea { font-family: var(--mono); min-height: 4.5rem; }
+      textarea.editor { line-height: 1.5; margin: 0 0 0.5rem; min-height: 26rem; }
+      input[type=file] { color: var(--text-muted); }
+      .notice ul { margin: 0.4rem 0 0; }
+      .notice pre { margin: 0; }
       .grid {
         display: grid;
         gap: 0 1rem;
@@ -142,6 +146,8 @@ _LAYOUT = """<!DOCTYPE html>
       <a href="/new/run">Extract</a>
       <a href="/new/apply-scaffold">Apply scaffold</a>
       <a href="/jobs">Jobs</a>
+      <a href="/logins">Logins</a>
+      <a href="/configs">Configs</a>
     </nav>
     <main>{% block body %}{% endblock %}</main>
   </body>
@@ -346,6 +352,14 @@ _MACROS = """{% macro text(name, label, v, hint=None, placeholder="", list=None)
 </div>
 {% endmacro %}
 
+{% macro saved_logins(logins) %}
+<datalist id="saved-logins">
+{% for login in logins %}
+  <option value="{{ login.label }}">{{ login.domain }}</option>
+{% endfor %}
+</datalist>
+{% endmacro %}
+
 {% macro sandbox(v, what) %}
 {{ check("sandbox", "This is a sandbox I own (allow destructive actions)", v,
   "Only for a local or test system you own. Spoor then also " ~ what ~
@@ -416,8 +430,10 @@ click on each screen, tries it, and records where it leads.</p>
 <fieldset>
   <legend>Login and resuming</legend>
   {{ m.text("session", "Saved login (optional)", v,
-    "The name of a login saved with Spoor's sessions, or the path of a "
-    ~ "storage-state file you captured. Spoor never logs in on its own.") }}
+    "The name of a login saved on the Logins page, or the path of a "
+    ~ "storage-state file you captured. Spoor never logs in on its own.",
+    list="saved-logins") }}
+  {{ m.saved_logins(saved_logins) }}
   {{ m.text("resume_from", "Continue from screen (optional)", v,
     "Continue an earlier exploration of this address instead of starting over: "
     ~ "id: followed by the start of a screen id, as shown on its map.") }}
@@ -465,7 +481,9 @@ it finds.</p>
 <form id="job-form" method="post" action="/new/run">
 <fieldset>
   <legend>Config</legend>
-  {{ m.text("config", "Config file", v, placeholder="configs/shop.yaml") }}
+  {{ m.text("config", "Config file", v, placeholder="configs/shop.yaml",
+    hint="Relative to the folder Spoor's GUI was started in. Edit configs on the "
+    ~ "Configs page.") }}
 </fieldset>
 <fieldset>
   <legend>Output</legend>
@@ -507,7 +525,8 @@ explored page. It only types: it never presses Enter or clicks submit.</p>
   {{ m.sandbox(v, "types into fields") }}
   <p class="hint">Without a sandbox, nothing is typed.</p>
   {{ m.text("session", "Saved login (optional)", v,
-    "Only needed if the fields are behind a login.") }}
+    "Only needed if the fields are behind a login.", list="saved-logins") }}
+  {{ m.saved_logins(saved_logins) }}
 </fieldset>
 <fieldset>
   <legend>What to update</legend>
@@ -638,6 +657,141 @@ _JOBS = """{% extends "layout.html" %}
 {% endblock %}
 """
 
+_LOGINS = """{% extends "layout.html" %}
+{% block title %}Logins · Spoor{% endblock %}
+{% block body %}
+<h1>Saved logins</h1>
+<p class="muted">Saved logins let Spoor explore or extract a site as a logged-in
+user. Spoor never logs in on its own: you log in once yourself and save the
+browser's login state as a file, then add it here under a name.</p>
+{% if messages %}
+<div class="notice{% if not ok %} notice-error{% else %} notice-info{% endif %}">
+  {% for m in messages %}<pre>{{ m }}</pre>{% endfor %}
+</div>
+{% endif %}
+
+{% if logins %}
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr><th>Site</th><th>Name</th><th>Saved</th><th>Last used</th><th></th></tr>
+    </thead>
+    <tbody>
+    {% for login in logins %}
+      <tr>
+        <td>{{ login.domain }}</td>
+        <td><strong>{{ login.label }}</strong></td>
+        <td>{{ login.created_at[:16]|replace("T", " ") }}</td>
+        <td>{{ (login.last_used_at or "never")[:16]|replace("T", " ") }}</td>
+        <td>
+          <form class="inline" method="post" action="/logins/remove"
+            onsubmit="return confirm('Remove this saved login?')">
+            <input type="hidden" name="site" value="{{ login.domain }}" />
+            <input type="hidden" name="label" value="{{ login.label }}" />
+            <button type="submit" class="secondary">Remove</button>
+          </form>
+        </td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card"><p>No saved logins yet.</p></div>
+{% endif %}
+
+<h2>Add a login</h2>
+<form method="post" action="/logins/add" enctype="multipart/form-data">
+<fieldset>
+  <label for="label">Name</label>
+  <input type="text" id="label" name="label" value="{{ v.get('label', '') }}"
+    placeholder="customer" />
+  <p class="hint">What you'll pick in the forms, e.g. "customer" or "admin". Saving
+  under a name that already exists for the site replaces it.</p>
+  <label for="site">Site</label>
+  <input type="text" id="site" name="site" value="{{ v.get('site', '') }}"
+    placeholder="shop.example or https://shop.example/" />
+  <label for="file">Login file</label>
+  <input type="file" id="file" name="file" accept=".json,application/json" />
+  <p class="hint">A browser storage-state file (JSON), for example saved with
+  Playwright's <code>context.storage_state()</code> after you logged in. Spoor
+  checks it, stores it on this computer only, and never shows its contents.</p>
+</fieldset>
+<button type="submit">Add login</button>
+</form>
+{% endblock %}
+"""
+
+_CONFIGS = """{% extends "layout.html" %}
+{% block title %}Configs · Spoor{% endblock %}
+{% block body %}
+<h1>Configs</h1>
+<p class="muted">Extraction configs (<code>.yaml</code> / <code>.yml</code>) in
+<code>{{ workdir }}</code>, the folder Spoor's GUI was started in.</p>
+{% if error %}<div class="notice notice-error">{{ error }}</div>{% endif %}
+{% if configs %}
+<div class="table-wrap">
+  <table>
+    <thead><tr><th>Config</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for c in configs %}
+      <tr>
+        <td><a href="/configs/edit?path={{ c.path|urlencode }}">{{ c.path }}</a></td>
+        <td>{% if c.problems %}<em>not valid</em>{% else %}valid{% endif %}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<div class="card"><p>No configs in this folder yet.</p></div>
+{% endif %}
+
+<h2>New config</h2>
+<form method="post" action="/configs/new">
+<fieldset>
+  <label for="path">File name</label>
+  <input type="text" id="path" name="path" value="{{ new_path }}"
+    placeholder="configs/my-site.yaml" />
+  <p class="hint">Starts from an example you then edit.</p>
+</fieldset>
+<button type="submit">Create</button>
+</form>
+{% endblock %}
+"""
+
+_CONFIG_EDIT = """{% extends "layout.html" %}
+{% block title %}{{ path }} · Spoor{% endblock %}
+{% block body %}
+<div class="crumbs"><a href="/configs">Configs</a> /</div>
+<h1>{{ path }}</h1>
+{% if problems is not none %}
+  {% if problems %}
+  <div class="notice notice-error">
+    <strong>{% if saved %}Saved, but the config is not valid yet:{% else %}The config
+    is not valid:{% endif %}</strong>
+    <ul>{% for p in problems %}<li><code>{{ p }}</code></li>{% endfor %}</ul>
+  </div>
+  {% else %}
+  <div class="notice notice-info">
+    {% if saved %}Saved. The config is valid.{% else %}The config is valid (not saved
+    yet).{% endif %}
+    <a href="{{ run_href }}">Run this config</a>
+  </div>
+  {% endif %}
+{% endif %}
+<form method="post" action="/configs/save">
+  <input type="hidden" name="path" value="{{ path }}" />
+  <textarea name="text" class="editor" spellcheck="false"
+    aria-label="Config text">{{ text }}</textarea>
+  <p class="hint">Shown exactly as saved on disk: Spoor doesn't hide secrets here,
+  because hiding them would also remove them from the file when you save.</p>
+  <button type="submit" formaction="/configs/check" class="secondary">Check</button>
+  <button type="submit">Save</button>
+</form>
+{% endblock %}
+"""
+
 _TEMPLATES = {
     "layout.html": _LAYOUT,
     "home.html": _HOME,
@@ -650,6 +804,9 @@ _TEMPLATES = {
     "form_apply_scaffold.html": _FORM_APPLY_SCAFFOLD,
     "job.html": _JOB,
     "jobs.html": _JOBS,
+    "logins.html": _LOGINS,
+    "configs.html": _CONFIGS,
+    "config_edit.html": _CONFIG_EDIT,
 }
 
 

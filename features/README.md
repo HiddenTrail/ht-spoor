@@ -13,7 +13,7 @@ diffing (§5.4).
 Each capability maps to a `spoor/` subpackage and a ROADMAP phase (§4). Files
 are authored when their phase begins, not up front.
 
-68 feature files, grouped below by what they cover rather than listed as one
+69 feature files, grouped below by what they cover rather than listed as one
 flat table — the grouping is purely navigational (every row's text is
 unchanged from before); the prose section further down keeps its own
 chronological, slice-by-slice narrative order.
@@ -84,6 +84,7 @@ chronological, slice-by-slice narrative order.
 |---|---|---|---|---|
 | `gui.feature` | Local GUI, slice gui-1: `spoor gui` opens a loopback-only web app (per-launch access token, Host and Origin checks) that lists mapped domains, each domain's mapped URLs, and a URL's map (records, freshness, exploration graph with safety-gate skips) through the same redacted view the serving layer uses. A separate control plane from the read-only serving layer, which it leaves unchanged | §2i | `spoor/gui`, CLI | post-v1 |
 | `gui_jobs.feature` | Local GUI, slice gui-2: forms for `explore`, `run` and `apply-scaffold` that build and run the real command (with a live preview of it), a job page with a redacted live log, Stop (graceful for explore, via a stop file) and Force stop (kills the whole process tree), and where each output landed: absolute paths, open folder, the wiki served from the job's own folder only, and a link to the map. A form posted from another site launches nothing, and an address that starts with "-" is refused rather than passed as an option | §2i | `spoor/gui`, CLI | post-v1 |
+| `gui_sessions_configs.feature` | Local GUI, slice gui-3: saved logins listed from the session store (names and dates only, never contents), added by upload through the real `spoor session add`, with names and sites passed after a `--` so one starting with "-" is never read as an option (the upload lives in a private temporary folder only while the command runs, and a hanging command is stopped) and removed through `spoor session remove`; login names suggested in the run forms. Config files: listed with whether each validates, created from the example, checked with the same loader `spoor run` uses (each problem with its field path or YAML line), saved (even when not valid yet, and said so), and run; only `.yaml`/`.yml` files inside the working folder, never in hidden, cache or output folders | §2i | `spoor/gui`, CLI | post-v1 |
 
 ### Exploration — safety, state identity & the core loop
 

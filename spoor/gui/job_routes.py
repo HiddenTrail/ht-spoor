@@ -31,6 +31,7 @@ from starlette.responses import Response
 
 from spoor.gui.commands import BUILDERS, RUN_FORMATS, FormError
 from spoor.gui.jobs import Job, JobManager
+from spoor.security.session_store import SessionStore
 from spoor.serving.store import MapStore
 
 Render = Callable[..., HTMLResponse]
@@ -106,6 +107,8 @@ def add_job_routes(
             error=error,
             formats=RUN_FORMATS,
             mapped_urls=[u for d in store.domains() for u, _ in store.urls(d)],
+            # Names only: SessionStore.list() can't return a login's contents.
+            saved_logins=SessionStore().list(),
         )
 
     def known_kind(kind: str) -> None:
@@ -126,8 +129,11 @@ def add_job_routes(
     def new_job_form(kind: str, request: Request) -> HTMLResponse:
         known_kind(kind)
         values = _defaults(kind, jobs.workdir)
-        # Pre-fill from the query (e.g. a map page's "Explore again" link).
-        values.update({k: v for k, v in request.query_params.items() if k == "url"})
+        # Pre-fill from the query: a map page's "Explore this page again" link
+        # (url), or a config editor's "Run this config" link (config).
+        values.update(
+            {k: v for k, v in request.query_params.items() if k in ("url", "config")}
+        )
         return form_page(kind, values, None)
 
     @app.post("/new/{kind}")
