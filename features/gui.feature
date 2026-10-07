@@ -54,6 +54,10 @@ Feature: A local GUI browses captured maps safely
     When I request the home page with the access token and Host header "evil.example"
     Then the response status is 403
 
+  Scenario: A form submission from another site is rejected
+    When I POST to the home page with the access token and Origin "https://evil.example"
+    Then the response status is 403
+
   Scenario: The GUI adds nothing to the read-only serving layer
     Then the read-only serving app's routes are unchanged by the GUI
 
@@ -68,6 +72,10 @@ Feature: A local GUI browses captured maps safely
     When I request the home page with the access token
     Then the response status is 200
     And the page says nothing has been mapped yet
+
+  Scenario: A domain page lists that domain's mapped URLs
+    When I open the domain page for "shop.example" with the access token
+    Then the page links to the map for "https://shop.example/products"
 
   Scenario: A map page shows when the URL was captured and how old that is
     When I open the map page for "https://shop.example/products" with the access token
@@ -101,4 +109,5 @@ Feature: A local GUI browses captured maps safely
     Given the GUI is running on loopback
     When a real browser opens the launch URL
     And clicks the domain "shop.example"
+    And clicks the mapped URL "https://shop.example/products"
     Then the browser shows the map for "https://shop.example/products"

@@ -82,7 +82,7 @@ chronological, slice-by-slice narrative order.
 
 | Feature file | Capability | ROADMAP | Package | Phase |
 |---|---|---|---|---|
-| `gui.feature` | Local GUI, slice gui-1: `spoor gui` opens a loopback-only web app (per-launch access token, Host checks) that lists mapped domains and shows a URL's map (records, freshness, exploration graph with safety-gate skips) through the same redacted view the serving layer uses. A separate control plane from the read-only serving layer, which it leaves unchanged | §2i | `spoor/gui`, CLI | post-v1 |
+| `gui.feature` | Local GUI, slice gui-1: `spoor gui` opens a loopback-only web app (per-launch access token, Host and Origin checks) that lists mapped domains, each domain's mapped URLs, and a URL's map (records, freshness, exploration graph with safety-gate skips) through the same redacted view the serving layer uses. A separate control plane from the read-only serving layer, which it leaves unchanged | §2i | `spoor/gui`, CLI | post-v1 |
 
 ### Exploration — safety, state identity & the core loop
 
