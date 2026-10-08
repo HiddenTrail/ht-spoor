@@ -3,7 +3,9 @@
 # `spoor gui` starts a local web app and opens the operator's browser on it, so
 # Spoor can be operated without the command line. This first slice is
 # deliberately read-only: it lists mapped domains and shows a URL's map. It
-# can't start a run or touch a target. Running jobs (gui-2), sessions and
+# can't start a run or touch a target. It also holds the introduction page the
+# GUI opens on (clicking "Spoor" returns to it): what Spoor is, what it does,
+# who it's for, how it stays safe, where to start, and a link to the repository. Running jobs (gui-2), sessions and
 # configs (gui-3), and server controls (gui-4) arrive in their own .feature
 # files.
 #
@@ -61,11 +63,20 @@ Feature: A local GUI browses captured maps safely
   Scenario: The GUI adds nothing to the read-only serving layer
     Then the read-only serving app's routes are unchanged by the GUI
 
-  # --- Browsing maps --------------------------------------------------------
+  # --- The introduction page ----------------------------------------------
 
-  Scenario: The home page lists every mapped domain
+  Scenario: Clicking Spoor opens an introduction to the product
     When I request the home page with the access token
-    Then the page lists the domain "shop.example"
+    Then the page introduces Spoor with what it is for
+    And the page describes what Spoor does and who it is for
+    And the page says how Spoor stays safe by default
+    And the page links to the Spoor repository
+    And the top bar's Spoor logo links to the introduction and Maps to the maps page
+
+  Scenario: The introduction says where to start and how much is mapped
+    When I request the home page with the access token
+    Then the page links to exploring a site, extracting, the maps and the servers
+    And the page says 1 site is mapped so far
 
   Scenario: Pages carry the Spoor logo in the top bar and as the browser-tab icon
     When I request the home page with the access token
@@ -76,9 +87,15 @@ Feature: A local GUI browses captured maps safely
     Then the page has the day/night switch and follows the system setting
     And the page carries the night logo and the day logo, one shown per mode
 
+  # --- Browsing maps --------------------------------------------------------
+
+  Scenario: The maps page lists every mapped domain
+    When I open the maps page with the access token
+    Then the page lists the domain "shop.example"
+
   Scenario: An empty store shows a getting-started message, not an error
     Given an empty map store
-    When I request the home page with the access token
+    When I open the maps page with the access token
     Then the response status is 200
     And the page says nothing has been mapped yet
 
@@ -127,6 +144,7 @@ Feature: A local GUI browses captured maps safely
   Scenario: Launching the GUI and opening a mapped domain in a real browser
     Given the GUI is running on loopback
     When a real browser opens the launch URL
+    And opens the maps page
     And clicks the domain "shop.example"
     And clicks the mapped URL "https://shop.example/products"
     Then the browser shows the map for "https://shop.example/products"

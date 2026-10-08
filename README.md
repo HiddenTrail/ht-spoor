@@ -106,6 +106,8 @@ spoor wizard
 ```
 
 **Prefer a browser to the terminal?** `spoor gui` opens Spoor in your web browser.
+It opens on a short introduction to Spoor (what it does, who it's for, how it
+stays safe, and where to start); click "Spoor" in the top bar to return to it.
 There you can:
 
 - **Browse what Spoor has mapped:** the sites, each mapped page, its extracted

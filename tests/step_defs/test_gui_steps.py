@@ -387,3 +387,81 @@ def in_day_mode(context: dict[str, Any]) -> None:
 @then("the page is in night mode with the night logo")
 def in_night_mode(context: dict[str, Any]) -> None:
     assert _mode(context) == ("rgb(31, 28, 27)", False, True)
+
+
+@when("I open the maps page with the access token")
+def open_maps(context: dict[str, Any]) -> None:
+    context["response"] = _client(context).get("/maps")
+
+
+@when("opens the maps page")
+def browser_opens_maps(context: dict[str, Any]) -> None:
+    context["page"].get_by_role("link", name="Maps", exact=True).click()
+
+
+@then("the page introduces Spoor with what it is for")
+def intro_headline(context: dict[str, Any]) -> None:
+    assert context["response"].status_code == 200
+    text = _text(context)
+    assert "Give your agents a map of the web." in text
+    assert "map of the site" in text
+
+
+def _readable(context: dict[str, Any]) -> str:
+    """The page as a reader sees its words: entities decoded, whitespace collapsed."""
+    import html
+
+    return " ".join(html.unescape(_text(context)).split())
+
+
+@then("the page describes what Spoor does and who it is for")
+def intro_does_and_who(context: dict[str, Any]) -> None:
+    text = _readable(context)
+    for heading in (
+        "What Spoor does",
+        "Maps a site's screens and actions",
+        "Extracts data that survives redesigns",
+        "Shows the API behind the page",
+        "Hands the map to scripts and agents",
+        "Who it's for",
+        "Test automation.",
+        "Building AI agents.",
+    ):
+        assert heading in text, heading
+
+
+@then("the page says how Spoor stays safe by default")
+def intro_safety(context: dict[str, Any]) -> None:
+    text = _text(context)
+    assert "Safe by default" in text
+    assert "Stays on your computer." in text
+    assert "never uploaded anywhere" in text
+    assert "Never deletes, buys or pays on a real site." in text
+
+
+@then("the page links to the Spoor repository")
+def intro_repo(context: dict[str, Any]) -> None:
+    from spoor.gui.app import project_urls
+
+    repo = project_urls()["Repository"]
+    assert repo == "https://github.com/HiddenTrail/ht-spoor"
+    assert f'href="{repo}"' in _text(context)
+
+
+@then("the top bar's Spoor logo links to the introduction and Maps to the maps page")
+def nav_links(context: dict[str, Any]) -> None:
+    text = _text(context)
+    assert '<a class="brand" href="/">' in text
+    assert '<a href="/maps">Maps</a>' in text
+
+
+@then("the page links to exploring a site, extracting, the maps and the servers")
+def intro_start_links(context: dict[str, Any]) -> None:
+    text = _text(context)
+    for href in ("/new/explore", "/new/run", "/maps", "/servers"):
+        assert f'<a class="card" href="{href}">' in text, href
+
+
+@then(parsers.parse("the page says {count:d} site is mapped so far"))
+def intro_count(context: dict[str, Any], count: int) -> None:
+    assert f"{count} site mapped so far." in _readable(context)
