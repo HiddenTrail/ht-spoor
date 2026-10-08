@@ -309,7 +309,9 @@ changes.
 ## Exploring a site (no config)
 
 When you don't have a config and just want to know what a site *does*, point
-Spoor at a starting URL:
+Spoor at a starting URL. If you leave out `http://` or `https://`, Spoor adds it
+the way a browser would: `http://` for your own computer or local network
+(`localhost:3000`), `https://` for anything else, and says so.
 
 ```bash
 spoor explore https://example.com

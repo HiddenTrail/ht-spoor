@@ -55,3 +55,22 @@ def live_server() -> Iterator[str]:
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
+
+
+@pytest.fixture(autouse=True)
+def _isolated_cache_root(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Give every test its own local cache, never the developer's real one.
+
+    Commands that record a map (`spoor run`, `spoor explore`) write under
+    `storage.CACHE_ROOT`. Without this, a test that didn't redirect it wrote into
+    the repository's real `.spoor-cache`, filling a developer's map store (and
+    the GUI's Maps page) with test entries. Tests that set their own root still
+    do; this is only the safe default underneath.
+    """
+    from spoor.security import storage
+
+    monkeypatch.setattr(
+        storage, "CACHE_ROOT", tmp_path_factory.mktemp("spoor-cache") / ".spoor-cache"
+    )

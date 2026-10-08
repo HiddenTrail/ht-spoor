@@ -208,6 +208,22 @@ def _expand_element_patterns(
     return tuple(expanded)
 
 
+def _complete_address(url: str) -> str:
+    """`url` with http:// or https:// added if it had none, saying so when it did.
+
+    See `spoor.core.address`: without a scheme the map would be filed under an
+    empty site name and a local target wouldn't be recognised as local.
+    """
+    from spoor.core.address import complete_address
+
+    completed = complete_address(url)
+    if completed != url.strip():
+        typer.echo(
+            f"Using {completed} for {url!r}: an address needs http:// or https://."
+        )
+    return completed
+
+
 def _supervised_tick(
     tick: Callable[[], None], controller: RunController, stop_file: str | None
 ) -> Callable[[], None]:
@@ -318,7 +334,16 @@ class _CliProgress:
 
 @app.command()
 def explore(
-    url: Annotated[str, typer.Argument(help="URL to start exploring from.")],
+    url: Annotated[
+        str,
+        typer.Argument(
+            help=(
+                "URL to start exploring from. Without http:// or https:// one is "
+                "added: http:// for this computer or your local network "
+                "(localhost:3000), https:// otherwise."
+            )
+        ),
+    ],
     sandbox: Annotated[
         bool,
         typer.Option(
@@ -526,6 +551,8 @@ def explore(
     a sandbox either way.
     """
     import signal
+
+    url = _complete_address(url)
 
     from spoor.exploration.control import RunBudget, RunController
     from spoor.exploration.driver import PlaywrightDriver
@@ -950,7 +977,13 @@ def session_remove(
 @app.command(name="apply-scaffold")
 def apply_scaffold_cmd(
     url: Annotated[
-        str, typer.Argument(help="A URL already mapped by `spoor explore`.")
+        str,
+        typer.Argument(
+            help=(
+                "A URL already mapped by `spoor explore` (http:// or https:// is "
+                "added the same way if missing)."
+            )
+        ),
     ],
     scaffold: Annotated[
         Path,
@@ -1020,6 +1053,7 @@ def apply_scaffold_cmd(
     it. Pass --wiki to see it there too, clearly marked as reached by typing rather
     than a click.
     """
+    url = _complete_address(url)
     entry = MapStore().get(url)
     if entry is None or entry.exploration is None:
         raise typer.BadParameter(

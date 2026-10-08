@@ -93,6 +93,12 @@ Feature: A local GUI browses captured maps safely
     When I open the maps page with the access token
     Then the page lists the domain "shop.example"
 
+  Scenario: A map saved without a site name is still listed, not a blank link
+    Given a map store that has also mapped "localhost:3000" without a site name
+    When I open the maps page with the access token
+    Then the page lists an entry for maps saved without a site name
+    And that entry links to the map for "localhost:3000"
+
   Scenario: An empty store shows a getting-started message, not an error
     Given an empty map store
     When I open the maps page with the access token

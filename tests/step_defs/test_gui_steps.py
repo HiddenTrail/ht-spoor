@@ -465,3 +465,27 @@ def intro_start_links(context: dict[str, Any]) -> None:
 @then(parsers.parse("the page says {count:d} site is mapped so far"))
 def intro_count(context: dict[str, Any], count: int) -> None:
     assert f"{count} site mapped so far." in _readable(context)
+
+
+@given(
+    parsers.parse('a map store that has also mapped "{address}" without a site name')
+)
+def mapped_without_site(context: dict[str, Any], address: str) -> None:
+    # What an address saved without http:// or https:// produced before Spoor
+    # completed such addresses: the store can't find a host, so no site name.
+    context["store"].record(address, [])
+    assert context["store"].get(address).domain == ""
+
+
+@then("the page lists an entry for maps saved without a site name")
+def lists_no_site(context: dict[str, Any]) -> None:
+    text = _text(context)
+    assert '<a href="/domain?name=">Maps without a site name</a>' in text
+
+
+@then(parsers.parse('that entry links to the map for "{address}"'))
+def no_site_links(context: dict[str, Any], address: str) -> None:
+    page = _client(context).get("/domain", params={"name": ""})
+    assert page.status_code == 200
+    assert "<h1>Maps without a site name</h1>" in page.text
+    assert f">{address}</a>" in page.text
