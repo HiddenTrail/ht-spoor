@@ -2,7 +2,7 @@
 
 The Spoor mark is a hoof print (a spoor) on a hexagon, in three colourways. Each
 comes as an SVG (scalable, preferred) and a PNG (664 × 724/725 px). The orange is
-`#E97132`.
+`#F85840`, the same coral as the accent colour in the GUI and the exploration wiki.
 
 | File | Looks like | Use it on |
 |---|---|---|
