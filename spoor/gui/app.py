@@ -25,6 +25,7 @@ import hmac
 import json
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
+from importlib import metadata
 from pathlib import Path
 from typing import Any, cast
 from urllib.parse import urlencode
@@ -190,12 +191,23 @@ def create_app(
         return response
 
     @app.get("/", response_class=HTMLResponse)
-    def home() -> HTMLResponse:
+    def introduction() -> HTMLResponse:
+        # What Spoor is and where to start; the first page after launch.
+        return render(
+            "intro.html",
+            mapped_sites=len(store.domains()),
+            running_jobs=sum(1 for job in jobs.all() if job.running),
+            links=project_urls(),
+            version=_version(),
+        )
+
+    @app.get("/maps", response_class=HTMLResponse)
+    def maps() -> HTMLResponse:
         domains = [
             {"name": d, "href": "/domain?" + urlencode({"name": d})}
             for d in store.domains()
         ]
-        return render("home.html", domains=domains)
+        return render("maps.html", domains=domains)
 
     @app.get("/domain", response_class=HTMLResponse)
     def domain(name: str = Query(...)) -> HTMLResponse:
@@ -242,6 +254,32 @@ def create_app(
     add_server_routes(app, jobs=jobs, render=render, health=health)
     app.state.jobs = jobs
     return app
+
+
+def _version() -> str:
+    """The installed Spoor version, or \"unknown\" when running from a bare checkout."""
+    try:
+        return metadata.version("ht-spoor")
+    except metadata.PackageNotFoundError:
+        return "unknown"
+
+
+def project_urls() -> dict[str, str]:
+    """The project's links (Repository, Documentation, Issues), from its metadata.
+
+    They live in `pyproject.toml`'s `[project.urls]`, the one place they are
+    written down, rather than in code. Empty when Spoor isn't installed as a
+    package; the introduction page then simply leaves the links out.
+    """
+    try:
+        entries = metadata.metadata("ht-spoor").get_all("Project-URL") or []
+    except metadata.PackageNotFoundError:
+        return {}
+    links: dict[str, str] = {}
+    for entry in entries:
+        label, _, url = entry.partition(",")
+        links[label.strip()] = url.strip()
+    return links
 
 
 def _age_seconds(captured_at: str) -> float:

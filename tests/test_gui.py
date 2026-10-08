@@ -79,7 +79,7 @@ def test_a_gui_on_another_loopback_address_accepts_its_own_host(
     try:
         response = httpx.get(gui.launch_url, follow_redirects=True)
         assert response.status_code == 200
-        assert "Nothing has been mapped yet" in response.text
+        assert "Give your agents a map of the web." in response.text
     finally:
         gui.stop()
 
@@ -291,3 +291,25 @@ def test_the_guis_logos_are_the_brand_files_unchanged(
     assert shipped == brand
     prefix = "data:image/svg+xml;base64,"
     assert logo_data_uri(variant) == prefix + base64.b64encode(brand).decode("ascii")
+
+
+def test_without_package_metadata_the_introduction_leaves_the_links_out(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from importlib import metadata
+
+    from spoor.gui import app as gui_app
+
+    def missing(name: str) -> None:
+        raise metadata.PackageNotFoundError(name)
+
+    monkeypatch.setattr(gui_app.metadata, "metadata", missing)
+    assert gui_app.project_urls() == {}
+    monkeypatch.setattr(storage, "CACHE_ROOT", tmp_path)
+    client = TestClient(
+        create_app(MapStore(), token="t", port=9000), base_url="http://127.0.0.1:9000"
+    )
+    client.cookies.set(token_cookie(9000), "t")
+    page = client.get("/").text
+    assert "Give your agents a map of the web." in page
+    assert "Spoor on" not in page

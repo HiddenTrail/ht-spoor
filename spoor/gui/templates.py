@@ -126,6 +126,32 @@ _GUI_CSS = """
       button.secondary:hover { color: var(--yellow); }
       form.inline { display: inline; }
 
+      /* Introduction page */
+      .hero {
+        align-items: center;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1.5rem;
+        margin: 0 0 1rem;
+      }
+      .hero > div { flex: 1 1 22rem; }
+      .hero-logo { height: 7rem; width: auto; }
+      .hero h1 { font-size: 2.2rem; }
+      .lead { color: var(--text-muted); font-size: 1.05rem; }
+      .cards {
+        display: grid;
+        gap: 0.75rem;
+        grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+        margin: 0 0 1rem;
+      }
+      .cards .card { margin: 0; }
+      .cards h3 { color: var(--accent); margin-top: 0; }
+      .cards p { color: var(--text-muted); font-size: 0.92rem; }
+      .cards.actions a.card { color: var(--text); text-decoration: none; }
+      .cards.actions a.card:hover { border-color: var(--accent); }
+      .uses li { color: var(--text-muted); }
+      .uses strong { color: var(--text); }
+
       /* Jobs */
       code.cmd {
         background: var(--surface-2);
@@ -164,7 +190,7 @@ _LAYOUT = """<!DOCTYPE html>
       <a class="brand" href="/">
         <img class="logo-night" src="{{ logo }}" alt="" />
         <img class="logo-day" src="{{ logo_day }}" alt="" />Spoor</a>
-      <a href="/">Maps</a>
+      <a href="/maps">Maps</a>
       <a href="/new/explore">Explore</a>
       <a href="/new/run">Extract</a>
       <a href="/new/apply-scaffold">Apply scaffold</a>
@@ -179,7 +205,117 @@ _LAYOUT = """<!DOCTYPE html>
 </html>
 """
 
-_HOME = """{% extends "layout.html" %}
+_INTRO = """{% extends "layout.html" %}
+{% block title %}Spoor{% endblock %}
+{% block body %}
+<section class="hero">
+  <img class="hero-logo logo-night" src="{{ logo }}" alt="" />
+  <img class="hero-logo logo-day" src="{{ logo_day }}" alt="" />
+  <div>
+    <h1>Give your agents a map of the web.</h1>
+    <p class="lead">Spoor explores a website the way a careful person would: it opens
+    each screen, finds everything you can click or fill in, tries it, and writes down
+    where it leads, what changed, and which requests the page made. The result is a
+    map of the site that people can read and that tests, scripts and AI agents can
+    use, so nobody has to rediscover the same site from scratch.</p>
+  </div>
+</section>
+
+<h2>What Spoor does</h2>
+<div class="cards">
+  <div class="card">
+    <h3>Maps a site's screens and actions</h3>
+    <p>Point it at an address and it walks the site: every screen it reaches,
+    every button and link on it, and what each one does. You get a browsable wiki
+    with screenshots if you want them.</p>
+  </div>
+  <div class="card">
+    <h3>Extracts data that survives redesigns</h3>
+    <p>Describe the data you want in a small config file. Spoor uses the fastest
+    method that works, renders the page in a browser only when it has to, and when
+    a redesign breaks a selector it finds the element again by what it looked like.</p>
+  </div>
+  <div class="card">
+    <h3>Shows the API behind the page</h3>
+    <p>While it works, Spoor notes the requests the site makes, finds any published
+    API description or GraphQL endpoint, and can tie an action to the requests it
+    triggered.</p>
+  </div>
+  <div class="card">
+    <h3>Hands the map to scripts and agents</h3>
+    <p>A small read-only server answers questions about what was mapped, over a web
+    API or MCP for AI agents, so an agent can ask "what happens when I click this?"
+    instead of finding out by trial and error.</p>
+  </div>
+</div>
+
+<h2>Who it's for</h2>
+<ul class="index-list uses">
+  <li><strong>Test automation.</strong> Turn a mapped site into a runnable
+  regression test suite, and re-run it later to catch what changed.</li>
+  <li><strong>Building AI agents.</strong> Give an agent a map of a site instead
+  of letting it spend time and tokens rediscovering the site on every run.</li>
+  <li><strong>Collecting data.</strong> Keep scraping configs working when the
+  site's markup changes, with a report of what was repaired.</li>
+  <li><strong>Understanding an application.</strong> See every screen, action and
+  request of an app you're testing, reviewing or taking over.</li>
+</ul>
+
+<h2>Safe by default</h2>
+<ul class="index-list uses">
+  <li><strong>Stays on your computer.</strong> Everything Spoor captures is stored
+  on this computer and never uploaded anywhere.</li>
+  <li><strong>Never deletes, buys or pays on a real site.</strong> Actions like
+  those are only ever tried on a test system you own and mark as a sandbox.</li>
+  <li><strong>Hides secrets in what it shows and shares.</strong> Tokens, keys and
+  passwords are shown as [REDACTED] in maps, logs, wikis and server answers.</li>
+  <li><strong>Polite, and never logs in on its own.</strong> It respects
+  <code>robots.txt</code> and rate limits, and works behind a login only with a
+  login you saved yourself.</li>
+</ul>
+
+<h2>Get started</h2>
+<p class="muted">
+  {% if mapped_sites %}{{ mapped_sites }} site{{ "" if mapped_sites == 1 else "s" }}
+  mapped so far{% else %}Nothing mapped yet{% endif %}{% if running_jobs %};
+  {{ running_jobs }} job{{ "" if running_jobs == 1 else "s" }} running now{% endif %}.
+</p>
+<div class="cards actions">
+  <a class="card" href="/new/explore"><h3>Explore a site</h3>
+    <p>Map a site's screens and actions.</p></a>
+  <a class="card" href="/new/run"><h3>Extract data</h3>
+    <p>Run a config and save the records.</p></a>
+  <a class="card" href="/maps"><h3>Browse the maps</h3>
+    <p>See what Spoor has mapped.</p></a>
+  <a class="card" href="/servers"><h3>Connect agents</h3>
+    <p>Start the map server or set up MCP.</p></a>
+</div>
+
+{% if links %}
+<h2>More</h2>
+<ul class="index-list">
+  {% if links.Repository %}
+  <li><a href="{{ links.Repository }}" target="_blank" rel="noopener">Spoor on
+    GitHub</a>
+    <span class="muted">· source code, documentation and the project plan</span></li>
+  {% endif %}
+  {% if links.Documentation %}
+  <li><a href="{{ links.Documentation }}" target="_blank" rel="noopener">Read the
+    guide</a> <span class="muted">· installing, configs and every command</span></li>
+  {% endif %}
+  {% if links.Issues %}
+  <li><a href="{{ links.Issues }}" target="_blank" rel="noopener">Report an
+    issue or suggest an idea</a></li>
+  {% endif %}
+</ul>
+{% endif %}
+<p class="hint">Spoor {{ version }}, early development · MIT licence · Spoor is a
+technical capability, not a legal opinion: whether you may crawl a site is for you
+to check.</p>
+{% endblock %}
+"""
+
+_MAPS = """{% extends "layout.html" %}
 {% block body %}
 <h1>Mapped sites</h1>
 {% if domains %}
@@ -204,7 +340,7 @@ _HOME = """{% extends "layout.html" %}
 _DOMAIN = """{% extends "layout.html" %}
 {% block title %}{{ domain }} · Spoor{% endblock %}
 {% block body %}
-<div class="crumbs"><a href="/">Mapped sites</a> /</div>
+<div class="crumbs"><a href="/maps">Mapped sites</a> /</div>
 <h1>{{ domain }}</h1>
 {% if urls %}
 <div class="table-wrap">
@@ -230,7 +366,7 @@ _MAP = """{% extends "layout.html" %}
 {% block title %}{{ view.url }} · Spoor{% endblock %}
 {% block body %}
 <div class="crumbs">
-  <a href="/">Mapped sites</a> / <a href="{{ domain_href }}">{{ view.domain }}</a> /
+  <a href="/maps">Mapped sites</a> / <a href="{{ domain_href }}">{{ view.domain }}</a> /
 </div>
 <h1>{{ view.url }}</h1>
 <p class="muted">
@@ -340,7 +476,7 @@ _MAP = """{% extends "layout.html" %}
 _NOT_MAPPED = """{% extends "layout.html" %}
 {% block title %}Not mapped · Spoor{% endblock %}
 {% block body %}
-<div class="crumbs"><a href="/">Mapped sites</a> /</div>
+<div class="crumbs"><a href="/maps">Mapped sites</a> /</div>
 <h1>{{ url }}</h1>
 <div class="card"><p>This page has not been mapped yet.</p></div>
 {% endblock %}
@@ -905,7 +1041,8 @@ document.querySelectorAll("button[data-copy]").forEach((button) => {
 
 _TEMPLATES = {
     "layout.html": _LAYOUT,
-    "home.html": _HOME,
+    "maps.html": _MAPS,
+    "intro.html": _INTRO,
     "domain.html": _DOMAIN,
     "map.html": _MAP,
     "not_mapped.html": _NOT_MAPPED,

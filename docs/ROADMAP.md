@@ -636,6 +636,17 @@ The captured HAR path is surfaced on the run summary so an operator can find it.
 
 The scenarios added to `gui.feature` and `exploration_wiki.feature` cover it. They include a real-browser scenario that starts in day mode under a light system setting, switches to night, and finds night still chosen after the GUI is restarted on another port. The result was also checked visually in both modes: GUI map, form and job pages, and the wiki with its diagram redrawing on the switch.
 
+**Decision — the GUI opens on an introduction page (maintainer request).** `/` is now an introduction to Spoor rather than the mapped-sites list, which moves to `/maps`. The "Spoor" logo in the top bar returns to the introduction; "Maps" goes to the list. The page is written for an operator, in plain language with no section references, and is consistent with the README's own framing. It covers:
+- the hero sentence and a short description;
+- what Spoor does (map a site's screens and actions, extract data that survives redesigns, show the API behind a page, hand the map to scripts and agents);
+- who it's for (test automation, AI-agent builders, data collection, understanding an application);
+- how it stays safe by default (local storage, sandbox-only destructive actions, redaction, `robots.txt` and rate limits, never logging in on its own);
+- where to start, with live counts of mapped sites and running jobs;
+- links to the repository, its README and its issues, read from the package's own metadata (`[project.urls]` in `pyproject.toml`, via `app.project_urls()`), not written in code. `scripts/check_genericity.py` scans `spoor/gui/` too and rightly flagged a hardcoded `github.com` constant; metadata, the standard place for project links, keeps the check strict instead of adding an allowlist exception;
+- the installed version and the README's short legal note.
+
+The copy was reviewed against what Spoor actually does, and two claims were softened before merge. "Nothing is sent anywhere" became "stored on this computer and never uploaded": Spoor does fetch the sites it visits, and the wiki loads its diagram library from a CDN. "Links each action to the requests it triggered" became "can tie an action to the requests it triggered".
+
 **Testing.** Fast tier: the GUI app via FastAPI `TestClient` (token/host/origin rejection, loopback-only bind refusal, pages render the redacted view, metadata-only sessions, config validation errors), and the job manager against a **fake runner** (an injected callable standing in for the subprocess) so argument assembly, status transitions, Stop and log redaction are tested without launching Spoor. `@browser` tier: one end-to-end scenario per slice that launches the real GUI and drives it with Playwright, Spoor dogfooding itself. For gui-2, that means starting an exploration of a static fixture through the form and seeing the output path appear. `scripts/check_genericity.py` already covers it: nothing here is site-specific (§0).
 
 **Deliberately out of scope here, each its own future decision:** remote/multi-user access and real authentication; capturing a login session from inside the GUI (open a headed Spoor browser, the operator logs in by hand, save its storage state as a named session; §2h's bring-your-own-session explicitly permits "in Spoor's [browser]", so this is likely the next high-value slice after gui-4, but it is a new capture path and gets its own note); a structured config form editor; persisted job history; and retiring `spoor wizard` (kept until the GUI covers every command it does).
