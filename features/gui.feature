@@ -67,6 +67,10 @@ Feature: A local GUI browses captured maps safely
     When I request the home page with the access token
     Then the page lists the domain "shop.example"
 
+  Scenario: Pages carry the Spoor logo in the top bar and as the browser-tab icon
+    When I request the home page with the access token
+    Then the page shows the Spoor logo in the top bar and as its browser-tab icon
+
   Scenario: An empty store shows a getting-started message, not an error
     Given an empty map store
     When I request the home page with the access token

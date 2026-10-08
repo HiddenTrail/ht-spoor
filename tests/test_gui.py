@@ -271,3 +271,18 @@ def test_saving_keeps_the_files_line_break_style(
         path.write_bytes(existing)
     configs.write(path, "target: y\r\nfields: {}\r\n")
     assert path.read_bytes() == expected
+
+
+def test_the_guis_logo_is_the_brand_file_unchanged() -> None:
+    # The GUI ships its own copy (docs/ isn't packaged); it must never drift from
+    # the canonical brand file in docs/assets/.
+    import base64
+
+    from spoor.gui.templates import logo_data_uri
+
+    root = Path(__file__).resolve().parent.parent
+    brand = (root / "docs" / "assets" / "Spoor_O_B.svg").read_bytes()
+    shipped = (root / "spoor" / "gui" / "assets" / "spoor-logo.svg").read_bytes()
+    assert shipped == brand
+    prefix = "data:image/svg+xml;base64,"
+    assert logo_data_uri() == prefix + base64.b64encode(brand).decode("ascii")
