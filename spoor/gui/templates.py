@@ -13,6 +13,9 @@ links to read as one product.
 
 from __future__ import annotations
 
+import base64
+from importlib.resources import files
+
 from jinja2 import DictLoader, Environment, select_autoescape
 
 from spoor.exploration.theme import STYLESHEET
@@ -22,7 +25,14 @@ _GUI_CSS = """
          spoor/exploration/theme.py) and built from the same tokens, so the GUI
          and the wiki read as one product. */
       :root { color-scheme: dark; }
-      nav .brand { color: var(--accent); font-weight: 700; }
+      nav .brand {
+        align-items: center;
+        color: var(--accent);
+        display: inline-flex;
+        font-weight: 700;
+        gap: 0.45rem;
+      }
+      nav .brand img { display: block; height: 1.6rem; width: auto; }
       .muted { color: var(--text-muted); }
       .crumbs { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 0.4rem; }
       .card {
@@ -136,12 +146,13 @@ _LAYOUT = """<!DOCTYPE html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Spoor{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ logo }}" />
     {% block head %}{% endblock %}
     <style>""" + STYLESHEET + _GUI_CSS + """    </style>
   </head>
   <body>
     <nav>
-      <a class="brand" href="/">Spoor</a>
+      <a class="brand" href="/"><img src="{{ logo }}" alt="" />Spoor</a>
       <a href="/">Maps</a>
       <a href="/new/explore">Explore</a>
       <a href="/new/run">Extract</a>
@@ -899,11 +910,25 @@ _TEMPLATES = {
 }
 
 
+def logo_data_uri() -> str:
+    """Spoor's logo (orange hexagon, black print) as an inline `data:` URI.
+
+    The GUI's copy of `docs/assets/Spoor_O_B.svg`, the brand file it must stay
+    identical to (a test checks). It's the variant that reads best on the
+    GUI's dark theme and in a browser tab. Inlined so every page carries its
+    own logo and favicon with no extra route or request.
+    """
+    svg = files("spoor.gui").joinpath("assets", "spoor-logo.svg").read_bytes()
+    return "data:image/svg+xml;base64," + base64.b64encode(svg).decode("ascii")
+
+
 def environment() -> Environment:
     """A Jinja2 environment with autoescape on for every template (§2h defence)."""
-    return Environment(
+    env = Environment(
         loader=DictLoader(_TEMPLATES),
         autoescape=select_autoescape(default=True, default_for_string=True),
         trim_blocks=True,
         lstrip_blocks=True,
     )
+    env.globals["logo"] = logo_data_uri()
+    return env

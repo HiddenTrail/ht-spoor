@@ -306,3 +306,13 @@ def browser_shows_map(context: dict[str, Any], url: str) -> None:
     page = context["page"]
     assert page.get_by_role("heading", name=url).is_visible()
     assert page.get_by_text("Blue mug").is_visible()
+
+
+@then("the page shows the Spoor logo in the top bar and as its browser-tab icon")
+def shows_logo(context: dict[str, Any]) -> None:
+    from spoor.gui.templates import logo_data_uri
+
+    text = _text(context)
+    logo = logo_data_uri()
+    assert f'<link rel="icon" type="image/svg+xml" href="{logo}" />' in text
+    assert f'<a class="brand" href="/"><img src="{logo}" alt="" />Spoor</a>' in text
