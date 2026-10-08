@@ -126,13 +126,17 @@ There you can:
 - **Write and fix extraction configs** (on the Configs page): create one from an
   example, check it (each problem is shown with where it is), save it, and run it.
   The editor works on `.yaml`/`.yml` files in the folder you started `spoor gui` in.
+- **Let scripts and AI agents use your maps** (on the Servers page): start and stop
+  the read-only map API server with one click, and copy a ready-made MCP
+  configuration for Claude or another AI client. That configuration points the
+  client at the maps this GUI uses, wherever the client starts it.
 
 Secrets Spoor captured are shown as `[REDACTED]` in the GUI's maps and run logs,
 just as `spoor serve` returns them. The config editor is the one exception: it shows
 your own config file exactly as it is on disk, because hiding a token there would
 also remove it from the file when you save. Output goes to the folders the form
 names, by default `spoor-output/<date and time>/` under the folder you started
-`spoor gui` in. Starting the map server from the browser is coming next.
+`spoor gui` in.
 
 The app is reachable only from your own computer, and only through the link
 `spoor gui` prints when it starts. That link carries a one-time access key, so
@@ -560,11 +564,13 @@ the wiki itself shows. Leave `hooks` out entirely and nothing changes.
 - response-header fingerprints
 - client-side storage state (with redaction on shared output)
 
-Captured artifacts are written to a local-only, git-ignored cache.
+Captured artifacts are written to a local-only, git-ignored cache: `.spoor-cache` in
+the folder you run Spoor from. To keep it somewhere else, set the `SPOOR_CACHE_DIR`
+environment variable to a folder; every Spoor command then uses that cache, which
+stays on your computer either way.
 
 ### Still on the roadmap
 
-- Starting the map server from the browser GUI (`spoor gui` browses maps, runs explore/extract/apply-scaffold, and manages saved logins and configs today)
 - Default-on capture behavior (today capture remains opt-in)
 - Automatic re-checking of a served map entry once it is "too old" (today the serving layer always shows how old an answer is and only re-fetches when a caller explicitly asks via `--recheck`, never on its own)
 

@@ -80,6 +80,9 @@ def _status_text(job: Job) -> str:
     if job.status == "failed":
         return "The log below says why."
     if job.killed:
+        if job.spec.kind == "serve":
+            # A read-only server has nothing to save.
+            return "Stopped."
         return "Force-stopped. Nothing more was saved from this run."
     return "Stopped at your request. What was mapped so far was saved."
 

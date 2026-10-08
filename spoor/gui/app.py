@@ -36,6 +36,7 @@ from starlette.responses import Response
 from spoor.gui.job_routes import add_job_routes
 from spoor.gui.jobs import JobManager, SubprocessRunner, open_folder
 from spoor.gui.manage_routes import add_manage_routes
+from spoor.gui.server_routes import add_server_routes, check_health
 from spoor.gui.templates import environment
 from spoor.serving.store import MapStore
 from spoor.serving.views import map_view
@@ -125,6 +126,7 @@ def create_app(
     host: str = "127.0.0.1",
     jobs: JobManager | None = None,
     opener: Callable[[Path], None] = open_folder,
+    health: Callable[[int], bool] = check_health,
 ) -> FastAPI:
     """Build the GUI app over `store`, guarded by `token`, for a loopback `port`.
 
@@ -134,7 +136,8 @@ def create_app(
     check accepts alongside the usual loopback names. `jobs` runs the commands
     started from the GUI's forms (by default the real CLI in the current working
     directory, the same one the local cache lives under); `opener` opens a job's
-    output folder. Both are injectable for tests. The manager is exposed as
+    output folder; `health` checks whether a managed map server answers. All
+    three are injectable for tests. The manager is exposed as
     `app.state.jobs` so the launcher can stop running jobs when the GUI closes.
     """
     if jobs is None:
@@ -236,6 +239,7 @@ def create_app(
 
     add_job_routes(app, jobs=jobs, store=store, render=render, opener=opener)
     add_manage_routes(app, jobs=jobs, render=render)
+    add_server_routes(app, jobs=jobs, render=render, health=health)
     app.state.jobs = jobs
     return app
 
