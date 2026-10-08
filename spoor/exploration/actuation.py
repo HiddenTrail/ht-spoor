@@ -19,6 +19,11 @@ is a pure decision over what sits at the element's click point, taken by `classi
                   signal that a layer is in the way — the hand-off to layer recovery
                   (7c) — carrying what covers it, never a mute skip.
   * NOT LOCATED — no discovered node matches, so the element is genuinely gone.
+  * DISABLED    — the element is there but disabled in this state (a native disabled
+                  control, inside a disabled fieldset, or aria-disabled). Checked
+                  before the hit-test: the browser looks straight through a disabled
+                  control to whatever is underneath, which would otherwise read as
+                  COVERED and send recovery clicking unrelated actions to "uncover" it.
 
 The live half (the CDP relocation, scroll-into-view, coordinate click, and the
 `elementFromPoint` verification that feed `classify` real values) lives in the driver
@@ -36,11 +41,18 @@ from spoor.exploration.discovery import ActionableElement, discover_actions
 
 
 class Verdict(Enum):
-    """The three honest outcomes of trying to actuate a discovered element."""
+    """The honest outcomes of trying to actuate a discovered element."""
 
     ACTUATE = "actuate"
     COVERED = "covered"
     NOT_LOCATED = "not located"
+    DISABLED = "disabled"
+
+
+#: The skip reason recorded for a control that is disabled on the screen where it was
+#: found. It is usually enabled on another screen, which is a different state (its
+#: disabled flag is part of state identity), so it is explored there instead.
+DISABLED_SKIP_REASON = "disabled on this screen"
 
 
 @dataclass(frozen=True)
@@ -70,6 +82,7 @@ def classify(
     located: bool,
     point_hits_target: bool,
     covering: CoveringElement | None,
+    disabled: bool = False,
 ) -> ActuationVerdict:
     """Decide the actuation verdict from what was observed at the click point.
 
@@ -77,10 +90,14 @@ def classify(
     `point_hits_target` is whether the click point resolves to the element or a
     descendant of it; `covering` is what sits on top when it does not. The live driver
     computes these three against a real page and calls this so the verdict has one
-    definition, shared by the pure tests and the browser path.
+    definition, shared by the pure tests and the browser path. `disabled` is whether
+    the located element is disabled in this state; it outranks the hit-test, because a
+    disabled control's click point resolves to whatever is underneath it.
     """
     if not located:
         return ActuationVerdict(Verdict.NOT_LOCATED)
+    if disabled:
+        return ActuationVerdict(Verdict.DISABLED)
     if point_hits_target:
         return ActuationVerdict(Verdict.ACTUATE)
     return ActuationVerdict(Verdict.COVERED, covering)

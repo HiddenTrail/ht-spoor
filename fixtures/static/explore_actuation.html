@@ -11,6 +11,10 @@
       resolves to the overlay, not the button — the driver must report it covered and
       must NOT activate the overlay. The overlay covers only Checkout, leaving the
       other two buttons clickable.
+    * "Export data", "Explore results" and "Save draft" are visible but disabled: a
+      native disabled button with pointer-events: none (as component libraries style
+      it), an aria-disabled button, and a button inside a disabled fieldset. The
+      driver must report each disabled and click none of them.
 
   Each clickable records that it (and only it) was clicked into window.__clicked, which
   the step definitions read back. The overlay records into window.__overlayActivated so
@@ -44,6 +48,11 @@
       <div id="overlay"></div>
     </span>
 
+    <!-- Disabled controls: present and visible, but not clickable here. -->
+    <button id="export" disabled style="pointer-events: none">Export data</button>
+    <button id="results" aria-disabled="true">Explore results</button>
+    <fieldset disabled><button id="draft">Save draft</button></fieldset>
+
     <div class="spacer"></div>
 
     <!-- Below-the-fold button: needs scrolling into view. -->
@@ -60,6 +69,9 @@
       document.getElementById("menu").addEventListener("click", record("Open account menu"));
       document.getElementById("far").addEventListener("click", record("Far below the fold"));
       document.getElementById("checkout").addEventListener("click", record("Checkout"));
+      document.getElementById("export").addEventListener("click", record("Export data"));
+      document.getElementById("results").addEventListener("click", record("Explore results"));
+      document.getElementById("draft").addEventListener("click", record("Save draft"));
       document.getElementById("overlay").addEventListener("click", function () {
         window.__overlayActivated = true;
       });

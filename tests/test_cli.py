@@ -540,6 +540,25 @@ def test_a_mix_of_skip_reasons_reports_both(monkeypatch: pytest.MonkeyPatch) -> 
     assert "2 could not be reached or performed after replay" in output
 
 
+def test_disabled_controls_are_reported_separately(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # A control disabled on the screen where it was found isn't missing or
+    # unreachable, so it isn't lumped in with "could not be reached or performed".
+    from spoor.exploration.actuation import DISABLED_SKIP_REASON
+
+    output = _explore_with_skips(
+        monkeypatch,
+        [
+            DISABLED_SKIP_REASON,
+            DISABLED_SKIP_REASON,
+            "could not be performed: button 'mute' not located after replay",
+        ],
+    )
+    assert "2 disabled on the screen where they were found" in output
+    assert "1 could not be reached or performed after replay" in output
+
+
 # --- wizard --------------------------------------------------------------------
 
 

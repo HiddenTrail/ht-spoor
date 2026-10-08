@@ -111,6 +111,22 @@ Feature: Exploration deals with blockers instead of abandoning what is behind th
     And the graph has a transition "home --Open--> menu"
     And the graph has states: home, menu
 
+  Scenario: A disabled control is flagged as disabled, not treated as a blocker or missing
+    # A disabled button is present but can't be clicked on this screen (it typically
+    # becomes usable on another screen, which is a different state because its disabled
+    # flag differs). It must be flagged at once as disabled on this screen: no replay
+    # retries, and no other action fired as "recovery" to try to uncover it.
+    Given a sandbox target
+    And an app whose actions are:
+      | from | label  | role   | to   |
+      | home | Export | button | dead |
+      | home | Open   | button | menu |
+    And the action "Export" is disabled
+    When I explore from "home"
+    Then the action "Export" from "home" is flagged as disabled on this screen
+    And no other action was fired while trying to reach "Export"
+    And the graph has a transition "home --Open--> menu"
+
   @browser
   Scenario: Mapping a live site whose entry screen is behind an overlay
     # The whole real stack: a headless browser against a fixture that shows a consent

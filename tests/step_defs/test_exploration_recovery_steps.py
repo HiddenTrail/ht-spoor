@@ -29,13 +29,19 @@ from typing import Any
 import pytest
 from pytest_bdd import given, parsers, scenarios, then, when
 
-from spoor.exploration.actuation import ActuationVerdict, CoveringElement, Verdict
+from spoor.exploration.actuation import (
+    DISABLED_SKIP_REASON,
+    ActuationVerdict,
+    CoveringElement,
+    Verdict,
+)
 from spoor.exploration.capture import StateSignals
 from spoor.exploration.control import RunBudget, RunController
 from spoor.exploration.discovery import ActionableElement
 from spoor.exploration.driver import PlaywrightDriver
 from spoor.exploration.explorer import (
     ElementCovered,
+    ElementDisabled,
     ElementNotLocated,
     explore,
 )
@@ -66,6 +72,7 @@ class _RecoveryApp:
         self._transitions: dict[tuple[str, str, str], str] = {}
         self._layers: dict[str, list[_LayerStep]] = {}
         self._cannot_locate: set[str] = set()
+        self._disabled: set[str] = set()
         self._next_id = 0
 
     # --- construction ----------------------------------------------------
@@ -87,6 +94,9 @@ class _RecoveryApp:
 
     def cannot_locate(self, label: str) -> None:
         self._cannot_locate.add(label)
+
+    def disable(self, label: str) -> None:
+        self._disabled.add(label)
 
     def _make(self, label: str, role: str) -> ActionableElement:
         self._next_id += 1
@@ -131,6 +141,9 @@ class _RecoveryApp:
     def is_cannot_locate(self, action: ActionableElement) -> bool:
         return action.name in self._cannot_locate
 
+    def is_disabled(self, action: ActionableElement) -> bool:
+        return action.name in self._disabled
+
     def next_state(self, name: str, action: ActionableElement) -> str:
         return self._transitions[(name, action.role, action.name)]
 
@@ -149,6 +162,8 @@ class _RecoveryDriver:
         self._app = app
         self._current = app.root
         self._layer_step: dict[str, int] = {}
+        # Every action this driver actually fired, as (state, label), in order.
+        self.performed: list[tuple[str, str]] = []
 
     def reset(self) -> None:
         self._current = self._app.root
@@ -168,6 +183,8 @@ class _RecoveryDriver:
         step = self._step(state)
         if self._app.is_cannot_locate(action):
             return ActuationVerdict(Verdict.NOT_LOCATED)
+        if self._app.is_disabled(action):
+            return ActuationVerdict(Verdict.DISABLED)
         layer = self._app.layer_action(state, step)
         if layer is not None and (action.role, action.name) == (
             layer.role,
@@ -189,7 +206,10 @@ class _RecoveryDriver:
         if verdict.verdict is Verdict.COVERED:
             assert verdict.covering is not None
             raise ElementCovered(verdict.covering.role, verdict.covering.text)
+        if verdict.verdict is Verdict.DISABLED:
+            raise ElementDisabled(action.role, action.name)
         state = self._current
+        self.performed.append((state, action.name))
         step = self._step(state)
         layer = self._app.layer_action(state, step)
         if layer is not None and (action.role, action.name) == (
@@ -296,6 +316,11 @@ def action_cannot_be_located(context: dict[str, Any], label: str) -> None:
     context["app"].cannot_locate(label)
 
 
+@given(parsers.parse('the action "{label}" is disabled'))
+def action_is_disabled(context: dict[str, Any], label: str) -> None:
+    context["app"].disable(label)
+
+
 # --- When ----------------------------------------------------------------
 
 
@@ -304,8 +329,11 @@ def i_explore(context: dict[str, Any], root: str) -> None:
     app: _RecoveryApp = context["app"]
     app.root = root
     controller = RunController(context["budget"])
+    # Kept under its own key: "driver" is the live scenario's real driver, which the
+    # teardown closes.
+    context["fake_driver"] = _RecoveryDriver(app)
     context["graph"] = explore(
-        _RecoveryDriver(app),
+        context["fake_driver"],
         target=context["target"],
         controller=controller,
         declared_sandbox=context["declared_sandbox"],
@@ -385,6 +413,29 @@ def flagged_blocked(context: dict[str, Any], label: str, frm: str) -> None:
         "blocked by an unresolved layer" in s.reason for s in skipped
     ), f"reason did not name an unresolved layer: {[s.reason for s in skipped]}"
     _not_fired(context, label, frm)
+
+
+@then(
+    parsers.parse(
+        'the action "{label}" from "{frm}" is flagged as disabled on this screen'
+    )
+)
+def flagged_disabled(context: dict[str, Any], label: str, frm: str) -> None:
+    skipped = _skipped_with(context, label, frm)
+    assert [s.reason for s in skipped] == [DISABLED_SKIP_REASON], [
+        s.reason for s in skipped
+    ]
+    _not_fired(context, label, frm)
+
+
+@then(parsers.parse('no other action was fired while trying to reach "{label}"'))
+def nothing_fired_for(context: dict[str, Any], label: str) -> None:
+    # The only actions fired are the graph's own transitions, each once: nothing
+    # was clicked as "recovery" on the disabled control's behalf.
+    fired = [name for _, name in context["fake_driver"].performed]
+    expected = [t.action.name for t in context["graph"].transitions]
+    assert sorted(fired) == sorted(expected), (fired, expected)
+    assert label not in fired
 
 
 @then(parsers.parse('the action "{label}" from "{frm}" is flagged as not located'))
