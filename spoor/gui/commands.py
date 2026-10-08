@@ -39,6 +39,9 @@ class CommandSpec:
     outputs: dict[str, Path] = field(default_factory=dict)
     # The URL whose map this command reads or writes, if any.
     map_url: str | None = None
+    # The form values this command was built from, so the GUI can rerun it or
+    # fill its form in again ("Rerun with changes").
+    form: dict[str, str] = field(default_factory=dict)
 
     @property
     def command_line(self) -> str:
@@ -167,7 +170,7 @@ def explore_command(form: Form, workdir: Path) -> CommandSpec:
     ):
         for pattern in _patterns(form, name):
             args += [flag, pattern]
-    return CommandSpec("explore", args, outputs, map_url=url)
+    return CommandSpec("explore", args, outputs, map_url=url, form=dict(form))
 
 
 def run_command(form: Form, workdir: Path) -> CommandSpec:
@@ -193,7 +196,7 @@ def run_command(form: Form, workdir: Path) -> CommandSpec:
     if report is not None:
         args += ["--healing-report", str(report)]
         outputs["healing report"] = report
-    return CommandSpec("run", args, outputs)
+    return CommandSpec("run", args, outputs, form=dict(form))
 
 
 def apply_scaffold_command(form: Form, workdir: Path) -> CommandSpec:
@@ -219,7 +222,47 @@ def apply_scaffold_command(form: Form, workdir: Path) -> CommandSpec:
     if wiki is not None:
         args += ["--wiki", str(wiki)]
         outputs["wiki"] = wiki
-    return CommandSpec("apply-scaffold", args, outputs, map_url=url)
+    return CommandSpec("apply-scaffold", args, outputs, map_url=url, form=dict(form))
+
+
+#: The folder default output goes into: spoor-output/<date and time>/… in the
+#: working folder.
+OUTPUT_ROOT = "spoor-output"
+
+#: Per kind, the form fields that name *new* output a rerun must not overwrite.
+#: (apply-scaffold's wiki_dir names an existing wiki to refresh, so it isn't one.)
+OUTPUT_FIELDS = {
+    "explore": ("wiki_dir", "gen_tests_dir", "scaffold_dir"),
+    "run": ("output", "healing_report_path"),
+}
+
+
+def fresh_output_form(
+    kind: str, form: Form, workdir: Path, stamp: str
+) -> dict[str, str]:
+    """`form` with its default output folders moved to `spoor-output/<stamp>/`.
+
+    A path under `spoor-output/<date and time>/` in the working folder is a
+    default the GUI chose, so a rerun gets a fresh date-and-time folder and the
+    earlier run's output stays intact. A path the operator chose elsewhere is
+    left as it is.
+    """
+    fresh = dict(form)
+    root = Path(os.path.abspath(workdir / OUTPUT_ROOT))
+    for name in OUTPUT_FIELDS.get(kind, ()):
+        value = fresh.get(name, "").strip()
+        if not value:
+            continue
+        path = _absolute(workdir, value)
+        if not path.is_relative_to(root):
+            continue
+        parts = path.relative_to(root).parts
+        if len(parts) < 2:
+            # Not inside a date-and-time folder (the root itself, or a file put
+            # straight into it): not one of the GUI's defaults, so keep it.
+            continue
+        fresh[name] = str(root.joinpath(stamp, *parts[1:]))
+    return fresh
 
 
 #: Form kind (as used in the GUI's URLs) → its command builder.

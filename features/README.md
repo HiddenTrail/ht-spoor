@@ -13,7 +13,7 @@ diffing (§5.4).
 Each capability maps to a `spoor/` subpackage and a ROADMAP phase (§4). Files
 are authored when their phase begins, not up front.
 
-70 feature files, grouped below by what they cover rather than listed as one
+71 feature files, grouped below by what they cover rather than listed as one
 flat table — the grouping is purely navigational (every row's text is
 unchanged from before); the prose section further down keeps its own
 chronological, slice-by-slice narrative order.
@@ -86,6 +86,7 @@ chronological, slice-by-slice narrative order.
 | `gui_jobs.feature` | Local GUI, slice gui-2: forms for `explore`, `run` and `apply-scaffold` that build and run the real command (with a live preview of it), a job page with a redacted live log, Stop (graceful for explore, via a stop file) and Force stop (kills the whole process tree), and where each output landed: absolute paths, open folder, the wiki served from the job's own folder only, and a link to the map. A form posted from another site launches nothing, and an address that starts with "-" is refused rather than passed as an option | §2i | `spoor/gui`, CLI | post-v1 |
 | `gui_sessions_configs.feature` | Local GUI, slice gui-3: saved logins listed from the session store (names and dates only, never contents), added by upload through the real `spoor session add`, with names and sites passed after a `--` so one starting with "-" is never read as an option (the upload lives in a private temporary folder only while the command runs, and a hanging command is stopped) and removed through `spoor session remove`; login names suggested in the run forms. Config files: listed with whether each validates, created from the example, checked with the same loader `spoor run` uses (each problem with its field path or YAML line), saved (even when not valid yet, and said so), and run; only `.yaml`/`.yml` files inside the working folder, never in hidden, cache or output folders | §2i | `spoor/gui`, CLI | post-v1 |
 | `gui_servers.feature` | Local GUI, slice gui-4: start and stop the read-only map API server (`spoor serve`, on this computer only, one at a time, shown as running only once it answers its health check; a port that isn't a port is refused) and a ready-to-paste MCP configuration for `spoor serve-mcp` that sets `SPOOR_CACHE_DIR` so a client started anywhere reads this GUI's maps, which is verified by running that configuration as a real MCP client. Also pins `SPOOR_CACHE_DIR` itself | §2i / §2h | `spoor/gui`, `spoor/security`, CLI | post-v1 |
+| `gui_reruns_and_browsing.feature` | Local GUI follow-ups: every run job's "…" menu (Jobs list and job page) offers Rerun (same settings; default output moves to a fresh `spoor-output/<date and time>/`, a folder the operator chose is reused), Rerun with changes (the form filled in with every original value), Apply scaffold (after an exploration that wrote one), Edit config and View map; another site can't trigger a rerun. Jobs show their local start date and time and duration. Every folder or file field has a Browse… button opening an in-page folder browser that lists names only (folders, plus YAML files when picking a file), skips hidden entries, starts from the nearest existing folder, and never writes | §2i | `spoor/gui` | post-v1 |
 
 ### Exploration — safety, state identity & the core loop
 

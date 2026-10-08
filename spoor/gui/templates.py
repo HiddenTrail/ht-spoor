@@ -152,6 +152,87 @@ _GUI_CSS = """
       .uses li { color: var(--text-muted); }
       .uses strong { color: var(--text); }
 
+      /* Path fields with a Browse… button, and the folder browser */
+      .pathfield { align-items: center; display: flex; gap: 0.5rem; }
+      .pathfield input { flex: 1 1 auto; }
+      .pathfield .browse { flex: 0 0 auto; white-space: nowrap; }
+      dialog.folder-browser {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        color: var(--text);
+        max-width: 40rem;
+        padding: 1rem 1.2rem;
+        width: calc(100% - 2rem);
+      }
+      dialog.folder-browser::backdrop { background: rgb(0 0 0 / 0.45); }
+      .fb-title { color: var(--teal); font-weight: 700; margin: 0 0 0.5rem; }
+      .fb-bar { align-items: center; display: flex; gap: 0.5rem; margin: 0 0 0.5rem; }
+      .fb-path { flex: 1 1 auto; overflow-wrap: anywhere; }
+      .fb-list {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        max-height: 45vh;
+        overflow: auto;
+      }
+      .fb-entry {
+        background: transparent;
+        border: 0;
+        border-bottom: 1px solid var(--border);
+        border-radius: 0;
+        color: var(--text);
+        display: block;
+        font-weight: 400;
+        padding: 0.4rem 0.7rem;
+        text-align: left;
+        width: 100%;
+      }
+      .fb-entry:hover { background: var(--surface-2); color: var(--accent); }
+      .fb-folder::after { color: var(--text-muted); content: "/"; }
+      .fb-actions {
+        display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end;
+        margin-top: 0.75rem;
+      }
+      .fb-actions input { flex: 1 1 12rem; }
+
+      /* The "…" menu */
+      .title-row { align-items: center; display: flex; gap: 0.75rem; }
+      .nowrap { white-space: nowrap; }
+      details.menu { display: inline-block; position: relative; }
+      details.menu summary {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        cursor: pointer;
+        list-style: none;
+        padding: 0 0.6rem;
+      }
+      details.menu summary::-webkit-details-marker { display: none; }
+      details.menu summary:hover { border-color: var(--accent); color: var(--accent); }
+      .menu-items {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        box-shadow: 0 6px 18px rgb(0 0 0 / 0.25);
+        min-width: 12rem;
+        position: absolute;
+        right: 0;
+        z-index: 20;
+      }
+      .menu-items form { margin: 0; }
+      .menu-item {
+        background: transparent;
+        border: 0;
+        border-radius: 0;
+        color: var(--text);
+        display: block;
+        font-weight: 600;
+        padding: 0.45rem 0.8rem;
+        text-align: left;
+        text-decoration: none;
+        width: 100%;
+      }
+      .menu-item:hover { background: var(--surface-2); color: var(--accent); }
+
       /* Jobs */
       code.cmd {
         background: var(--surface-2);
@@ -173,6 +254,148 @@ _GUI_CSS = """
         padding: 0.8rem 1rem;
       }
 """
+
+#: Keeps an open "…" menu on screen: positioned against the window, so a
+#: scrolling table can't clip it, and closed by an outside click, Escape or
+#: scrolling. Only one menu is open at a time.
+_MENU_SCRIPT = """<script>
+(() => {
+  const menus = () => document.querySelectorAll("details.menu[open]");
+  const closeAll = (except) => {
+    for (const menu of menus()) if (menu !== except) menu.open = false;
+  };
+  document.addEventListener("toggle", (event) => {
+    const menu = event.target;
+    if (!menu.matches || !menu.matches("details.menu") || !menu.open) return;
+    closeAll(menu);
+    const box = menu.querySelector("summary").getBoundingClientRect();
+    const items = menu.querySelector(".menu-items");
+    items.style.position = "fixed";
+    items.style.top = box.bottom + 4 + "px";
+    items.style.right = window.innerWidth - box.right + "px";
+  }, true);
+  document.addEventListener("click", (event) => {
+    if (!event.target.closest("details.menu")) closeAll(null);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") closeAll(null);
+  });
+  window.addEventListener("scroll", () => closeAll(null), true);
+})();
+</script>"""
+
+#: The folder browser behind every "Browse…" button (see browse_routes.py).
+_FOLDER_BROWSER = """<dialog class="folder-browser" id="folder-browser">
+  <p class="fb-title">Choose a folder</p>
+  <div class="fb-bar">
+    <button type="button" class="secondary fb-up">Up</button>
+    <code class="fb-path"></code>
+    <select class="fb-drives" aria-label="Drive" hidden></select>
+  </div>
+  <div class="fb-list" role="list"></div>
+  <p class="hint fb-note" hidden></p>
+  <div class="fb-actions">
+    <input type="text" class="fb-new" placeholder="New folder name (optional)"
+      aria-label="New folder name" />
+    <button type="button" class="secondary fb-cancel">Cancel</button>
+    <button type="button" class="fb-choose">Choose this folder</button>
+  </div>
+</dialog>
+<script>
+(() => {
+  // "Browse…": lists folders (and YAML files) via /browse; choosing fills in the
+  // field. Names only; nothing is created until a run writes into the folder.
+  const dialog = document.getElementById("folder-browser");
+  const buttons = document.querySelectorAll("button[data-browse]");
+  if (!dialog || !buttons.length) return;
+  const q = (selector) => dialog.querySelector(selector);
+  const TITLES = {
+    file: "Choose a file",
+    save: "Choose the folder to save in",
+    dir: "Choose a folder",
+  };
+  let target = null;
+  let mode = "dir";
+  let current = null;
+  const trim = (path) => path.replace(/[\\\\/]+$/, "");
+  function entry(label, kind, onClick) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "fb-entry fb-" + kind;
+    button.textContent = label;
+    button.addEventListener("click", onClick);
+    return button;
+  }
+  function noteFor(listing) {
+    if (listing.error) return listing.error;
+    if (listing.truncated) return "Only the first 1,000 entries are shown.";
+    if (!listing.folders.length && !listing.files.length) {
+      return "Nothing to show in this folder.";
+    }
+    return "";
+  }
+  async function load(path) {
+    const query = new URLSearchParams({ path, mode });
+    const response = await fetch("/browse?" + query);
+    current = await response.json();
+    q(".fb-path").textContent = current.path;
+    q(".fb-up").disabled = !current.parent;
+    const list = q(".fb-list");
+    list.replaceChildren();
+    for (const folder of current.folders) {
+      list.append(entry(folder.name, "folder", () => load(folder.path)));
+    }
+    for (const file of current.files) {
+      list.append(entry(file.name, "file", () => choose(file.path)));
+    }
+    const note = q(".fb-note");
+    note.textContent = noteFor(current);
+    note.hidden = !note.textContent;
+    const drives = q(".fb-drives");
+    drives.hidden = !current.drives.length;
+    const here = current.path.toUpperCase();
+    drives.replaceChildren(
+      ...current.drives.map(
+        (d) => new Option(d, d, false, here.startsWith(d.toUpperCase()))
+      )
+    );
+  }
+  function choose(path) {
+    const input = document.getElementById(target);
+    input.value = path;
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    dialog.close();
+  }
+  for (const button of buttons) {
+    button.addEventListener("click", () => {
+      target = button.dataset.target;
+      mode = button.dataset.browse;
+      q(".fb-title").textContent = TITLES[mode];
+      q(".fb-new").value = "";
+      q(".fb-new").hidden = mode === "file";
+      q(".fb-choose").hidden = mode === "file";
+      load(document.getElementById(target).value);
+      dialog.showModal();
+    });
+  }
+  q(".fb-up").addEventListener("click", () => {
+    if (current && current.parent) load(current.parent);
+  });
+  q(".fb-drives").addEventListener("change", (event) => load(event.target.value));
+  q(".fb-cancel").addEventListener("click", () => dialog.close());
+  q(".fb-choose").addEventListener("click", () => {
+    let path = trim(current.path);
+    const extra = q(".fb-new").value.trim();
+    if (extra) path += current.separator + extra;
+    if (mode === "save") {
+      const name = document.getElementById(target).value.split(/[\\\\/]/).pop();
+      if (name) path += current.separator + name;
+    }
+    choose(path);
+  });
+})();
+</script>"""
+
 
 _LAYOUT = """<!DOCTYPE html>
 <html lang="en">
@@ -201,6 +424,7 @@ _LAYOUT = """<!DOCTYPE html>
       """ + TOGGLE_BUTTON + """
     </nav>
     <main>{% block body %}{% endblock %}</main>
+    """ + _FOLDER_BROWSER + _MENU_SCRIPT + """
   </body>
 </html>
 """
@@ -482,11 +706,37 @@ _NOT_MAPPED = """{% extends "layout.html" %}
 {% endblock %}
 """
 
-_MACROS = """{% macro text(name, label, v, hint=None, placeholder="", list=None) %}
+_MACROS = """{% macro browse_button(target, mode) %}
+<button type="button" class="secondary browse" data-browse="{{ mode }}"
+  data-target="{{ target }}">Browse…</button>
+{% endmacro %}
+
+{% macro text(name, label, v, hint=None, placeholder="", list=None, browse=None) %}
 <label for="{{ name }}">{{ label }}</label>
+{% if browse %}<div class="pathfield">{% endif %}
 <input type="text" id="{{ name }}" name="{{ name }}" value="{{ v.get(name, '') }}"
   placeholder="{{ placeholder }}"{% if list %} list="{{ list }}"{% endif %} />
+{% if browse %}{{ browse_button(name, browse) }}</div>{% endif %}
 {% if hint %}<p class="hint">{{ hint }}</p>{% endif %}
+{% endmacro %}
+
+{% macro menu(items, label) %}
+{% if items %}
+<details class="menu">
+  <summary aria-label="{{ label }}" title="More actions">…</summary>
+  <div class="menu-items">
+  {% for item in items %}
+    {% if item.method == "post" %}
+    <form method="post" action="{{ item.href }}">
+      <button type="submit" class="menu-item">{{ item.label }}</button>
+    </form>
+    {% else %}
+    <a class="menu-item" href="{{ item.href }}">{{ item.label }}</a>
+    {% endif %}
+  {% endfor %}
+  </div>
+</details>
+{% endif %}
 {% endmacro %}
 
 {% macro number(name, label, v) %}
@@ -505,11 +755,12 @@ _MACROS = """{% macro text(name, label, v, hint=None, placeholder="", list=None)
 {% if hint %}<p class="hint indent">{{ hint }}</p>{% endif %}
 {% endmacro %}
 
-{% macro output(tick, path_name, label, v) %}
+{% macro output(tick, path_name, label, v, browse=None) %}
 {{ check(tick, label, v) }}
-<div class="indent">
-  <input type="text" name="{{ path_name }}" value="{{ v.get(path_name, '') }}"
-    aria-label="{{ label }}: folder" />
+<div class="indent{% if browse %} pathfield{% endif %}">
+  <input type="text" id="{{ path_name }}" name="{{ path_name }}"
+    value="{{ v.get(path_name, '') }}" aria-label="{{ label }}: folder" />
+  {% if browse %}{{ browse_button(path_name, browse) }}{% endif %}
 </div>
 {% endmacro %}
 
@@ -601,19 +852,20 @@ click on each screen, tries it, and records where it leads.</p>
 </fieldset>
 <fieldset>
   <legend>What to write</legend>
-  {{ m.output("wiki", "wiki_dir", "A browsable wiki", v) }}
+  {{ m.output("wiki", "wiki_dir", "A browsable wiki", v, browse="dir") }}
   <div class="indent">
   {{ m.check("screenshots", "Include screenshots in the wiki", v,
     "Pictures can show secrets that can't be blanked out the way text is. "
     ~ "Only tick this if you're comfortable sharing the images.") }}
   </div>
-  {{ m.output("gen_tests", "gen_tests_dir", "A runnable regression test suite", v) }}
+  {{ m.output("gen_tests", "gen_tests_dir", "A runnable regression test suite", v,
+    browse="dir") }}
   <div class="indent">
   {{ m.check("assert_no_new_signals", "Also fail a test on unexpected new activity",
     v, "Fails if a later run logs, stores or requests something this run never saw.") }}
   </div>
   {{ m.output("scaffold", "scaffold_dir", "A form-filling scaffold (interactive.yaml)",
-    v) }}
+    v, browse="dir") }}
 </fieldset>
 <fieldset>
   <legend>Which elements to try</legend>
@@ -642,13 +894,13 @@ it finds.</p>
 <form id="job-form" method="post" action="/new/run">
 <fieldset>
   <legend>Config</legend>
-  {{ m.text("config", "Config file", v, placeholder="configs/shop.yaml",
+  {{ m.text("config", "Config file", v, placeholder="configs/shop.yaml", browse="file",
     hint="Relative to the folder Spoor's GUI was started in. Edit configs on the "
     ~ "Configs page.") }}
 </fieldset>
 <fieldset>
   <legend>Output</legend>
-  {{ m.text("output", "Write records to", v) }}
+  {{ m.text("output", "Write records to", v, browse="save") }}
   <label for="format">Format</label>
   <select id="format" name="format">
   {% for f in formats %}
@@ -658,7 +910,8 @@ it finds.</p>
   </select>
   <div class="spaced">
   {{ m.output("healing_report", "healing_report_path",
-    "A report of selectors that stopped matching and how they were repaired", v) }}
+    "A report of selectors that stopped matching and how they were repaired", v,
+    browse="save") }}
   </div>
 </fieldset>
 {{ m.footer(kind) }}
@@ -681,7 +934,7 @@ explored page. It only types: it never presses Enter or clicks submit.</p>
   <datalist id="mapped-urls">
   {% for u in mapped_urls %}<option value="{{ u }}"></option>{% endfor %}
   </datalist>
-  {{ m.text("scaffold", "Filled-in scaffold file", v,
+  {{ m.text("scaffold", "Filled-in scaffold file", v, browse="file",
     placeholder="spoor-output/.../scaffold/interactive.yaml") }}
   {{ m.sandbox(v, "types into fields") }}
   <p class="hint">Without a sandbox, nothing is typed.</p>
@@ -691,7 +944,8 @@ explored page. It only types: it never presses Enter or clicks submit.</p>
 </fieldset>
 <fieldset>
   <legend>What to update</legend>
-  {{ m.output("wiki", "wiki_dir", "Refresh the wiki in this folder", v) }}
+  {{ m.output("wiki", "wiki_dir", "Refresh the wiki in this folder", v,
+    browse="dir") }}
 </fieldset>
 {{ m.footer(kind) }}
 </form>
@@ -699,13 +953,22 @@ explored page. It only types: it never presses Enter or clicks submit.</p>
 """
 
 _JOB = """{% extends "layout.html" %}
+{% import "macros.html" as m %}
 {% block title %}Job {{ job.id }} · Spoor{% endblock %}
 {% block body %}
 <div class="crumbs"><a href="/jobs">Jobs</a> /</div>
-<h1>{{ job.spec.kind|capitalize }} job</h1>
+<div class="title-row">
+  <h1>{{ job.spec.kind|capitalize }} job</h1>
+  {{ m.menu(actions, "More actions for this job") }}
+</div>
 <div class="card">
   <code class="cmd">{{ job.spec.command_line }}</code>
 </div>
+<p class="muted">
+  Started {{ when(job.started_at) }}{% if job.finished_at %} · finished
+  {{ when(job.finished_at) }}{% endif %} · {{ duration(job) }}{% if job.running %} so
+  far{% endif %}
+</p>
 <p>
   <span class="status status-{{ job.status }}">{{ job.status|capitalize }}</span>
   {% if job.exit_code is not none %} · exit code {{ job.exit_code }}{% endif %}
@@ -787,21 +1050,26 @@ _JOB = """{% extends "layout.html" %}
 """
 
 _JOBS = """{% extends "layout.html" %}
+{% import "macros.html" as m %}
 {% block title %}Jobs · Spoor{% endblock %}
 {% block body %}
 <h1>Jobs</h1>
 {% if jobs %}
 <div class="table-wrap">
   <table>
-    <thead><tr><th>Started</th><th>Command</th><th>Status</th></tr></thead>
+    <thead>
+      <tr><th>Started</th><th>Duration</th><th>Command</th><th>Status</th><th></th></tr>
+    </thead>
     <tbody>
     {% for job in jobs %}
       <tr>
-        <td>{{ job.started_at.astimezone().strftime("%H:%M:%S") }}</td>
+        <td class="nowrap">{{ when(job.started_at) }}</td>
+        <td class="nowrap">{{ duration(job) }}</td>
         <td>
           <a href="/jobs/{{ job.id }}"><code>{{ job.spec.command_line }}</code></a>
         </td>
         <td class="status status-{{ job.status }}">{{ job.status|capitalize }}</td>
+        <td>{{ m.menu(actions(job), "More actions for this job") }}</td>
       </tr>
     {% endfor %}
     </tbody>
