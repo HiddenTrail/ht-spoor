@@ -584,3 +584,20 @@ def state_links_up_to_index(context: dict[str, Any], name: str) -> None:
 @then(parsers.parse('the state page for "{name}" links up to the help page'))
 def state_links_up_to_help(context: dict[str, Any], name: str) -> None:
     assert 'href="../help.html"' in _state_page(context, name)
+
+
+@then("every wiki page has the day/night switch and follows the system setting")
+def wiki_has_theme_switch(context: dict[str, Any]) -> None:
+    from spoor.exploration.theme import THEME_SCRIPT, TOGGLE_BUTTON
+
+    for name, html in _pages(context).items():
+        assert THEME_SCRIPT in html, name
+        assert TOGGLE_BUTTON in html, name
+        assert "@media (prefers-color-scheme: light)" in html, name
+
+
+@then("the overview diagram takes its colours from the page's theme")
+def diagram_follows_theme(context: dict[str, Any]) -> None:
+    index = _pages(context)["index.html"]
+    assert 'background: token("--bg")' in index
+    assert 'document.addEventListener("spoor-theme-change", draw)' in index

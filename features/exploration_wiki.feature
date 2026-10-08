@@ -69,6 +69,11 @@ Feature: Exploration wiki generation — the browsable map (ROADMAP.md §2e, sli
       | menu  | Menu open | 6        | menu opened | session; token | /home.js; /menu.js |
     And a transition "Open menu" from "home" to "menu"
 
+  Scenario: Every wiki page offers a day/night switch and follows the system by default
+    When I render the wiki for "https://shop.example"
+    Then every wiki page has the day/night switch and follows the system setting
+    And the overview diagram takes its colours from the page's theme
+
   Scenario: The wiki has an index, a page per state, and a page per transition
     When I render the wiki for "https://shop.example"
     Then the wiki has an index page

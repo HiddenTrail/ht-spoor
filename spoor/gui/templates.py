@@ -18,13 +18,17 @@ from importlib.resources import files
 
 from jinja2 import DictLoader, Environment, select_autoescape
 
-from spoor.exploration.theme import STYLESHEET
+from spoor.exploration.theme import (
+    STYLESHEET,
+    THEME_SCRIPT,
+    TOGGLE_BUTTON,
+    TOGGLE_CSS,
+)
 
 _GUI_CSS = """
       /* GUI-only rules, layered on Spoor's shared stylesheet (the wiki's theme,
          spoor/exploration/theme.py) and built from the same tokens, so the GUI
          and the wiki read as one product. */
-      :root { color-scheme: dark; }
       nav .brand {
         align-items: center;
         color: var(--accent);
@@ -32,7 +36,11 @@ _GUI_CSS = """
         font-weight: 700;
         gap: 0.45rem;
       }
-      nav .brand img { display: block; height: 1.6rem; width: auto; }
+      nav .brand img { height: 1.6rem; width: auto; }
+      /* Night: the orange hexagon; day: the black hexagon, which needs a light
+         background to show its shape. */
+      .logo-night { display: var(--night-only); }
+      .logo-day { display: var(--day-only); }
       .muted { color: var(--text-muted); }
       .crumbs { color: var(--text-muted); font-size: 0.9rem; margin: 0 0 0.4rem; }
       .card {
@@ -148,11 +156,14 @@ _LAYOUT = """<!DOCTYPE html>
     <title>{% block title %}Spoor{% endblock %}</title>
     <link rel="icon" type="image/svg+xml" href="{{ logo }}" />
     {% block head %}{% endblock %}
-    <style>""" + STYLESHEET + _GUI_CSS + """    </style>
+    <style>""" + STYLESHEET + TOGGLE_CSS + _GUI_CSS + """    </style>
+    """ + THEME_SCRIPT + """
   </head>
   <body>
     <nav>
-      <a class="brand" href="/"><img src="{{ logo }}" alt="" />Spoor</a>
+      <a class="brand" href="/">
+        <img class="logo-night" src="{{ logo }}" alt="" />
+        <img class="logo-day" src="{{ logo_day }}" alt="" />Spoor</a>
       <a href="/">Maps</a>
       <a href="/new/explore">Explore</a>
       <a href="/new/run">Extract</a>
@@ -161,6 +172,7 @@ _LAYOUT = """<!DOCTYPE html>
       <a href="/logins">Logins</a>
       <a href="/configs">Configs</a>
       <a href="/servers">Servers</a>
+      """ + TOGGLE_BUTTON + """
     </nav>
     <main>{% block body %}{% endblock %}</main>
   </body>
@@ -910,15 +922,20 @@ _TEMPLATES = {
 }
 
 
-def logo_data_uri() -> str:
-    """Spoor's logo (orange hexagon, black print) as an inline `data:` URI.
+#: The GUI's copies of the brand logos in docs/assets/ (a test keeps them
+#: identical): night mode and the browser tab use the orange hexagon
+#: (Spoor_O_B), day mode the black hexagon (Spoor_B_O).
+LOGOS = {"night": "spoor-logo-night.svg", "day": "spoor-logo-day.svg"}
 
-    The GUI's copy of `docs/assets/Spoor_O_B.svg`, the brand file it must stay
-    identical to (a test checks). It's the variant that reads best on the
-    GUI's dark theme and in a browser tab. Inlined so every page carries its
-    own logo and favicon with no extra route or request.
+
+def logo_data_uri(variant: str = "night") -> str:
+    """One of Spoor's logos as an inline `data:` URI.
+
+    Inlined so every page carries its own logo and favicon with no extra route
+    or request. "night" (the orange hexagon) is also the browser-tab icon,
+    because it reads on both light and dark tab bars.
     """
-    svg = files("spoor.gui").joinpath("assets", "spoor-logo.svg").read_bytes()
+    svg = files("spoor.gui").joinpath("assets", LOGOS[variant]).read_bytes()
     return "data:image/svg+xml;base64," + base64.b64encode(svg).decode("ascii")
 
 
@@ -930,5 +947,6 @@ def environment() -> Environment:
         trim_blocks=True,
         lstrip_blocks=True,
     )
-    env.globals["logo"] = logo_data_uri()
+    env.globals["logo"] = logo_data_uri("night")
+    env.globals["logo_day"] = logo_data_uri("day")
     return env

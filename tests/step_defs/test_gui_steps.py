@@ -313,6 +313,77 @@ def shows_logo(context: dict[str, Any]) -> None:
     from spoor.gui.templates import logo_data_uri
 
     text = _text(context)
-    logo = logo_data_uri()
-    assert f'<link rel="icon" type="image/svg+xml" href="{logo}" />' in text
-    assert f'<a class="brand" href="/"><img src="{logo}" alt="" />Spoor</a>' in text
+    night = logo_data_uri("night")
+    # The orange hexagon is the tab icon in both modes: it reads on any tab bar.
+    assert f'<link rel="icon" type="image/svg+xml" href="{night}" />' in text
+    assert f'<img class="logo-night" src="{night}" alt="" />' in text
+
+
+@then("the page has the day/night switch and follows the system setting")
+def has_theme_switch(context: dict[str, Any]) -> None:
+    from spoor.exploration.theme import THEME_SCRIPT, TOGGLE_BUTTON
+
+    text = _text(context)
+    assert THEME_SCRIPT in text
+    assert TOGGLE_BUTTON in text
+    assert "@media (prefers-color-scheme: light)" in text
+    # Nothing chosen server-side: the browser's setting decides until the reader
+    # picks a mode.
+    assert '<html lang="en">' in text
+
+
+@then("the page carries the night logo and the day logo, one shown per mode")
+def has_both_logos(context: dict[str, Any]) -> None:
+    from spoor.gui.templates import logo_data_uri
+
+    text = _text(context)
+    assert f'<img class="logo-night" src="{logo_data_uri("night")}" alt="" />' in text
+    assert f'<img class="logo-day" src="{logo_data_uri("day")}" alt="" />' in text
+    assert ".logo-night { display: var(--night-only); }" in text
+    assert ".logo-day { display: var(--day-only); }" in text
+
+
+@when("a real browser set to light mode opens the launch URL")
+def light_browser_opens(context: dict[str, Any]) -> None:
+    from playwright.sync_api import sync_playwright
+
+    pw = sync_playwright().start()
+    browser = pw.chromium.launch()
+    context["browser"] = (pw, browser)
+    page = browser.new_context(color_scheme="light").new_page()
+    context["page"] = page
+    page.goto(context["gui"].launch_url)
+
+
+@when("the browser switches to night mode")
+def switch_to_night(context: dict[str, Any]) -> None:
+    context["page"].get_by_role("button", name="Switch to night mode").click()
+
+
+@when("the GUI is restarted on another port and the browser opens it again")
+def restart_gui(context: dict[str, Any]) -> None:
+    old = context["gui"]
+    old.stop()
+    context["gui"] = start_gui(context["store"])
+    assert context["gui"].url != old.url
+    context["page"].goto(context["gui"].launch_url)
+
+
+def _mode(context: dict[str, Any]) -> tuple[str, bool, bool]:
+    page = context["page"]
+    background = page.evaluate("getComputedStyle(document.body).backgroundColor")
+    return (
+        background,
+        page.locator("nav .logo-day").is_visible(),
+        page.locator("nav .logo-night").is_visible(),
+    )
+
+
+@then("the page is in day mode with the day logo")
+def in_day_mode(context: dict[str, Any]) -> None:
+    assert _mode(context) == ("rgb(255, 255, 255)", True, False)
+
+
+@then("the page is in night mode with the night logo")
+def in_night_mode(context: dict[str, Any]) -> None:
+    assert _mode(context) == ("rgb(31, 28, 27)", False, True)

@@ -85,7 +85,8 @@ presentational: the class names (`.count`, `.screenshot`, `.screenshot-crop`) an
 non-style attribute are unchanged, so existing content, links, and redaction behaviour
 are untouched. (The stylesheet itself now lives in `theme.py:STYLESHEET`, shared
 verbatim with the §2i local GUI so the two surfaces can't drift apart; the layout
-below embeds it unchanged.)
+below embeds it unchanged. It has since gained a day mode beside this night
+one: see the day/night decision in ROADMAP §2i.)
 
 Slice 6i deepens that pass with the detail 6h's first cut left flat: three stat tiles
 (states/transitions/skipped) replace the index's bare bullet list; the index's and
@@ -132,7 +133,12 @@ from spoor.exploration.capture import StateSignals
 from spoor.exploration.explorer import ElementShot
 from spoor.exploration.graph import ExplorationGraph, SkippedAction, Transition
 from spoor.exploration.screenshot_store import ImageRef
-from spoor.exploration.theme import STYLESHEET
+from spoor.exploration.theme import (
+    STYLESHEET,
+    THEME_SCRIPT,
+    TOGGLE_BUTTON,
+    TOGGLE_CSS,
+)
 from spoor.security.redaction import REDACTED, redact
 
 # Length of the state-id prefix shown as a human-readable label. State ids are
@@ -677,12 +683,14 @@ _LAYOUT = """<!DOCTYPE html>
   <head>
     <meta charset="utf-8" />
     <title>{% block title %}Spoor exploration wiki{% endblock %}</title>
-    <style>""" + STYLESHEET + """</style>
+    <style>""" + STYLESHEET + TOGGLE_CSS + """</style>
+    """ + THEME_SCRIPT + """
   </head>
   <body>
     <nav><a href="{{ root }}index.html">&larr; Overview</a> &middot;
       <a href="{{ root }}help.html">Help / glossary</a> &middot;
-      <span>Explored target: <code>{{ target }}</code></span></nav>
+      <span>Explored target: <code>{{ target }}</code></span>
+      """ + TOGGLE_BUTTON + """</nav>
     <main>
     {% block body %}{% endblock %}
     </main>
@@ -713,18 +721,31 @@ else.</p>
 </pre>
 <script type="module">
   import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
-  mermaid.initialize({
-    startOnLoad: true,
-    theme: "base",
-    themeVariables: {
-      background: "#1f1c1b",
-      primaryColor: "#2a2724",
-      primaryBorderColor: "#5a5550",
-      primaryTextColor: "#f0ece8",
-      lineColor: "#aaa39d",
-      fontFamily: "-apple-system, \\"Segoe UI\\", Roboto, Helvetica, Arial, sans-serif",
-    },
-  });
+  // Coloured from the page's own theme tokens, so the diagram matches day or
+  // night, and redrawn when the reader switches.
+  const diagram = document.querySelector("pre.mermaid");
+  const source = diagram.textContent;
+  const token = (name) =>
+    getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  async function draw() {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: "base",
+      themeVariables: {
+        background: token("--bg"),
+        primaryColor: token("--surface"),
+        primaryBorderColor: token("--border-hover"),
+        primaryTextColor: token("--text"),
+        lineColor: token("--text-muted"),
+        fontFamily: getComputedStyle(document.body).fontFamily,
+      },
+    });
+    diagram.removeAttribute("data-processed");
+    diagram.textContent = source;
+    await mermaid.run({ nodes: [diagram] });
+  }
+  draw();
+  document.addEventListener("spoor-theme-change", draw);
 </script>
 
 <h2>States</h2>
