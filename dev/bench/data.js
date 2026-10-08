@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791408561186,
+  "lastUpdate": 1791438568576,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -10640,6 +10640,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5372.3,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dd0803cf34bf2e60f634be62deef9507e5527171",
+          "message": "GUI slice gui-3: saved logins and config files from the browser (§2i) (#225)\n\n* Add GUI slice gui-3: saved logins and config files (§2i)\n\nLogins page: lists stored sessions straight from the session store (names and\ndates only; it can't return contents), adds one by upload through the real\n`spoor session add`, and removes one through `spoor session remove`. The upload\nlives in a private temporary folder only while the command runs, a hanging\ncommand is force-stopped, and names/sites go after `--` so one starting with\n\"-\" is never read as an option. The explore and apply-scaffold forms suggest\nstored login names.\n\nConfigs page: lists .yaml/.yml files in the working folder with whether each\nvalidates; creates one from the README example; an editor checks with the same\nloader `spoor run` uses (each problem with its field path or YAML line), saves\n(even when not valid yet, and says so), and links to \"Run this config\". Only\nfiles inside the working folder, never hidden, cache or output folders. A file\nthe editor can't safely round-trip (too large, not UTF-8) gets no editor.\n\nRecords the gui-3 mechanics decision in ROADMAP §2i. BDD:\nfeatures/gui_sessions_configs.feature (23 scenarios, two @browser). The fake\nrunner shared by the GUI steps moves to tests/step_defs/_gui_fakes.py.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* GUI config editor keeps a file's line-break style on save (§2i)\n\nA browser submits a text area with CRLF line breaks whatever the file used,\nso saving rewrote every line ending: opening and saving a CRLF fixture showed\nup in git as a whole-file change with no real edit. Saving now writes the\nfile's existing style back (CRLF if it had any, LF otherwise and for new\nfiles).\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-08T08:44:26+03:00",
+          "tree_id": "8e140a601b6c284b624855a97c284bdfb75cb21d",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/dd0803cf34bf2e60f634be62deef9507e5527171"
+        },
+        "date": 1791438568135,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 229.404,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04268,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.1159,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.12912,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.0821,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.07262,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 12.6914,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.13681,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 20.992,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.0478,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.2928,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.58243,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.9122,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.04812,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 13.4389,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.02122,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.6368,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09325,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5752,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01075,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.488,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5303,
             "unit": "MB"
           }
         ]
