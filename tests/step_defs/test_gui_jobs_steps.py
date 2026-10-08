@@ -12,16 +12,16 @@ runner and explores a local static fixture end to end.
 from __future__ import annotations
 
 import os
-import queue
 import shlex
-import threading
 import time
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import pytest
+from _gui_fakes import FINISH_TIMEOUT_S as _FINISH_TIMEOUT_S
+from _gui_fakes import FakeProcess, FakeRunner, flag_value
 from fastapi.testclient import TestClient
 from pytest_bdd import given, parsers, scenarios, then, when
 
@@ -36,68 +36,6 @@ scenarios("gui_jobs.feature")
 _TOKEN = "known-test-token"
 _PORT = 8766
 _BASE = f"http://127.0.0.1:{_PORT}"
-_FINISH_TIMEOUT_S = 10.0
-
-
-# --- The fake runner -----------------------------------------------------------
-
-
-class FakeProcess:
-    """A scripted stand-in for a child process."""
-
-    def __init__(self) -> None:
-        self._lines: queue.Queue[str | None] = queue.Queue()
-        self._done = threading.Event()
-        self.killed = threading.Event()
-        self.exit_code = 0
-
-    def emit(self, line: str) -> None:
-        self._lines.put(line + "\n")
-
-    def exit(self, code: int) -> None:
-        self.exit_code = code
-        self._lines.put(None)
-        self._done.set()
-
-    def readline(self) -> str:
-        line = self._lines.get(timeout=_FINISH_TIMEOUT_S)
-        return "" if line is None else line
-
-    def wait(self) -> int:
-        self._done.wait(_FINISH_TIMEOUT_S)
-        return self.exit_code
-
-    def kill(self) -> None:
-        self.killed.set()
-
-
-Script = Callable[[FakeProcess, Sequence[str], Mapping[str, str]], None]
-
-
-def _exit_at_once(proc: FakeProcess, args: Sequence[str], env: Any) -> None:
-    proc.exit(0)
-
-
-class FakeRunner:
-    """Records every start and runs the current script in a thread."""
-
-    def __init__(self) -> None:
-        self.started: list[tuple[list[str], dict[str, str]]] = []
-        self.processes: list[FakeProcess] = []
-        self.script: Script = _exit_at_once
-
-    def start(self, args: Sequence[str], env: Mapping[str, str]) -> FakeProcess:
-        self.started.append((list(args), dict(env)))
-        proc = FakeProcess()
-        self.processes.append(proc)
-        threading.Thread(
-            target=self.script, args=(proc, list(args), dict(env)), daemon=True
-        ).start()
-        return proc
-
-
-def _flag_value(args: Sequence[str], flag: str) -> str:
-    return args[args.index(flag) + 1]
 
 
 # --- Fixtures ------------------------------------------------------------------
@@ -189,7 +127,7 @@ def fake_prints(context: dict[str, Any], line: str, code: int) -> None:
 @given("the fake command will write a wiki and exit 0")
 def fake_writes_wiki(context: dict[str, Any]) -> None:
     def script(proc: FakeProcess, args: Sequence[str], env: Any) -> None:
-        wiki = Path(_flag_value(args, "--wiki"))
+        wiki = Path(flag_value(args, "--wiki"))
         wiki.mkdir(parents=True)
         (wiki / "index.html").write_text("<h1>Wiki index</h1>", encoding="utf-8")
         # Something just outside the wiki that must never be served from it.

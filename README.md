@@ -119,11 +119,20 @@ There you can:
   current action and save what it mapped so far; Force stop ends any run at once.
 - **See where each run's output landed**, open its folder, open its wiki, or jump
   to the map it produced.
+- **Save logins** (on the Logins page) so explore and extract runs can work as a
+  logged-in user: upload a browser login file once, give it a name, then pick that
+  name in the forms. Spoor stores it on your computer only and never shows its
+  contents; it still never logs in on its own.
+- **Write and fix extraction configs** (on the Configs page): create one from an
+  example, check it (each problem is shown with where it is), save it, and run it.
+  The editor works on `.yaml`/`.yml` files in the folder you started `spoor gui` in.
 
-Secrets are shown as `[REDACTED]` everywhere in the GUI, just as `spoor serve`
-returns them. Output goes to the folders the form names, by default
-`spoor-output/<date and time>/` under the folder you started `spoor gui` in. Managing
-saved logins and editing configs from the browser are coming next.
+Secrets Spoor captured are shown as `[REDACTED]` in the GUI's maps and run logs,
+just as `spoor serve` returns them. The config editor is the one exception: it shows
+your own config file exactly as it is on disk, because hiding a token there would
+also remove it from the file when you save. Output goes to the folders the form
+names, by default `spoor-output/<date and time>/` under the folder you started
+`spoor gui` in. Starting the map server from the browser is coming next.
 
 The app is reachable only from your own computer, and only through the link
 `spoor gui` prints when it starts. That link carries a one-time access key, so
@@ -555,7 +564,7 @@ Captured artifacts are written to a local-only, git-ignored cache.
 
 ### Still on the roadmap
 
-- Managing saved logins, editing configs, and starting the map server from the browser GUI (`spoor gui` browses maps and runs explore/extract/apply-scaffold today)
+- Starting the map server from the browser GUI (`spoor gui` browses maps, runs explore/extract/apply-scaffold, and manages saved logins and configs today)
 - Default-on capture behavior (today capture remains opt-in)
 - Automatic re-checking of a served map entry once it is "too old" (today the serving layer always shows how old an answer is and only re-fetches when a caller explicitly asks via `--recheck`, never on its own)
 
