@@ -13,7 +13,7 @@ diffing (§5.4).
 Each capability maps to a `spoor/` subpackage and a ROADMAP phase (§4). Files
 are authored when their phase begins, not up front.
 
-71 feature files, grouped below by what they cover rather than listed as one
+72 feature files, grouped below by what they cover rather than listed as one
 flat table — the grouping is purely navigational (every row's text is
 unchanged from before); the prose section further down keeps its own
 chronological, slice-by-slice narrative order.
@@ -133,6 +133,7 @@ chronological, slice-by-slice narrative order.
 | `exploration_replay.feature` | Replay resilience: verify each reset-and-replay against the state ids it first reached and retry a transient bad render, flagging a persistently unreachable or divergent step honestly (sub-slice 7d) | §2e | `spoor/exploration` | 5 |
 | `exploration_settling_network.feature` | Settling also waits for the network: treat the page as busy while a request is in flight so a late response can't render a different page after a read, bounded so a never-ending request is flagged unsettled not hung (sub-slice 7e) | §2e | `spoor/exploration` | 5 |
 | `exploration_settling_announcements.feature` | Settling also waits out an urgent live-region announcement: treat an on-screen `aria-live="assertive"`/`role="alert"` toast as page activity so a transient notification that auto-dismisses can't leave two captures of one screen on different state ids, bounded so a never-clearing announcement is flagged unsettled not hung; durable `polite`/`status` regions are ignored (sub-slice 7f) | §2e | `spoor/exploration` | 5 |
+| `exploration_settling_busy.feature` | Settling also waits while a loading indicator is on screen (7g): a visible `aria-busy="true"` element, an indeterminate `role="progressbar"` (no `aria-valuenow`) or a `<progress>` without a value counts as page activity, so a capture reads the loaded screen, not a spinner screen that sits still with no mutation or request; a progress bar showing a value, or a hidden spinner, never holds the wait; an indicator that never clears is unsettled at the timeout | §2e | `spoor/exploration` | 5 |
 
 ### Exploration — traversal & resume
 

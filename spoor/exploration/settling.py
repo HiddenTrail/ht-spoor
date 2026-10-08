@@ -83,6 +83,7 @@ def wait_for_quiescence(
     poll_interval: float,
     busy: Callable[[], bool] | None = None,
     announcing: Callable[[], bool] | None = None,
+    loading: Callable[[], bool] | None = None,
 ) -> SettleResult:
     """Wait until the page goes quiet for `quiet_window`, bounded by `timeout`.
 
@@ -92,13 +93,18 @@ def wait_for_quiescence(
     a late network response that will mutate the DOM cannot be settled past (7e).
     `announcing`, when given, reports whether an urgent live-region announcement is on
     screen — while it is true the page is likewise treated as active, so a transient
-    toast that auto-dismisses cannot be settled past (7f). Either predicate omitted (the
-    default) simply never contributes activity, so 7b's DOM-only quiet is the base case.
+    toast that auto-dismisses cannot be settled past (7f). `loading`, when given,
+    reports whether a loading indicator (a spinner, an aria-busy region) is on screen —
+    while it is true the page is likewise treated as active, so a loading screen that
+    sits still before the real content renders cannot be settled past (7g). Any
+    predicate omitted (the default) simply never contributes activity, so 7b's DOM-only
+    quiet is the base case.
     Polls every `poll_interval`, reading time through `clock` and waiting via `sleep` so
     the whole decision is deterministic under a fake clock. Returns settled once
-    mutations have held steady *and* nothing is busy or announcing for `quiet_window`;
-    returns unsettled once `timeout` elapses without that happening — so a request or an
-    announcement that never clears is bounded exactly like a page that mutates forever.
+    mutations have held steady *and* nothing is busy, announcing or loading for
+    `quiet_window`; returns unsettled once `timeout` elapses without that happening — so
+    a request, an announcement or a loading indicator that never clears is bounded
+    exactly like a page that mutates forever.
     All three time arguments must share one unit and `poll_interval` must be positive.
     """
     if poll_interval <= 0:
@@ -106,15 +112,16 @@ def wait_for_quiescence(
 
     is_busy = busy if busy is not None else _never_active
     is_announcing = announcing if announcing is not None else _never_active
+    is_loading = loading if loading is not None else _never_active
 
     def active() -> bool:
-        return is_busy() or is_announcing()
+        return is_busy() or is_announcing() or is_loading()
 
     start = clock()
     last_count = observe()
-    # The last instant the page was active — a mutation, a request in flight, or an
-    # announcement on screen. Quiet is measured from here; any kind of activity pushes
-    # it forward.
+    # The last instant the page was active — a mutation, a request in flight, an
+    # announcement or a loading indicator on screen. Quiet is measured from here; any
+    # kind of activity pushes it forward.
     last_active = start
     while True:
         now = clock()
@@ -134,7 +141,7 @@ def wait_for_quiescence(
 def _never_active() -> bool:
     """The default for an omitted activity signal: never contributes activity.
 
-    Used for both `busy` (7e) and `announcing` (7f) when the caller supplies neither, so
-    the decision reduces to 7b's DOM-only quiet.
+    Used for `busy` (7e), `announcing` (7f) and `loading` (7g) when the caller supplies
+    none of them, so the decision reduces to 7b's DOM-only quiet.
     """
     return False

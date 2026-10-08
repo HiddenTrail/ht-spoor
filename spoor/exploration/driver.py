@@ -238,6 +238,28 @@ _ANNOUNCING_JS = """
 }
 """
 
+# True while a *loading indicator* is visibly on screen (§2e, 7g): an element marked
+# `aria-busy="true"`, an indeterminate `role="progressbar"` (no `aria-valuenow`), or
+# an HTML `<progress>` with no value. A page often shows one while it loads with no DOM
+# mutation (the spinner is a CSS animation) and no request in flight (the delay is a
+# client timer), so DOM-quiet and network-idle would settle on the loading screen; the
+# settle wait treats one on screen as page activity instead. Deliberately excludes a
+# progress bar that shows a value, which is durable status (a gauge) and must not hold
+# the page unsettled, and an indicator that isn't displayed (no layout box, or
+# `visibility: hidden`). Any read failure counts as not loading (quiet), matching the
+# other probes' fail-quiet stance.
+_LOADING_JS = """
+() => {
+  const sel = '[aria-busy="true"], [role="progressbar"]:not([aria-valuenow]),' +
+    ' progress:not([value])';
+  for (const el of document.querySelectorAll(sel)) {
+    if (el.getClientRects().length > 0 &&
+        getComputedStyle(el).visibility !== 'hidden') return true;
+  }
+  return false;
+}
+"""
+
 # A fixed viewport at device-scale 1: CSS pixels equal device pixels equal the
 # coordinate space `elementFromPoint` and the mouse both use, so every computed click
 # centre is reproducible run to run — the reproducibility robust actuation needs (7a).
@@ -721,16 +743,18 @@ class PlaywrightDriver:
         )
 
     def _wait_for_settle(self) -> SettleResult:
-        """Wait for the page to go quiet, recording whether it settled (7b/7e/7f).
+        """Wait for the page to go quiet, recording whether it settled (7b/7e/7f/7g).
 
         Feeds the live mutation counter into the pure quiescence decision
         (`wait_for_quiescence`) through this driver's clock/sleep seams, along with the
-        in-flight request count (the `busy` signal, 7e) and an on-screen urgent-
-        announcement probe (the `announcing` signal, 7f) so a late network response or a
-        transient toast cannot be settled past. A read that fails because the execution
-        context was torn down mid-navigation reuses the last count / reads as not
-        announcing rather than crashing, so the wait tolerates a full-page navigation in
-        flight. Stores the settled verdict for the next captured bundle.
+        in-flight request count (the `busy` signal, 7e), an on-screen urgent-
+        announcement probe (the `announcing` signal, 7f) and a visible loading-indicator
+        probe (the `loading` signal, 7g), so a late network response, a transient toast
+        or a still loading screen cannot be settled past. A read that fails because the
+        execution context was torn down mid-navigation reuses the last count / reads as
+        not announcing or loading rather than crashing, so the wait tolerates a
+        full-page navigation in flight. Stores the settled verdict for the next
+        captured bundle.
         """
         page = self._live_page
 
@@ -750,6 +774,13 @@ class PlaywrightDriver:
                 # the same fail-quiet stance the mutation read takes above.
                 return False
 
+        def loading() -> bool:
+            try:
+                return bool(page.evaluate(_LOADING_JS))
+            except PlaywrightError:
+                # Same fail-quiet stance: a read that can't happen isn't "loading".
+                return False
+
         result = wait_for_quiescence(
             observe=observe,
             clock=self._clock,
@@ -759,6 +790,7 @@ class PlaywrightDriver:
             poll_interval=self._poll_interval,
             busy=lambda: self._inflight > 0,
             announcing=announcing,
+            loading=loading,
         )
         self._last_settled = result.settled
         return result
