@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1791441303812,
+  "lastUpdate": 1791442505962,
   "repoUrl": "https://github.com/HiddenTrail/ht-spoor",
   "entries": {
     "Spoor exploration perf (small)": [
@@ -10928,6 +10928,150 @@ window.BENCHMARK_DATA = {
           {
             "name": "juice-shop-small / peak RSS",
             "value": 5324.8,
+            "unit": "MB"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "103989476+pekka-hiddentrail@users.noreply.github.com",
+            "name": "pekka-hiddentrail",
+            "username": "pekka-hiddentrail"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "06b2b50881d3808751231690587d951014923704",
+          "message": "Add the Spoor logos, and brand the GUI with one (#227)\n\n* Add the Spoor logos, and brand the GUI with one (§2i)\n\nThe three logo colourways (hoof print on a hexagon) now live in docs/assets/\nas the canonical brand files, SVG and PNG each, with a short guide to which to\nuse where. Each SVG gains a viewBox so it scales cleanly to icon size.\n\nThe GUI shows the orange-hexagon variant in its top bar and as its browser-tab\nicon (the black-hexagon variants lose their edge on the dark theme). docs/ isn't\npackaged, so the GUI ships a copy at spoor/gui/assets/spoor-logo.svg, inlined\nas a data: URI, with a test that fails if it drifts from docs/assets.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n* Match the logos' orange to the theme's coral (#F85840)\n\nThe two orange logo variants used #E97132, visibly off the theme accent the\nlogo now sits beside in the GUI's top bar. Both are recoloured to #F85840:\nthe SVGs by a fill swap, the PNGs by reapplying each pixel's orange/black\nblend to the new colour, so edges and transparency are unchanged. The\nblack/white variant has no orange and is untouched. The GUI's shipped copy is\nrefreshed to match.\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Claude Opus 5.5 <noreply@anthropic.com>",
+          "timestamp": "2026-10-08T09:49:51+03:00",
+          "tree_id": "8390f29412163a98f53886788516b3dd57fc50dd",
+          "url": "https://github.com/HiddenTrail/ht-spoor/commit/06b2b50881d3808751231690587d951014923704"
+        },
+        "date": 1791442504640,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "juice-shop-small / total elapsed",
+            "value": 229.952,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes median",
+            "value": 0.04301,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / ax_nodes total",
+            "value": 2.2581,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals median",
+            "value": 0.13004,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / capture_signals total",
+            "value": 3.122,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url median",
+            "value": 0.00001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / current_url total",
+            "value": 0.0001,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box median",
+            "value": 0.08171,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_box total",
+            "value": 12.6571,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot median",
+            "value": 0.12373,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / element_screenshot total",
+            "value": 20.6422,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot median",
+            "value": 0.05167,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / opened_screenshot total",
+            "value": 0.3365,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform median",
+            "value": 0.58971,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / perform total",
+            "value": 32.7284,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe median",
+            "value": 0.0573,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / probe total",
+            "value": 14.4167,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset median",
+            "value": 6.01281,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / reset total",
+            "value": 126.9711,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot median",
+            "value": 0.09059,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / screenshot total",
+            "value": 0.5478,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html median",
+            "value": 0.01087,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / state_html total",
+            "value": 0.4888,
+            "unit": "s"
+          },
+          {
+            "name": "juice-shop-small / peak RSS",
+            "value": 5361.3,
             "unit": "MB"
           }
         ]
