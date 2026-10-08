@@ -107,6 +107,19 @@ Feature: Running Spoor's commands from the local GUI
       | wiki_dir | out/wiki                      |
     Then the fake runner was started with "apply-scaffold http://127.0.0.1:9/app <abs:out/scaffold/interactive.yaml> --sandbox --session customer --wiki <abs:out/wiki>"
 
+  Scenario Outline: An address typed without http:// or https:// is completed like a browser would
+    When I submit the explore form with:
+      | field | value     |
+      | url   | <typed>   |
+    Then the fake runner was started with "explore <completed>"
+
+    Examples:
+      | typed            | completed                |
+      | localhost:3000   | http://localhost:3000    |
+      | 192.168.1.20/app | http://192.168.1.20/app  |
+      | shop.example/a   | https://shop.example/a   |
+      | http://x.example | http://x.example         |
+
   Scenario: A missing required field re-shows the form with a message, launching nothing
     When I submit the explore form with:
       | field      | value |

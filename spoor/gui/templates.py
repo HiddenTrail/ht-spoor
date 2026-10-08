@@ -547,7 +547,9 @@ _MAPS = """{% extends "layout.html" %}
 <div class="card">
   <ul class="index-list">
   {% for d in domains %}
-    <li><a href="{{ d.href }}">{{ d.name }}</a></li>
+    <li><a href="{{ d.href }}">{{ d.name or NO_SITE }}</a>
+      {% if not d.name %}<span class="muted">· saved from addresses without
+      http:// or https://</span>{% endif %}</li>
   {% endfor %}
   </ul>
 </div>
@@ -562,10 +564,10 @@ _MAPS = """{% extends "layout.html" %}
 """
 
 _DOMAIN = """{% extends "layout.html" %}
-{% block title %}{{ domain }} · Spoor{% endblock %}
+{% block title %}{{ domain or NO_SITE }} · Spoor{% endblock %}
 {% block body %}
 <div class="crumbs"><a href="/maps">Mapped sites</a> /</div>
-<h1>{{ domain }}</h1>
+<h1>{{ domain or NO_SITE }}</h1>
 {% if urls %}
 <div class="table-wrap">
   <table>
@@ -1353,5 +1355,8 @@ def environment() -> Environment:
         lstrip_blocks=True,
     )
     env.globals["logo"] = logo_data_uri("night")
+    # How a map filed under an empty site name is listed (an address saved
+    # without http:// or https:// before Spoor completed such addresses).
+    env.globals["NO_SITE"] = "Maps without a site name"
     env.globals["logo_day"] = logo_data_uri("day")
     return env

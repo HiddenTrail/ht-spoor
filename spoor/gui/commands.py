@@ -21,6 +21,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from spoor.core.address import complete_address
+
 #: The output formats `spoor run --format` accepts ("" = infer from the file name).
 RUN_FORMATS = ("", "json", "jsonl", "csv", "md", "sqlite", "parquet")
 
@@ -119,8 +121,10 @@ def _output(
 
 def explore_command(form: Form, workdir: Path) -> CommandSpec:
     """`spoor explore` from the explore form."""
-    url = _positional(
-        form, "url", "Enter the address of the site to explore.", "The address"
+    url = complete_address(
+        _positional(
+            form, "url", "Enter the address of the site to explore.", "The address"
+        )
     )
     args = ["explore", url]
     outputs: dict[str, Path] = {}
@@ -201,8 +205,10 @@ def run_command(form: Form, workdir: Path) -> CommandSpec:
 
 def apply_scaffold_command(form: Form, workdir: Path) -> CommandSpec:
     """`spoor apply-scaffold` from the apply-scaffold form."""
-    url = _positional(
-        form, "url", "Enter the address of the mapped page.", "The address"
+    url = complete_address(
+        _positional(
+            form, "url", "Enter the address of the mapped page.", "The address"
+        )
     )
     scaffold = _absolute(
         workdir,

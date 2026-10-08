@@ -845,3 +845,44 @@ def test_progress_lines_mode_prints_plain_lines_even_without_a_terminal(
     out = capsys.readouterr().out
     assert out == "progress: 0 state(s), 0 request(s), 0s\n"
     assert "\r" not in out
+
+
+def test_explore_completes_an_address_without_a_scheme(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from spoor.exploration import driver as driver_mod
+    from spoor.exploration.graph import ExplorationGraph
+    from spoor.serving.store import MapStore
+
+    seen: dict[str, object] = {}
+
+    class _FakeDriver:
+        def __init__(self, target: str, *, session: str | None = None) -> None:
+            seen["target"] = target
+
+        def __enter__(self) -> _FakeDriver:
+            return self
+
+        def __exit__(self, *exc: object) -> None:
+            pass
+
+    monkeypatch.setattr(driver_mod, "PlaywrightDriver", _FakeDriver)
+    monkeypatch.setattr(
+        "spoor.exploration.explorer.explore", lambda *a, **k: ExplorationGraph()
+    )
+    result = runner.invoke(cli.app, ["explore", "localhost:3000"])
+    assert result.exit_code == 0, result.output
+    assert seen["target"] == "http://localhost:3000"
+    assert "Using http://localhost:3000 for 'localhost:3000'" in result.output
+    # Filed under its site, so the GUI's Maps page lists it by name.
+    entry = MapStore().get("http://localhost:3000")
+    assert entry is not None
+    assert entry.domain == "localhost:3000"
+
+
+def test_apply_scaffold_completes_an_address_without_a_scheme(tmp_path: Path) -> None:
+    scaffold = tmp_path / "interactive.yaml"
+    scaffold.write_text("fields: []\n", encoding="utf-8")
+    result = runner.invoke(cli.app, ["apply-scaffold", "localhost:3000", str(scaffold)])
+    assert result.exit_code != 0
+    assert "no saved exploration map for http://localhost:3000" in result.output
