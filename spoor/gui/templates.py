@@ -136,6 +136,7 @@ _LAYOUT = """<!DOCTYPE html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Spoor{% endblock %}</title>
+    {% block head %}{% endblock %}
     <style>""" + STYLESHEET + _GUI_CSS + """    </style>
   </head>
   <body>
@@ -148,6 +149,7 @@ _LAYOUT = """<!DOCTYPE html>
       <a href="/jobs">Jobs</a>
       <a href="/logins">Logins</a>
       <a href="/configs">Configs</a>
+      <a href="/servers">Servers</a>
     </nav>
     <main>{% block body %}{% endblock %}</main>
   </body>
@@ -792,6 +794,92 @@ _CONFIG_EDIT = """{% extends "layout.html" %}
 {% endblock %}
 """
 
+_SERVERS = """{% extends "layout.html" %}
+{% block title %}Servers · Spoor{% endblock %}
+{% block head %}{% if state == "starting" %}
+<meta http-equiv="refresh" content="2" />{% endif %}{% endblock %}
+{% block body %}
+<h1>Servers</h1>
+<p class="muted">Let scripts and AI agents use what Spoor has mapped. Both servers
+only read the maps; neither can change anything on a site.</p>
+
+<h2>Map API server</h2>
+<p class="muted">A small web API on this computer that answers questions about
+mapped pages, for scripts and dashboards.</p>
+{% if error %}<div class="notice notice-error">{{ error }}</div>{% endif %}
+{% if state == "running" %}
+<div class="notice notice-info">
+  The map server is running at <a href="{{ url }}/domains" target="_blank"
+  rel="noopener">{{ url }}</a>.
+  Try <a href="{{ url }}/domains" target="_blank" rel="noopener">{{ url }}/domains</a>.
+</div>
+{% elif state == "starting" %}
+<div class="notice">The map server is starting at {{ url }}…</div>
+{% elif state == "failed" %}
+<div class="notice notice-error">The map server stopped with an error. Its log
+  is below.</div>
+{% else %}
+<div class="card"><p>The map server is not running.</p></div>
+{% endif %}
+
+{% if state in ("running", "starting") %}
+<form method="post" action="/servers/stop">
+  <button type="submit">Stop the map server</button>
+  {% if job %}<a href="/jobs/{{ job.id }}">See its log</a>{% endif %}
+</form>
+{% else %}
+<form method="post" action="/servers/start">
+<fieldset>
+  <label for="port">Port</label>
+  <input type="text" inputmode="numeric" id="port" name="port" value="{{ port }}" />
+  <p class="hint">It listens on this computer only (127.0.0.1).</p>
+  <label class="check">
+    <input type="checkbox" name="recheck" />
+    <span>Allow callers to ask for a fresh read of a mapped page</span>
+  </label>
+  <p class="hint indent">A fresh read re-runs that page's extraction (it reads the
+  site again; it never changes anything there). Off by default.</p>
+</fieldset>
+<button type="submit">Start the map server</button>
+</form>
+{% endif %}
+{% if log %}
+<h2>Recent log</h2>
+<pre class="log">{% for line in log %}{{ line }}
+{% endfor %}</pre>
+{% endif %}
+
+<h2>For AI agents (MCP)</h2>
+<p class="muted">AI clients such as Claude start Spoor's MCP server themselves, so it
+isn't started here. Add this to your client's MCP configuration; it points the
+server at the maps this GUI uses, wherever the client starts it.</p>
+<div class="card">
+  <pre id="mcp-json">{{ mcp_json }}</pre>
+</div>
+<button type="button" class="secondary" data-copy="mcp-json">Copy</button>
+<p class="hint">Or, for Claude Code, run:</p>
+<div class="card">
+  <pre id="mcp-command">{{ mcp_command }}</pre>
+</div>
+<button type="button" class="secondary" data-copy="mcp-command">Copy</button>
+<p class="hint">To let agents ask for a fresh read of a mapped page, add
+<code>--recheck</code> after <code>serve-mcp</code>.</p>
+<script>
+document.querySelectorAll("button[data-copy]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const text = document.getElementById(button.dataset.copy).textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      button.textContent = "Copied";
+    } catch (e) {
+      button.textContent = "Select the text and copy it";
+    }
+  });
+});
+</script>
+{% endblock %}
+"""
+
 _TEMPLATES = {
     "layout.html": _LAYOUT,
     "home.html": _HOME,
@@ -807,6 +895,7 @@ _TEMPLATES = {
     "logins.html": _LOGINS,
     "configs.html": _CONFIGS,
     "config_edit.html": _CONFIG_EDIT,
+    "servers.html": _SERVERS,
 }
 
 
