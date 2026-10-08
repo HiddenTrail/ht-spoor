@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Callable
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -29,7 +29,14 @@ from fastapi.responses import (
 )
 from starlette.responses import Response
 
-from spoor.gui.commands import BUILDERS, RUN_FORMATS, FormError
+from spoor.gui import configs
+from spoor.gui.commands import (
+    BUILDERS,
+    OUTPUT_ROOT,
+    RUN_FORMATS,
+    FormError,
+    fresh_output_form,
+)
 from spoor.gui.jobs import Job, JobManager
 from spoor.security.session_store import SessionStore
 from spoor.serving.store import MapStore
@@ -43,14 +50,54 @@ _FORMS = {
     "apply-scaffold": ("Apply a filled-in scaffold", "form_apply_scaffold.html"),
 }
 
+#: The file a `--scaffold` folder holds (what apply-scaffold reads).
+SCAFFOLD_FILE = "interactive.yaml"
+
 #: Seconds between checks for new log lines while a job's log is being streamed.
 _POLL_SECONDS = 0.2
 
 
+def _fresh_stamp(workdir: Path) -> str:
+    """A date-and-time folder name not yet used under spoor-output/.
+
+    Two runs started in the same second (say, a rerun right after its job)
+    would otherwise share a folder, so a counter is added when needed.
+    """
+    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+    root = workdir / OUTPUT_ROOT
+    candidate, n = stamp, 2
+    while (root / candidate).exists() or candidate in _issued_stamps:
+        candidate, n = f"{stamp}-{n}", n + 1
+    _issued_stamps.add(candidate)
+    return candidate
+
+
+#: Stamps handed out in this GUI session (a form can be opened before any of its
+#: folders exist on disk, so the disk alone can't tell which are taken).
+_issued_stamps: set[str] = set()
+
+
 def _default_folder(workdir: Path) -> Path:
     """A fresh per-form output folder, so one run never overwrites another's."""
-    stamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    return workdir / "spoor-output" / stamp
+    return workdir / OUTPUT_ROOT / _fresh_stamp(workdir)
+
+
+def when(moment: datetime | None) -> str:
+    """A moment as a local date and time, e.g. \"2026-10-08 14:32:05\"."""
+    return moment.astimezone().strftime("%Y-%m-%d %H:%M:%S") if moment else ""
+
+
+def duration(job: Job) -> str:
+    """How long a job ran (or has been running), e.g. \"1 min 05 s\"."""
+    end = job.finished_at or datetime.now(UTC)
+    seconds = max(0, int((end - job.started_at).total_seconds()))
+    hours, rest = divmod(seconds, 3600)
+    minutes, secs = divmod(rest, 60)
+    if hours:
+        return f"{hours} h {minutes:02d} min"
+    if minutes:
+        return f"{minutes} min {secs:02d} s"
+    return f"{secs} s"
 
 
 def _defaults(kind: str, workdir: Path) -> dict[str, str]:
@@ -114,6 +161,83 @@ def add_job_routes(
             saved_logins=SessionStore().list(),
         )
 
+    def actions(job: Job) -> list[dict[str, str]]:
+        """The job's \"…\" menu: label, link and method of each follow-up."""
+        kind = job.spec.kind
+        if kind not in _FORMS or not job.spec.form:
+            return []
+        items = [
+            {"label": "Rerun", "href": f"/jobs/{job.id}/rerun", "method": "post"},
+            {
+                "label": "Rerun with changes",
+                "href": f"/new/{kind}?" + urlencode({"from": job.id}),
+                "method": "get",
+            },
+        ]
+        scaffold = job.spec.outputs.get("scaffold")
+        if kind == "explore" and scaffold and (scaffold / SCAFFOLD_FILE).is_file():
+            items.append(
+                {
+                    "label": "Apply scaffold",
+                    "href": "/new/apply-scaffold?" + urlencode({"from": job.id}),
+                    "method": "get",
+                }
+            )
+        if kind == "run":
+            relative = _config_in_workdir(job)
+            if relative is not None:
+                items.append(
+                    {
+                        "label": "Edit config",
+                        "href": "/configs/edit?" + urlencode({"path": relative}),
+                        "method": "get",
+                    }
+                )
+        if job.spec.map_url and store.get(job.spec.map_url):
+            items.append(
+                {
+                    "label": "View map",
+                    "href": "/map?" + urlencode({"url": job.spec.map_url}),
+                    "method": "get",
+                }
+            )
+        return items
+
+    def _config_in_workdir(job: Job) -> str | None:
+        """The run's config relative to the working folder, if the editor allows it."""
+        config = job.spec.form.get("config", "").strip()
+        if not config:
+            return None
+        root = jobs.workdir.resolve()
+        target = (jobs.workdir / config).resolve()
+        if not target.is_relative_to(root):
+            return None
+        relative = target.relative_to(root).as_posix()
+        path = configs.resolve(jobs.workdir, relative)
+        return relative if path is not None and path.is_file() else None
+
+    def prefill_from(kind: str, job: Job) -> dict[str, str]:
+        """Form values for `kind`, started from an earlier job."""
+        stamp = _fresh_stamp(jobs.workdir)
+        if kind == job.spec.kind:
+            return fresh_output_form(kind, job.spec.form, jobs.workdir, stamp)
+        if kind == "apply-scaffold" and job.spec.kind == "explore":
+            scaffold = job.spec.outputs.get("scaffold")
+            if scaffold is None:
+                raise HTTPException(status_code=404)
+            source = job.spec.form
+            values = {
+                "url": source.get("url", ""),
+                "scaffold": str(scaffold / SCAFFOLD_FILE),
+                "sandbox": source.get("sandbox", ""),
+                "session": source.get("session", ""),
+            }
+            wiki = job.spec.outputs.get("wiki")
+            if wiki is not None:
+                values.update(wiki="on", wiki_dir=str(wiki))
+            return values
+        raise HTTPException(status_code=404)
+
     def known_kind(kind: str) -> None:
         if kind not in _FORMS:
             raise HTTPException(status_code=404)
@@ -131,6 +255,10 @@ def add_job_routes(
     @app.get("/new/{kind}", response_class=HTMLResponse)
     def new_job_form(kind: str, request: Request) -> HTMLResponse:
         known_kind(kind)
+        source = request.query_params.get("from")
+        if source is not None:
+            # "Rerun with changes" / "Apply scaffold" from an earlier job.
+            return form_page(kind, prefill_from(kind, get_job(source)), None)
         values = _defaults(kind, jobs.workdir)
         # Pre-fill from the query: a map page's "Explore this page again" link
         # (url), or a config editor's "Run this config" link (config).
@@ -161,7 +289,29 @@ def add_job_routes(
 
     @app.get("/jobs", response_class=HTMLResponse)
     def job_list() -> HTMLResponse:
-        return render("jobs.html", jobs=jobs.all(), status_text=_status_text)
+        return render(
+            "jobs.html",
+            jobs=jobs.all(),
+            status_text=_status_text,
+            actions=actions,
+            when=when,
+            duration=duration,
+        )
+
+    @app.post("/jobs/{job_id}/rerun")
+    def rerun(job_id: str) -> RedirectResponse:
+        job = get_job(job_id)
+        kind = job.spec.kind
+        if kind not in BUILDERS or not job.spec.form:
+            raise HTTPException(status_code=404)
+        form = fresh_output_form(
+            kind, job.spec.form, jobs.workdir, _fresh_stamp(jobs.workdir)
+        )
+        try:
+            spec = BUILDERS[kind](form, jobs.workdir)
+        except FormError as exc:  # pragma: no cover - it was valid the first time
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return RedirectResponse(f"/jobs/{jobs.start(spec).id}", status_code=303)
 
     @app.get("/jobs/{job_id}", response_class=HTMLResponse)
     def job_page(job_id: str) -> HTMLResponse:
@@ -193,6 +343,9 @@ def add_job_routes(
             outputs=outputs,
             map_href=map_href,
             status_text=_status_text(job),
+            actions=actions(job),
+            when=when,
+            duration=duration,
         )
 
     @app.get("/jobs/{job_id}/events")

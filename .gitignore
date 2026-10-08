@@ -234,3 +234,6 @@ demo/
 
 # One-off local scratch script
 _roadmap_issues.py
+
+# Default output folder of runs started from the local GUI (spoor gui).
+spoor-output/

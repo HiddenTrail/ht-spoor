@@ -121,6 +121,13 @@ There you can:
   current action and save what it mapped so far; Force stop ends any run at once.
 - **See where each run's output landed**, open its folder, open its wiki, or jump
   to the map it produced.
+- **Run a job again in one click.** The "…" menu on every job (in Jobs and on the
+  job's page) offers Rerun (same settings, fresh output folders, so the earlier
+  run's output stays), Rerun with changes (the form, already filled in), Apply
+  scaffold after an exploration that wrote one, Edit config, and View map. Jobs
+  show when they started and how long they ran.
+- **Pick folders instead of typing them.** Every folder or file field has a
+  Browse… button that lets you click through the folders on your computer.
 - **Save logins** (on the Logins page) so explore and extract runs can work as a
   logged-in user: upload a browser login file once, give it a name, then pick that
   name in the forms. Spoor stores it on your computer only and never shows its

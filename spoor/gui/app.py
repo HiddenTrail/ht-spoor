@@ -34,6 +34,7 @@ from fastapi import FastAPI, Query, Request
 from fastapi.responses import HTMLResponse, PlainTextResponse, RedirectResponse
 from starlette.responses import Response
 
+from spoor.gui.browse_routes import add_browse_routes
 from spoor.gui.job_routes import add_job_routes
 from spoor.gui.jobs import JobManager, SubprocessRunner, open_folder
 from spoor.gui.manage_routes import add_manage_routes
@@ -252,6 +253,7 @@ def create_app(
     add_job_routes(app, jobs=jobs, store=store, render=render, opener=opener)
     add_manage_routes(app, jobs=jobs, render=render)
     add_server_routes(app, jobs=jobs, render=render, health=health)
+    add_browse_routes(app, workdir=jobs.workdir)
     app.state.jobs = jobs
     return app
 
