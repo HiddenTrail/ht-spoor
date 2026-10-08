@@ -1,7 +1,9 @@
 """Spoor's shared HTML stylesheet: the exploration wiki's theme, reused by the GUI.
 
-One dark, token-driven theme (CSS custom properties for background, surface,
-border, text and accent colours) for every HTML surface Spoor renders: the §2e
+One token-driven theme (CSS custom properties for background, surface, border,
+text and accent colours), in a night and a day palette that follow the reader's
+system setting or their own choice (THEME_SCRIPT), for every HTML surface Spoor
+renders: the §2e
 wiki (`wiki.py`, where it was designed; see the slice 6h/6i notes there) and the
 §2i local GUI (`spoor/gui/templates.py`, which adds only its own form and job
 rules on top). Kept in one string so the two can't drift apart: change a token
@@ -10,6 +12,36 @@ here and both surfaces follow.
 Generic to Spoor's own output (§0): no target branding, and only system fonts,
 so nothing fails to load for a reader without them installed.
 """
+
+# Day palette: the same token names as the night palette in STYLESHEET, so every
+# rule follows. Coral, teal and yellow are deepened for white (each passes WCAG
+# AA against the day background and surfaces; see tests/test_theme.py). The
+# logo keeps its bright coral; only text uses the deeper shade.
+_DAY_TOKENS = """
+        --bg: #ffffff;
+        --surface: #faf8f6;
+        --surface-2: #f1ede9;
+        --surface-3: #e6e0da;
+        --border: #e2dcd6;
+        --border-hover: #b9b0a8;
+        --text: #1f1c1b;
+        --text-muted: #635c56;
+        --accent: #b8341f;
+        --teal: #13707a;
+        --yellow: #7a5a00;
+        color-scheme: light;
+        --night-only: none;
+        --day-only: block;
+"""
+
+# Day applies when the reader chose it (data-theme="light" on <html>, set by
+# THEME_SCRIPT), or when their system prefers light and they haven't chosen dark.
+_DAY_RULES = (
+    '      :root[data-theme="light"] {' + _DAY_TOKENS + "      }\n"
+    "      @media (prefers-color-scheme: light) {\n"
+    '        :root:not([data-theme="dark"]) {' + _DAY_TOKENS + "        }\n"
+    "      }\n"
+)
 
 STYLESHEET = """
       :root {
@@ -28,8 +60,12 @@ STYLESHEET = """
         --radius-sm: 5px;
         --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono",
           monospace;
+        color-scheme: dark;
+        /* Show an element only at night / only by day: display: var(--night-only). */
+        --night-only: block;
+        --day-only: none;
       }
-      * { box-sizing: border-box; }
+""" + _DAY_RULES + """      * { box-sizing: border-box; }
       html { scroll-behavior: smooth; }
       body {
         background: var(--bg);
@@ -216,3 +252,89 @@ STYLESHEET = """
         h1 { font-size: 1.6rem; }
       }
     """
+
+#: The day/night switch: a button with class "theme-toggle" anywhere on the page.
+TOGGLE_CSS = """
+      .theme-toggle {
+        background: transparent;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--text-muted);
+        cursor: pointer;
+        font: inherit;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-left: auto;
+        padding: 0.15rem 0.7rem;
+      }
+      .theme-toggle:hover {
+        background: transparent;
+        border-color: var(--border-hover);
+        color: var(--text);
+      }
+"""
+
+#: Markup for the switch button; THEME_SCRIPT fills in its label.
+TOGGLE_BUTTON = '<button type="button" class="theme-toggle" hidden>Day</button>'
+
+#: Runs in <head>, before the page is drawn, so a saved choice never flashes the
+#: wrong theme. With no saved choice the page follows the system setting. The
+#: choice is kept in a cookie (not tied to a port, so it survives the GUI's
+#: per-launch port) and in localStorage (which works for a wiki opened as a
+#: local file, where cookies don't). Toggling, or the system setting changing
+#: while nothing is saved, fires a "spoor-theme-change" event on `document`.
+THEME_SCRIPT = """<script>
+(() => {
+  const KEY = "spoor-theme";
+  const root = document.documentElement;
+  const system = window.matchMedia("(prefers-color-scheme: light)");
+  function saved() {
+    const match = document.cookie.match(/(?:^|; )spoor-theme=(light|dark)/);
+    if (match) return match[1];
+    try {
+      const value = localStorage.getItem(KEY);
+      return value === "light" || value === "dark" ? value : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function current() {
+    return root.dataset.theme || (system.matches ? "light" : "dark");
+  }
+  function label() {
+    const night = current() === "dark";
+    document.querySelectorAll(".theme-toggle").forEach((button) => {
+      button.textContent = night ? "\u2600 Day" : "\u263E Night";
+      button.setAttribute(
+        "aria-label", night ? "Switch to day mode" : "Switch to night mode"
+      );
+      button.hidden = false;
+    });
+  }
+  function changed() {
+    label();
+    document.dispatchEvent(new Event("spoor-theme-change"));
+  }
+  const choice = saved();
+  if (choice) root.dataset.theme = choice;
+  system.addEventListener("change", () => {
+    if (!saved()) changed();
+  });
+  document.addEventListener("DOMContentLoaded", () => {
+    label();
+    document.querySelectorAll(".theme-toggle").forEach((button) => {
+      button.addEventListener("click", () => {
+        const next = current() === "dark" ? "light" : "dark";
+        root.dataset.theme = next;
+        document.cookie =
+          KEY + "=" + next + "; path=/; max-age=31536000; SameSite=Strict";
+        try {
+          localStorage.setItem(KEY, next);
+        } catch (e) {}
+        changed();
+      });
+    });
+  });
+})();
+</script>"""
+

@@ -71,6 +71,11 @@ Feature: A local GUI browses captured maps safely
     When I request the home page with the access token
     Then the page shows the Spoor logo in the top bar and as its browser-tab icon
 
+  Scenario: Pages offer a day/night switch and follow the system by default
+    When I request the home page with the access token
+    Then the page has the day/night switch and follows the system setting
+    And the page carries the night logo and the day logo, one shown per mode
+
   Scenario: An empty store shows a getting-started message, not an error
     Given an empty map store
     When I request the home page with the access token
@@ -107,6 +112,16 @@ Feature: A local GUI browses captured maps safely
     And the page says the URL has not been mapped
 
   # --- End to end in a real browser ------------------------------------------
+
+  @browser
+  Scenario: Day and night in a real browser, remembered across GUI launches
+    Given the GUI is running on loopback
+    When a real browser set to light mode opens the launch URL
+    Then the page is in day mode with the day logo
+    When the browser switches to night mode
+    Then the page is in night mode with the night logo
+    When the GUI is restarted on another port and the browser opens it again
+    Then the page is in night mode with the night logo
 
   @browser
   Scenario: Launching the GUI and opening a mapped domain in a real browser

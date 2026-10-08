@@ -273,16 +273,21 @@ def test_saving_keeps_the_files_line_break_style(
     assert path.read_bytes() == expected
 
 
-def test_the_guis_logo_is_the_brand_file_unchanged() -> None:
-    # The GUI ships its own copy (docs/ isn't packaged); it must never drift from
-    # the canonical brand file in docs/assets/.
+@pytest.mark.parametrize(
+    ("variant", "brand_file"), [("night", "Spoor_O_B.svg"), ("day", "Spoor_B_O.svg")]
+)
+def test_the_guis_logos_are_the_brand_files_unchanged(
+    variant: str, brand_file: str
+) -> None:
+    # The GUI ships its own copies (docs/ isn't packaged); they must never drift
+    # from the canonical brand files in docs/assets/.
     import base64
 
-    from spoor.gui.templates import logo_data_uri
+    from spoor.gui.templates import LOGOS, logo_data_uri
 
     root = Path(__file__).resolve().parent.parent
-    brand = (root / "docs" / "assets" / "Spoor_O_B.svg").read_bytes()
-    shipped = (root / "spoor" / "gui" / "assets" / "spoor-logo.svg").read_bytes()
+    brand = (root / "docs" / "assets" / brand_file).read_bytes()
+    shipped = (root / "spoor" / "gui" / "assets" / LOGOS[variant]).read_bytes()
     assert shipped == brand
     prefix = "data:image/svg+xml;base64,"
-    assert logo_data_uri() == prefix + base64.b64encode(brand).decode("ascii")
+    assert logo_data_uri(variant) == prefix + base64.b64encode(brand).decode("ascii")

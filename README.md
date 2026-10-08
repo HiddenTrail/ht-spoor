@@ -131,6 +131,9 @@ There you can:
   configuration for Claude or another AI client. That configuration points the
   client at the maps this GUI uses, wherever the client starts it.
 
+The GUI (and the wiki) follow your computer's light or dark setting; the Day/Night
+button at the top right switches between them, and the choice is remembered.
+
 Secrets Spoor captured are shown as `[REDACTED]` in the GUI's maps and run logs,
 just as `spoor serve` returns them. The config editor is the one exception: it shows
 your own config file exactly as it is on disk, because hiding a token there would
