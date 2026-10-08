@@ -323,9 +323,11 @@ spoor explore https://example.com --max-states 200 --max-requests 1000 --max-sec
 Spoor opens the page in a real browser, discovers the interactive elements it can
 find on each screen (buttons, links, form controls), waits for the page to finish
 settling, tries each one, and records where it leads — building a graph of the
-site's states and the transitions between them. "Settling" means both the DOM and
-any in-flight page requests have been quiet for a short window, so Spoor reads the
-fully-rendered screen rather than a mid-hydration snapshot. If the page never
+site's states and the transitions between them. "Settling" means the page has
+stopped changing for a short window: no changes to the page, no requests still in
+flight, no pop-up alert still showing, and no loading spinner still on screen (a
+progress bar that shows a value, like a gauge, doesn't count). So Spoor reads the
+fully-rendered screen rather than a loading screen or a mid-hydration snapshot. If the page never
 reaches that quiet point before the safety timeout, Spoor records the state as
 unsettled and continues on the last snapshot instead of hanging. It recognizes a
 screen it has already seen, so it maps the site instead of looping forever, and
