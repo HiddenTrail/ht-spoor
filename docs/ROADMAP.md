@@ -399,6 +399,28 @@ The same race would also record a spinner screen as the destination of any click
 
 *Cost:* each reset now waits out the app's own loading time (about 0.5 s here), plus the usual quiet window.
 
+**Sub-slice 7h — a disabled control is reported as disabled, not as covered or missing.** *Shipped.* Found while following up the 7g report: after 7g, the same app still had two actions skipped as "not located after replay" (EXPLORE RESULTS, EXPORT DATA).
+
+*The cause, measured on the live app.* On the start screen both buttons are **disabled**: a native `disabled` attribute, with MUI's `pointer-events: none`. They are visible and in the accessibility tree, so discovery lists them, and the relocation found each one. But the actuation hit-test (`elementFromPoint` at the centre) looks straight through a disabled control to the element underneath, so `classify` read it as **COVERED**. That handed off to layer recovery (7c), whose candidates are simply the first actuatable, gate-permitted actions in document order. So on each of three replay attempts per button, recovery clicked an unrelated action (SETTINGS) to "uncover" it. That navigated away, the button then really was gone, and the skip finally read "not located after replay": wrong on its face, and it fired pointless clicks on the operator's app. The safety gate still applied to those clicks, but with `--sandbox` the first actuatable action could have been anything.
+
+*The fix.*
+- A fourth actuation verdict, **DISABLED**, decided before the hit-test. `classify` gains `disabled: bool = False`, and disabled outranks covered.
+- The live probe reports it when the element `matches(':disabled')` (a native disabled control, including inside a disabled `<fieldset>`) or sits inside `[aria-disabled="true"]`.
+- The explorer treats it as stable: no replay retries and no recovery clicks on its behalf. It records the skip as `actuation.DISABLED_SKIP_REASON` ("disabled on this screen").
+- `perform`/`fill` raise the new `ElementDisabled`, and a replay step that is now disabled is a divergence.
+- `spoor explore`'s summary counts these separately ("N disabled on the screen where they were found"), not as "could not be reached or performed".
+
+Nothing is lost: `disabled` is already a state-bearing attribute in state identity (§2e), so a screen where the same button is *enabled* is a different state, and it is explored there.
+
+*Pinned by:*
+- `exploration_actuation.feature`: disabled, including disabled-under-another-element, gives DISABLED;
+- `exploration_recovery.feature`: flagged disabled on this screen, and no other action fired while trying to reach it, checked by recording every action the fake driver fires;
+- `exploration_actuation_live.feature`: a native disabled button with `pointer-events: none`, an `aria-disabled` button and a button in a disabled fieldset are each reported disabled, and none is clicked;
+- a CLI summary test;
+- the reporting app re-explored with the same command for the same 3 minutes. Before: 11 states, 12 transitions, 2 skipped as "not located after replay". After: 12 states, 13 transitions, 2 skipped as "disabled on this screen". The time saved on retries and recovery clicks went into mapping.
+
+The two buttons also appear on three later screens, which the 3-minute budget didn't reach before it ran out, so whether they are enabled there wasn't exercised.
+
 **Design (not yet built) — §2e second-round interactive exploration: a map-generated config, subtractive permissions, sandbox-only destructive scope.** Exploration mode above (slices 6–8) is read-only: it discovers, observes, and maps, but never types into a field, logs in, or fires a destructive action outside a sandbox. This note captures the agreed shape of the *next* exploration capability — a **second, opt-in round** that goes further using a **config the first run generates for that specific site** — so the design and, above all, its safety boundary are locked in before any code. It is not built yet; when built it follows the BDD-first workflow like everything else, and it stays gated behind the read-only-mode-exit prerequisites already tracked in §9 (keyword-list localization, input-data provisioning). It pairs with the anchored depth-relative *resume* capability in the design note immediately below — the two are the intended shape of §2e "v2."
 
 *The loop.* Round one is today's read-only autonomous crawl, producing the state-action map (§2e) and wiki. From that map Spoor **scaffolds a starter config matched to the site**: the actions it discovered, the input fields it saw (each with an inferred type/generator and an example, per the §9 input-data-provisioning seam), the points where a login is required, and every action its safety heuristic flagged destructive (and whether it was skipped for being off-sandbox). The user reviews and fills that config — supplying a session, pinning specific input values, and opting in per-action to what round two may touch — and round two re-runs, now able to authenticate, fill forms, and (only where the sandbox rule already allows it) exercise state-changing flows, complementing the map with the states only reachable past a login or a form.

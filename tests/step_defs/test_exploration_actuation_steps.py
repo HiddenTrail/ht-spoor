@@ -50,6 +50,19 @@ def click_point_is(context: dict[str, Any], observed: str) -> None:
             point_hits_target=False,
             covering=CoveringElement("generic", ""),
         )
+    elif observed == "a disabled target":
+        context["verdict"] = classify(
+            located=True, point_hits_target=False, covering=None, disabled=True
+        )
+    elif observed == "a disabled target under another element":
+        # What the browser reports for a disabled control: the click point resolves
+        # to what is underneath. Disabled must still win over "covered".
+        context["verdict"] = classify(
+            located=True,
+            point_hits_target=False,
+            covering=CoveringElement("generic", "toolbar"),
+            disabled=True,
+        )
     else:
         raise AssertionError(f"unrecognised observation: {observed!r}")
 

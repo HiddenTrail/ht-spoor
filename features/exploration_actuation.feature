@@ -40,6 +40,11 @@ Feature: The explorer classifies whether a discovered element can be actuated
       # "no element" — the accessibility tree has no node for this element at all
       # (e.g. it was removed from the page), so there is nothing to click.
       | button | Missing | no element                  | not located |
+      # "disabled" — the element is there but can't be clicked in this state (a native
+      # disabled control, or aria-disabled). That is checked before the hit-test, since
+      # the browser looks straight through a disabled control to what is underneath.
+      | button | Export  | a disabled target           | disabled    |
+      | button | Export  | a disabled target under another element | disabled |
 
   Scenario: A covered verdict names the layer's role and text, for recovery to use
     # The covered signal is not just "blocked": it carries what is on top (its role and

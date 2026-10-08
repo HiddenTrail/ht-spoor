@@ -61,7 +61,12 @@ from urllib.parse import urlparse
 import numpy as np
 
 from spoor.core.visual import hamming_distance
-from spoor.exploration.actuation import ActuationVerdict, CoveringElement, Verdict
+from spoor.exploration.actuation import (
+    DISABLED_SKIP_REASON,
+    ActuationVerdict,
+    CoveringElement,
+    Verdict,
+)
 from spoor.exploration.capture import StateSignals, diff_signals
 from spoor.exploration.control import RunController
 from spoor.exploration.dedup import UndecodableImage, decode, find_subimage
@@ -155,14 +160,30 @@ class ElementNotLocated(ActionError):
         self.name = name
 
 
+class ElementDisabled(ActionError):
+    """The element is present but disabled in this state, so it can't be clicked (§2e).
+
+    Distinct from `ElementCovered`: nothing is on top of it; the browser simply won't
+    activate it (and looks through it to what is underneath). Recovery must not try to
+    "uncover" it by clicking other actions. The explorer records it as skipped,
+    disabled on this screen; where it is enabled it is a different state.
+    """
+
+    def __init__(self, role: str, name: str) -> None:
+        super().__init__(f"{role} {name!r} is disabled")
+        self.role = role
+        self.name = name
+
+
 class ElementNotEditable(ActionError):
     """`fill` clicked and typed into an element whose value never changed (§2e, #131).
 
-    A read-only or disabled field takes a click and swallows keystrokes without
+    A read-only field takes a click and swallows keystrokes without
     updating its value — the click and the typing both "succeed" from the driver's
     point of view, so this is the only honest way to tell a real fill from one the
     page silently ignored. Raised by `fill`, never `perform`, since `perform` never
-    checks for a resulting value change.
+    checks for a resulting value change. A *disabled* field never gets this far: it
+    is refused before any click, as `ElementDisabled`.
     """
 
     def __init__(self, role: str, name: str) -> None:
@@ -491,6 +512,7 @@ class _Reach(Enum):
     PROCEED = "proceed"  # actuatable now (possibly after a layer was cleared)
     BLOCKED = "blocked"  # covered by a layer nothing available could clear
     NOT_LOCATED = "not located"  # no matching element — gone, not covered
+    DISABLED = "disabled"  # present but disabled here — stable, not covered
 
 
 @dataclass(frozen=True)
@@ -876,6 +898,9 @@ def explore(
             return _Reachability(_Reach.PROCEED)
         if verdict.verdict is Verdict.NOT_LOCATED:
             return _Reachability(_Reach.NOT_LOCATED)
+        if verdict.verdict is Verdict.DISABLED:
+            # Not covered: nothing to clear, so no recovery clicks on its behalf.
+            return _Reachability(_Reach.DISABLED)
         covering = verdict.covering
         cleared = _describe(covering)
         attempted: set[tuple[str, str]] = set()
@@ -895,6 +920,8 @@ def explore(
                 return _Reachability(_Reach.PROCEED, recovered_via=cleared)
             if verdict.verdict is Verdict.NOT_LOCATED:
                 return _Reachability(_Reach.NOT_LOCATED)
+            if verdict.verdict is Verdict.DISABLED:
+                return _Reachability(_Reach.DISABLED)
             covering = verdict.covering or covering
         return _Reachability(_Reach.BLOCKED, blocker=_describe(covering))
 
@@ -925,6 +952,10 @@ def explore(
                 raise _ReplayFailure(
                     f"replay could not reach {step.action.name!r}: "
                     f"blocked by {outcome.blocker}"
+                )
+            if outcome.status is _Reach.DISABLED:
+                raise _ReplayFailure(
+                    f"replay could not reach {step.action.name!r}: disabled"
                 )
             driver.perform(step.action)
             if state_id(driver.state_html()) != step.to_state:
@@ -961,7 +992,8 @@ def explore(
                     f"{action.role} {action.name!r} not located after replay"
                 )
                 continue
-            return outcome  # PROCEED (reachable) or BLOCKED (stable — do not retry)
+            # PROCEED (reachable), or BLOCKED / DISABLED (stable — do not retry).
+            return outcome
         assert last is not None  # the loop ran at least once, so a failure was recorded
         raise ActionError(last.reason(_MAX_REPLAY_ATTEMPTS))
 
@@ -1058,6 +1090,9 @@ def explore(
                         action,
                         f"blocked by an unresolved layer: {outcome.blocker}",
                     )
+                    continue
+                if outcome.status is _Reach.DISABLED:
+                    graph.record_skip(state, action, DISABLED_SKIP_REASON)
                     continue
                 # Capture the free signals either side of the action so the transition
                 # records what it changed (§2e sub-slice 5c). `before` is taken after

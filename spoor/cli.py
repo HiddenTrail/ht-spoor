@@ -688,6 +688,7 @@ def explore(
     typer.echo(f"  transitions:       {len(graph.transitions)}")
     typer.echo(f"  actions skipped:   {len(graph.skipped)}")
     if graph.skipped:
+        from spoor.exploration.actuation import DISABLED_SKIP_REASON
         from spoor.exploration.safety import DESTRUCTIVE_SKIP_REASON
 
         # An action can be skipped for two unrelated reasons, and only one of them
@@ -698,11 +699,20 @@ def explore(
         destructive = sum(
             1 for skip in graph.skipped if skip.reason == DESTRUCTIVE_SKIP_REASON
         )
-        other = len(graph.skipped) - destructive
+        # A control disabled on the screen where it was found is neither: it isn't
+        # missing or unreachable, it just can't be clicked there.
+        disabled = sum(
+            1 for skip in graph.skipped if skip.reason == DISABLED_SKIP_REASON
+        )
+        other = len(graph.skipped) - destructive - disabled
         if destructive and not sandbox:
             typer.echo(
                 f"  ({destructive} destructive, skipped — this target is not a "
                 "declared sandbox)"
+            )
+        if disabled:
+            typer.echo(
+                f"  ({disabled} disabled on the screen where they were found)"
             )
         if other:
             typer.echo(

@@ -50,6 +50,23 @@ Feature: The live driver actuates elements reliably and detects covered ones
     Then the driver reports the element as covered
     And the fixture records that the overlay was not activated
 
+  Scenario Outline: A disabled control is reported disabled and never clicked
+    # Visible and in the accessibility tree, but not clickable here: a native disabled
+    # button (styled pointer-events: none, as component libraries do), an
+    # aria-disabled one (which would still receive a click), and a button inside a
+    # disabled fieldset. The driver must say "disabled" (not "covered" by whatever is
+    # underneath) and must not click it.
+    Given a live browser on the actuation fixture "explore_actuation.html"
+    When I try to actuate the "button" named "<name>"
+    Then the driver reports the element as disabled
+    And the fixture records that nothing was clicked
+
+    Examples:
+      | name            |
+      | Export data     |
+      | Explore results |
+      | Save draft      |
+
   Scenario: The driver runs at a fixed, known viewport for reproducibility
     Given a live browser on the actuation fixture "explore_actuation.html"
     Then the live page reports a fixed viewport

@@ -17,7 +17,7 @@ from pytest_bdd import given, parsers, scenarios, then, when
 
 from spoor.exploration.discovery import ActionableElement
 from spoor.exploration.driver import PlaywrightDriver
-from spoor.exploration.explorer import ElementCovered
+from spoor.exploration.explorer import ElementCovered, ElementDisabled
 
 scenarios("exploration_actuation_live.feature")
 
@@ -74,6 +74,19 @@ def records_clicked(context: dict[str, Any], name: str) -> None:
 def reports_covered(context: dict[str, Any]) -> None:
     error = context.get("error")
     assert isinstance(error, ElementCovered), f"expected ElementCovered, got {error!r}"
+
+
+@then("the driver reports the element as disabled")
+def reports_disabled(context: dict[str, Any]) -> None:
+    error = context.get("error")
+    assert isinstance(error, ElementDisabled), (
+        f"expected ElementDisabled, got {error!r}"
+    )
+
+
+@then("the fixture records that nothing was clicked")
+def nothing_clicked(context: dict[str, Any]) -> None:
+    assert _evaluate(context, "() => window.__clicked") is None
 
 
 @then("the fixture records that the overlay was not activated")

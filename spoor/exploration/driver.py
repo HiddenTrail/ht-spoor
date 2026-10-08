@@ -92,6 +92,7 @@ from spoor.exploration.discovery import ActionableElement
 from spoor.exploration.explorer import (
     ActionError,
     ElementCovered,
+    ElementDisabled,
     ElementNotEditable,
     ElementNotLocated,
 )
@@ -273,6 +274,11 @@ _VIEWPORT_HEIGHT = 800
 # best-effort description of what is on top, for the covered flag and recovery (7c).
 _ACTUATION_PROBE_JS = """
 function() {
+  // A disabled control can't be clicked here, and the hit-test would look straight
+  // through it to what is underneath (reading as "covered"), so say so first (§2e).
+  if (this.matches(':disabled') || this.closest('[aria-disabled="true"]') !== null) {
+    return {disabled: true, hitsTarget: false, covering: null, cx: null, cy: null};
+  }
   this.scrollIntoView({block: 'center', inline: 'center'});
   const r = this.getBoundingClientRect();
   if (r.width === 0 && r.height === 0) {
@@ -1005,6 +1011,8 @@ class PlaywrightDriver:
         verdict, cx, cy = self._actuation(action)
         if verdict.verdict is Verdict.NOT_LOCATED:
             raise ElementNotLocated(action.role, action.name)
+        if verdict.verdict is Verdict.DISABLED:
+            raise ElementDisabled(action.role, action.name)
         if verdict.verdict is Verdict.COVERED:
             assert verdict.covering is not None  # COVERED always carries the layer
             raise ElementCovered(verdict.covering.role, verdict.covering.text)
@@ -1046,6 +1054,8 @@ class PlaywrightDriver:
         verdict, cx, cy = self._actuation(action)
         if verdict.verdict is Verdict.NOT_LOCATED:
             raise ElementNotLocated(action.role, action.name)
+        if verdict.verdict is Verdict.DISABLED:
+            raise ElementDisabled(action.role, action.name)
         if verdict.verdict is Verdict.COVERED:
             assert verdict.covering is not None
             raise ElementCovered(verdict.covering.role, verdict.covering.text)
@@ -1107,6 +1117,11 @@ class PlaywrightDriver:
             # id, so it cannot be actuated by coordinate. Either way it is gone.
             return ActuationVerdict(Verdict.NOT_LOCATED), None, None
         probe = self._probe_click_point(page, target.backend_node_id)
+        if probe.get("disabled"):
+            verdict = classify(
+                located=True, point_hits_target=False, covering=None, disabled=True
+            )
+            return verdict, None, None
         cx, cy = probe["cx"], probe["cy"]
         if cx is None or cy is None:
             # The element resolved but offers no clickable point (zero-size, or its
